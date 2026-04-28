@@ -2,2229 +2,1665 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Movie Night</title>
-<!-- PWA -->
-<link rel="manifest" href="manifest.json">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Movie Night">
-<meta name="theme-color" content="#0d0d1a">
-<link rel="apple-touch-icon" href="icon.png">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#faf7f2">
+<title>Hum</title>
+<link rel="manifest" id="pwa-manifest">
+<meta name="apple-mobile-web-app-title" content="Hum">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<script>
+// Inline manifest (no separate file needed)
+const manifest = {
+  name: "Hum",
+  short_name: "Hum",
+  description: "Capture before it fades",
+  start_url: "./",
+  display: "standalone",
+  background_color: "#faf7f2",
+  theme_color: "#faf7f2",
+  orientation: "portrait-primary",
+  icons: [
+    { src: "data:image/svg+xml," + encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' fill='%23faf7f2' rx='42'/><circle cx='96' cy='96' r='52' fill='%23e8a87c'/><rect x='87' y='60' width='18' height='42' rx='9' fill='white'/><path d='M72 96a24 24 0 0048 0' stroke='white' stroke-width='5' stroke-linecap='round' fill='none'/><line x1='96' y1='120' x2='96' y2='132' stroke='white' stroke-width='5' stroke-linecap='round'/><line x1='82' y1='138' x2='110' y2='138' stroke='white' stroke-width='5' stroke-linecap='round'/></svg>`), sizes: "192x192", type: "image/svg+xml" },
+    { src: "data:image/svg+xml," + encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' fill='%23faf7f2' rx='112'/><circle cx='256' cy='256' r='138' fill='%23e8a87c'/><rect x='232' y='162' width='48' height='110' rx='24' fill='white'/><path d='M192 256a64 64 0 00128 0' stroke='white' stroke-width='13' stroke-linecap='round' fill='none'/><line x1='256' y1='320' x2='256' y2='352' stroke='white' stroke-width='13' stroke-linecap='round'/><line x1='218' y1='366' x2='294' y2='366' stroke='white' stroke-width='13' stroke-linecap='round'/></svg>`), sizes: "512x512", type: "image/svg+xml" }
+  ]
+};
+const blob = new Blob([JSON.stringify(manifest)], {type:'application/json'});
+document.getElementById('pwa-manifest').href = URL.createObjectURL(blob);
+
+// Apple touch icon (inline SVG → PNG via canvas would require more code; SVG works on modern iOS)
+const appleIcon = document.createElement('link');
+appleIcon.rel = 'apple-touch-icon';
+appleIcon.href = "data:image/svg+xml," + encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect width='180' height='180' fill='%23faf7f2' rx='38'/><circle cx='90' cy='90' r='50' fill='%23e8a87c'/><rect x='82' y='56' width='16' height='38' rx='8' fill='white'/><path d='M67 90a23 23 0 0046 0' stroke='white' stroke-width='4.5' stroke-linecap='round' fill='none'/><line x1='90' y1='113' x2='90' y2='124' stroke='white' stroke-width='4.5' stroke-linecap='round'/><line x1='77' y1='129' x2='103' y2='129' stroke='white' stroke-width='4.5' stroke-linecap='round'/></svg>`);
+document.head.appendChild(appleIcon);
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&family=Geist:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: #0d0d1a; color: #f0f0f0; font-family: 'DM Sans', sans-serif; }
-  ::-webkit-scrollbar { width: 4px; }
-  ::-webkit-scrollbar-thumb { background: #2a2a3a; border-radius: 4px; }
+:root {
+  --paper: #faf7f2;
+  --paper2: #f3eee5;
+  --paper3: #ebe5d9;
+  --paper4: #e0d9c9;
+  --ink: #2a2622;
+  --ink2: #6a635a;
+  --ink3: #a8a195;
+  --ink4: #d2ccbf;
+  --warm: #e8a87c;       /* peachy capture button */
+  --warm2: #d68f5e;
+  --warm-soft: #fae5d6;
+  --sage: #88a896;
+  --sage-soft: #e2ece6;
+  --rose: #c47878;
+  --rose-soft: #f5e0e0;
+  --plum: #9580a8;
+  --plum-soft: #ebe4f0;
+  --sky: #7fa0c0;
+  --sky-soft: #e0e9f2;
+  --sand: #c69968;
+  --sand-soft: #f3e7d4;
+  --moss: #94a878;
+  --moss-soft: #e8edd9;
+  --serif: 'Newsreader', Georgia, serif;
+  --sans: 'Geist', system-ui, -apple-system, sans-serif;
+  --r: 12px;
+  --r2: 18px;
+  --r3: 26px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { height: 100%; }
+body {
+  height: 100%;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-weight: 400;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
 
-  .app { max-width: 480px; margin: 0 auto; min-height: 100vh; padding-bottom: 80px; }
+#app { display: flex; height: 100dvh; height: 100vh; }
 
-  .header { padding: 22px 18px 12px; border-bottom: 1px solid rgba(255,255,255,0.08); }
-  .header h1 { font-family: 'Bebas Neue', cursive; font-size: 32px; letter-spacing: 2px; line-height: 1; }
-  .header h1 span.gold { color: #F5C518; }
-  .header p { color: #555; font-size: 11px; }
-  .header-grid {
-    display: grid;
-    grid-template-columns: 1fr auto auto;
-    grid-template-rows: auto auto;
-    column-gap: 14px;
-    row-gap: 3px;
-    align-items: baseline;
-    margin-top: 3px;
+/* ── SIDEBAR ── */
+#sidebar {
+  width: 230px; min-width: 230px;
+  background: var(--paper2);
+  border-right: 1px solid var(--paper4);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.sidebar-top { padding: 26px 20px 18px; }
+.brand-wrap { display: flex; align-items: baseline; gap: 5px; }
+.brand {
+  font-family: var(--serif);
+  font-size: 28px;
+  font-weight: 500;
+  color: var(--ink);
+  letter-spacing: -0.015em;
+  line-height: 1;
+}
+.brand-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--warm);
+  display: inline-block;
+}
+.brand-sub {
+  font-size: 11px;
+  color: var(--ink3);
+  margin-top: 6px;
+  letter-spacing: 0.02em;
+  font-weight: 400;
+}
+
+.view-tabs {
+  margin: 14px 14px 0;
+  background: var(--paper3);
+  border-radius: 10px;
+  padding: 3px;
+  display: flex;
+  gap: 2px;
+}
+.view-tab {
+  flex: 1; padding: 6px 10px;
+  border-radius: 8px;
+  font-family: var(--sans); font-size: 11px; font-weight: 400;
+  background: transparent; border: none;
+  color: var(--ink2); cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  display: flex; align-items: center; justify-content: center; gap: 5px;
+}
+.view-tab.active { background: white; color: var(--ink); box-shadow: 0 1px 2px rgba(42,38,34,0.04); }
+.view-tab svg { width: 12px; height: 12px; }
+
+.sidebar-scroll { flex: 1; overflow-y: auto; padding: 14px 10px; }
+.sidebar-scroll::-webkit-scrollbar { width: 0; }
+
+.nav-section { margin-bottom: 18px; }
+.nav-label {
+  font-size: 10px; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--ink3);
+  padding: 0 10px; margin-bottom: 4px; display: block;
+  font-weight: 500;
+}
+
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 13px; font-weight: 400;
+  color: var(--ink2);
+  transition: background 0.15s, color 0.15s;
+  user-select: none;
+}
+.nav-item:hover { background: var(--paper3); color: var(--ink); }
+.nav-item.active { background: white; color: var(--ink); box-shadow: 0 1px 2px rgba(42,38,34,0.04); }
+.nav-item .ni-icon { width: 16px; height: 16px; opacity: 0.7; flex-shrink: 0; }
+.nav-item.active .ni-icon { opacity: 1; }
+.nav-item .ni-count { margin-left: auto; font-size: 11px; color: var(--ink3); font-variant-numeric: tabular-nums; }
+.proj-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+
+/* ── HEATMAP ── */
+.heatmap-wrap {
+  margin: 0 14px 18px;
+  padding: 12px 12px 10px;
+  background: var(--paper3);
+  border-radius: 12px;
+}
+.heatmap-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  margin-bottom: 8px;
+}
+.heatmap-title { font-size: 11px; font-weight: 500; color: var(--ink2); letter-spacing: 0.02em; }
+.heatmap-sub { font-size: 10px; color: var(--ink3); font-variant-numeric: tabular-nums; }
+
+.heatmap-grid {
+  display: flex;
+  flex-direction: row;
+  gap: 2px;
+  overflow: hidden;
+  width: 100%;
+}
+.hm-week {
+  display: flex; flex-direction: column;
+  gap: 2px; flex: 1; min-width: 0;
+}
+.hm-cell {
+  width: 100%; aspect-ratio: 1;
+  border-radius: 3px;
+  background: var(--paper);
+  border: 0.5px solid rgba(0,0,0,0.05);
+  cursor: pointer;
+  transition: border-color 0.12s;
+  position: relative; z-index: 1;
+}
+.hm-cell:hover { border-color: var(--ink3); z-index: 2; opacity: 0.85; }
+.hm-cell.hidden-day { visibility: hidden; cursor: default; }
+.hm-l1 { background: #f7e6d4; }
+.hm-l2 { background: #f0c499; }
+.hm-l3 { background: #e8a87c; }
+.hm-l4 { background: #d68f5e; }
+.hm-cell.today { box-shadow: 0 0 0 1.5px var(--ink2); }
+.hm-cell.selected { box-shadow: 0 0 0 1.5px var(--ink); }
+
+.heatmap-foot {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-top: 8px;
+  font-size: 9.5px; color: var(--ink3);
+}
+.heatmap-scale { display: flex; align-items: center; gap: 3px; }
+.heatmap-scale-cell { width: 9px; height: 9px; border-radius: 2px; }
+
+.hm-tooltip {
+  position: fixed;
+  background: var(--ink); color: white;
+  font-size: 10.5px;
+  padding: 5px 9px;
+  border-radius: 6px;
+  pointer-events: none;
+  z-index: 250;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.1s;
+  font-variant-numeric: tabular-nums;
+}
+.hm-tooltip.show { opacity: 1; }
+
+.heatmap-clear {
+  font-size: 10px; color: var(--ink3);
+  background: none; border: none; cursor: pointer;
+  padding: 0; font-family: var(--sans);
+  text-decoration: underline; text-decoration-color: var(--paper4);
+  text-underline-offset: 2px;
+}
+.heatmap-clear:hover { color: var(--warm2); text-decoration-color: var(--warm); }
+
+.sidebar-bottom { padding: 14px 10px; border-top: 1px solid var(--paper4); }
+#new-proj-btn {
+  width: 100%; padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px dashed var(--ink4);
+  background: transparent;
+  font-family: var(--sans); font-size: 12px; font-weight: 400;
+  color: var(--ink3); cursor: pointer;
+  transition: all 0.18s;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+#new-proj-btn:hover {
+  border-color: var(--warm2);
+  color: var(--warm2);
+  background: var(--warm-soft);
+}
+
+/* ── MAIN ── */
+#main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+
+#topbar {
+  padding: 18px 24px 14px;
+  display: flex; align-items: center; gap: 14px;
+  border-bottom: 1px solid var(--paper4);
+}
+#view-title {
+  font-family: var(--serif); font-size: 22px; font-weight: 500;
+  color: var(--ink); flex: 1;
+  letter-spacing: -0.01em;
+}
+#search-wrap { position: relative; }
+#search-input {
+  background: var(--paper2);
+  border: 1px solid var(--paper4);
+  border-radius: 100px;
+  padding: 8px 14px 8px 34px;
+  font-family: var(--sans); font-size: 13px; font-weight: 400;
+  color: var(--ink); width: 200px; outline: none;
+  transition: border 0.15s, width 0.2s, background 0.15s;
+}
+#search-input:focus { border-color: var(--warm); width: 260px; background: white; }
+#search-input::placeholder { color: var(--ink3); }
+.search-icon-svg { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); width: 13px; height: 13px; color: var(--ink3); pointer-events: none; }
+
+#mob-menu { display: none; }
+
+/* ── CAPTURE AREA — THE STAR ── */
+#capture-area {
+  padding: 26px 24px 22px;
+  border-bottom: 1px solid var(--paper4);
+  display: flex; align-items: flex-end; gap: 18px;
+  background: linear-gradient(180deg, rgba(232,168,124,0.05) 0%, transparent 100%);
+}
+
+#capture-btn {
+  position: relative;
+  width: 64px; height: 64px;
+  border-radius: 50%;
+  border: none;
+  background: var(--warm);
+  cursor: pointer;
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  transition: transform 0.2s cubic-bezier(0.34,1.56,0.64,1), background 0.2s, box-shadow 0.2s;
+  box-shadow:
+    0 0 0 0 rgba(232,168,124,0.4),
+    0 4px 16px rgba(214,143,94,0.25),
+    inset 0 1px 0 rgba(255,255,255,0.3);
+  animation: idle 3.2s ease-in-out infinite;
+}
+@keyframes idle {
+  0%,100% { box-shadow: 0 0 0 0 rgba(232,168,124,0.35), 0 4px 16px rgba(214,143,94,0.25), inset 0 1px 0 rgba(255,255,255,0.3); }
+  50% { box-shadow: 0 0 0 7px rgba(232,168,124,0.08), 0 4px 18px rgba(214,143,94,0.3), inset 0 1px 0 rgba(255,255,255,0.3); }
+}
+#capture-btn:hover {
+  transform: scale(1.06);
+  background: var(--warm2);
+  animation: none;
+  box-shadow: 0 0 0 8px rgba(232,168,124,0.15), 0 6px 22px rgba(214,143,94,0.35), inset 0 1px 0 rgba(255,255,255,0.3);
+}
+#capture-btn.recording {
+  background: var(--rose);
+  animation: rec-pulse 1.6s ease-in-out infinite;
+}
+@keyframes rec-pulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(196,120,120,0.4), 0 4px 16px rgba(196,120,120,0.3); }
+  50% { box-shadow: 0 0 0 14px rgba(196,120,120,0), 0 4px 20px rgba(196,120,120,0.4); }
+}
+
+/* Mic icon */
+.btn-icon {
+  width: 24px; height: 24px;
+  color: white;
+  transition: opacity 0.15s, transform 0.2s;
+}
+.btn-icon.hidden { display: none; }
+.btn-stop { width: 16px; height: 16px; border-radius: 3px; background: white; }
+
+.capture-right { flex: 1; display: flex; flex-direction: column; gap: 9px; min-width: 0; }
+.capture-label {
+  font-size: 11px; color: var(--ink3);
+  letter-spacing: 0.04em;
+  display: flex; align-items: center; gap: 6px;
+}
+.capture-label-strong { color: var(--warm2); font-weight: 500; }
+
+#quick-input {
+  width: 100%;
+  background: white;
+  border: 1px solid var(--paper4);
+  border-radius: 14px;
+  padding: 12px 16px;
+  font-family: var(--sans); font-size: 14px; font-weight: 400;
+  color: var(--ink); outline: none; resize: none; height: 46px;
+  line-height: 1.55; transition: border 0.15s, height 0.22s, box-shadow 0.15s;
+}
+#quick-input:focus {
+  border-color: var(--warm);
+  height: 100px;
+  box-shadow: 0 0 0 4px rgba(232,168,124,0.1);
+}
+#quick-input::placeholder { color: var(--ink3); font-style: normal; }
+
+.attach-row { display: flex; gap: 6px; align-items: center; }
+.attach-btn {
+  height: 30px; padding: 0 12px;
+  border-radius: 100px;
+  border: 1px solid var(--paper4);
+  background: white;
+  font-family: var(--sans); font-size: 11.5px; font-weight: 400;
+  color: var(--ink2); cursor: pointer;
+  transition: all 0.15s;
+  display: flex; align-items: center; gap: 5px;
+}
+.attach-btn:hover { border-color: var(--warm); color: var(--warm2); background: var(--warm-soft); }
+.attach-btn svg { width: 13px; height: 13px; }
+
+/* ── CONTENT ── */
+#content { flex: 1; overflow-y: auto; padding: 20px 24px; }
+#content::-webkit-scrollbar { width: 5px; }
+#content::-webkit-scrollbar-thumb { background: var(--paper4); border-radius: 3px; }
+
+/* ── GRID VIEW ── */
+.cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 12px; }
+.card {
+  background: white;
+  border: 1px solid var(--paper4);
+  border-radius: var(--r2);
+  padding: 16px 18px;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.18s, transform 0.15s;
+  position: relative; overflow: hidden;
+}
+.card:hover {
+  border-color: var(--ink4);
+  box-shadow: 0 4px 16px rgba(42,38,34,0.06);
+  transform: translateY(-1px);
+}
+.card-accent { position: absolute; left: 0; top: 0; bottom: 0; width: 3px; }
+.card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 7px; }
+.card-title { font-family: var(--serif); font-size: 16px; font-weight: 500; line-height: 1.3; color: var(--ink); letter-spacing: -0.005em; }
+
+.type-pill {
+  font-size: 10px; letter-spacing: 0.02em;
+  padding: 3px 8px 3px 7px; border-radius: 100px;
+  flex-shrink: 0; font-weight: 500;
+  display: inline-flex; align-items: center; gap: 4px;
+  text-transform: lowercase;
+}
+.type-pill svg { width: 10px; height: 10px; }
+.tp-audio   { background: var(--rose-soft); color: #8a4a4a; }
+.tp-text    { background: var(--sage-soft); color: #4d6f5e; }
+.tp-idea    { background: var(--warm-soft); color: #966238; }
+.tp-dream   { background: var(--plum-soft); color: #6a5587; }
+.tp-photo   { background: var(--sky-soft); color: #4d6c8a; }
+.tp-video   { background: var(--moss-soft); color: #5e7548; }
+.tp-midi    { background: var(--sand-soft); color: #876538; }
+
+.card-preview {
+  font-size: 13px; color: var(--ink2); line-height: 1.6;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+  margin-bottom: 10px;
+}
+.card-wave { height: 28px; display: flex; align-items: center; gap: 2px; margin-bottom: 10px; }
+.wbar { border-radius: 2px; background: var(--rose); opacity: 0.5; width: 3px; flex-shrink: 0; }
+.card-photo { width: 100%; max-height: 130px; object-fit: cover; border-radius: 10px; margin-bottom: 10px; }
+
+.card-foot { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.card-date { font-size: 11px; color: var(--ink3); }
+.card-tag { font-size: 11px; color: var(--ink3); background: var(--paper2); padding: 2px 8px; border-radius: 100px; }
+.card-dur { font-size: 11px; color: var(--ink3); margin-left: auto; font-variant-numeric: tabular-nums; }
+.card-bpm { font-size: 11px; color: var(--warm2); background: var(--warm-soft); padding: 2px 8px; border-radius: 100px; font-weight: 500; }
+
+/* ── STREAM VIEW ── */
+.stream { max-width: 720px; margin: 0 auto; }
+.stream-day { margin-bottom: 32px; }
+.stream-day-header {
+  display: flex; align-items: baseline; gap: 12px;
+  margin-bottom: 14px;
+  position: sticky; top: -20px;
+  background: linear-gradient(180deg, var(--paper) 60%, transparent);
+  padding: 12px 0 8px;
+  z-index: 5;
+}
+.stream-day-date {
+  font-family: var(--serif); font-size: 22px; font-weight: 500;
+  color: var(--ink); letter-spacing: -0.01em;
+}
+.stream-day-rel { font-size: 12px; color: var(--ink3); }
+.stream-day-line { flex: 1; height: 1px; background: var(--paper4); align-self: center; }
+
+.stream-entry {
+  background: white;
+  border: 1px solid var(--paper4);
+  border-radius: var(--r2);
+  padding: 18px 22px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  position: relative; overflow: hidden;
+  transition: border-color 0.15s, box-shadow 0.18s;
+}
+.stream-entry:hover {
+  border-color: var(--ink4);
+  box-shadow: 0 2px 10px rgba(42,38,34,0.04);
+}
+.stream-time {
+  font-size: 12px; color: var(--ink3);
+  font-variant-numeric: tabular-nums;
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 6px;
+}
+.stream-entry-title {
+  font-family: var(--serif); font-size: 17px; font-weight: 500;
+  color: var(--ink); margin-bottom: 6px;
+  letter-spacing: -0.005em;
+}
+.stream-entry-body {
+  font-size: 14px; color: var(--ink2); line-height: 1.7;
+  white-space: pre-wrap;
+  display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden;
+}
+.stream-entry-foot {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+/* ── EMPTY ── */
+.empty { grid-column: 1/-1; text-align: center; padding: 70px 20px; }
+.empty-circle {
+  width: 64px; height: 64px; border-radius: 50%;
+  background: var(--paper2); border: 1.5px dashed var(--ink4);
+  margin: 0 auto 20px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--ink3);
+}
+.empty-title { font-family: var(--serif); font-size: 19px; font-weight: 500; color: var(--ink2); margin-bottom: 6px; }
+.empty-sub { font-size: 13px; color: var(--ink3); }
+
+/* ── STATUS BAR ── */
+#statusbar {
+  padding: 7px 24px;
+  border-top: 1px solid var(--paper4);
+  display: flex; align-items: center; gap: 16px;
+  background: var(--paper2);
+}
+.sb-item { font-size: 11px; color: var(--ink3); display: flex; align-items: center; gap: 5px; }
+.sb-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--moss); }
+
+/* ── RECORDING OVERLAY ── */
+#rec-overlay {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(250,247,242,0.9);
+  backdrop-filter: blur(14px);
+  display: none; align-items: center; justify-content: center;
+}
+#rec-overlay.show { display: flex; }
+.rec-card {
+  background: white;
+  border: 1px solid var(--paper4);
+  border-radius: var(--r3);
+  padding: 36px 40px;
+  width: 340px; text-align: center;
+  box-shadow: 0 12px 48px rgba(42,38,34,0.1);
+}
+.rec-label {
+  font-family: var(--serif); font-size: 18px; font-weight: 500;
+  color: var(--ink); margin-bottom: 4px;
+}
+.rec-sub {
+  font-size: 11px; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--ink3); margin-bottom: 26px;
+}
+.rec-waves { height: 56px; display: flex; align-items: center; justify-content: center; gap: 4px; margin-bottom: 22px; }
+.rwave { width: 4px; border-radius: 3px; background: var(--rose); opacity: 0.7; animation: rwave 1s ease-in-out infinite; }
+.rwave:nth-child(2) { animation-delay:.13s }
+.rwave:nth-child(3) { animation-delay:.26s }
+.rwave:nth-child(4) { animation-delay:.39s }
+.rwave:nth-child(5) { animation-delay:.2s }
+.rwave:nth-child(6) { animation-delay:.08s }
+.rwave:nth-child(7) { animation-delay:.33s }
+@keyframes rwave { 0%,100%{height:6px;opacity:.3} 50%{height:42px;opacity:.85} }
+.rec-time {
+  font-family: var(--serif); font-size: 44px; font-weight: 500;
+  color: var(--ink); letter-spacing: 0.02em;
+  margin-bottom: 28px;
+  font-variant-numeric: tabular-nums;
+}
+.rec-stop {
+  width: 56px; height: 56px; border-radius: 50%;
+  background: var(--ink); border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 16px; transition: transform 0.15s;
+}
+.rec-stop:hover { transform: scale(1.06); }
+.rec-stop-sq { width: 16px; height: 16px; border-radius: 3px; background: white; }
+.rec-cancel { background: none; border: none; font-family: var(--sans); font-size: 12px; color: var(--ink3); cursor: pointer; font-weight: 400; }
+.rec-cancel:hover { color: var(--ink2); }
+
+/* ── SAVE OVERLAY ── */
+#save-overlay {
+  position: fixed; inset: 0; z-index: 101;
+  background: rgba(250,247,242,0.9);
+  backdrop-filter: blur(14px);
+  display: none; align-items: center; justify-content: center; padding: 20px;
+}
+#save-overlay.show { display: flex; }
+.save-card {
+  background: white;
+  border: 1px solid var(--paper4);
+  border-radius: 22px;
+  padding: 26px 28px 24px;
+  width: 100%; max-width: 420px;
+  max-height: 90vh; overflow-y: auto;
+  box-shadow: 0 12px 48px rgba(42,38,34,0.1);
+}
+.save-card::-webkit-scrollbar { width: 0; }
+.save-heading { font-family: var(--serif); font-size: 20px; font-weight: 500; margin-bottom: 18px; color: var(--ink); letter-spacing: -0.01em; }
+
+.fg { margin-bottom: 14px; }
+.flabel { display: block; font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink3); margin-bottom: 6px; font-weight: 500; }
+.finput, .fselect, .ftextarea {
+  width: 100%;
+  background: var(--paper2);
+  border: 1px solid var(--paper4);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-family: var(--sans); font-size: 13px; font-weight: 400;
+  color: var(--ink); outline: none;
+  transition: border 0.15s, background 0.15s;
+  appearance: none;
+}
+.finput:focus, .fselect:focus, .ftextarea:focus { border-color: var(--warm); background: white; }
+.finput::placeholder, .ftextarea::placeholder { color: var(--ink3); }
+.ftextarea { resize: vertical; min-height: 72px; line-height: 1.65; }
+.frow2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.frow3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+
+.tags-wrap {
+  display: flex; flex-wrap: wrap; gap: 5px;
+  background: var(--paper2); border: 1px solid var(--paper4);
+  border-radius: 10px; padding: 8px 12px; cursor: text;
+  min-height: 42px; align-items: center;
+  transition: border 0.15s, background 0.15s;
+}
+.tags-wrap:focus-within { border-color: var(--warm); background: white; }
+.tchip {
+  background: white; border: 1px solid var(--paper4);
+  border-radius: 100px; padding: 2px 4px 2px 9px;
+  font-size: 11px; color: var(--ink2);
+  display: flex; align-items: center; gap: 2px;
+}
+.tchip-x { cursor: pointer; color: var(--ink3); width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
+.tchip-x:hover { color: var(--rose); background: var(--rose-soft); }
+.tinput { background: none; border: none; outline: none; font-family: var(--sans); font-size: 12.5px; font-weight: 400; color: var(--ink); min-width: 80px; flex: 1; }
+.tinput::placeholder { color: var(--ink3); }
+
+.save-actions { display: flex; gap: 9px; margin-top: 20px; }
+.btn-save {
+  flex: 1; padding: 11px;
+  background: var(--ink); border: none;
+  border-radius: 10px;
+  font-family: var(--sans); font-size: 13px; font-weight: 500;
+  color: white; cursor: pointer;
+  transition: opacity 0.15s, transform 0.1s;
+}
+.btn-save:hover { opacity: 0.88; }
+.btn-save:active { transform: scale(0.98); }
+.btn-cancel {
+  padding: 11px 18px;
+  background: var(--paper2); border: 1px solid var(--paper4);
+  border-radius: 10px;
+  font-family: var(--sans); font-size: 13px; font-weight: 400;
+  color: var(--ink2); cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-cancel:hover { border-color: var(--ink4); color: var(--ink); }
+
+/* ── DETAIL ── */
+#detail {
+  position: fixed; right: 0; top: 0; bottom: 0; width: 420px;
+  background: white; border-left: 1px solid var(--paper4);
+  display: flex; flex-direction: column; z-index: 50;
+  transform: translateX(100%);
+  transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
+}
+#detail.open { transform: translateX(0); }
+.detail-top { padding: 18px 22px 14px; border-bottom: 1px solid var(--paper4); display: flex; align-items: center; gap: 10px; }
+.detail-close {
+  margin-left: auto; width: 30px; height: 30px; border-radius: 9px;
+  border: 1px solid var(--paper4); background: var(--paper2);
+  cursor: pointer; color: var(--ink2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; transition: all 0.15s;
+}
+.detail-close:hover { border-color: var(--ink4); color: var(--ink); }
+.detail-body { flex: 1; overflow-y: auto; padding: 22px; }
+.detail-body::-webkit-scrollbar { width: 0; }
+.detail-title { font-family: var(--serif); font-size: 24px; font-weight: 500; line-height: 1.25; margin-bottom: 5px; letter-spacing: -0.015em; }
+.detail-date { font-size: 12px; color: var(--ink3); margin-bottom: 18px; }
+.dsec { margin-bottom: 20px; }
+.dsec-label { font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink3); margin-bottom: 8px; display: block; font-weight: 500; }
+.detail-text { font-size: 14.5px; color: var(--ink2); line-height: 1.8; white-space: pre-wrap; }
+
+.detail-player { background: var(--paper2); border-radius: 14px; padding: 14px 16px; }
+.player-wave { height: 44px; display: flex; align-items: center; gap: 2px; margin-bottom: 12px; }
+.pwbar { border-radius: 2px; background: var(--rose); opacity: 0.55; flex: 1; max-width: 6px; }
+.player-row { display: flex; align-items: center; gap: 10px; }
+.play-btn2 {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: var(--ink); border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; transition: transform 0.15s;
+}
+.play-btn2:hover { transform: scale(1.06); }
+.play-btn2 svg { width: 12px; height: 12px; fill: white; margin-left: 1px; }
+.player-prog { flex: 1; height: 3px; background: var(--paper4); border-radius: 2px; cursor: pointer; }
+.player-fill { height: 100%; background: var(--ink); border-radius: 2px; width: 0%; }
+.player-t { font-size: 11px; color: var(--ink3); font-variant-numeric: tabular-nums; }
+
+.meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.meta-cell { background: var(--paper2); border-radius: 10px; padding: 9px 12px; }
+.meta-k { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink3); margin-bottom: 2px; font-weight: 500; }
+.meta-v { font-size: 13.5px; color: var(--ink); }
+.dtags { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.detail-foot { padding: 12px 16px; border-top: 1px solid var(--paper4); display: flex; gap: 7px; }
+.exp-btn {
+  flex: 1; padding: 8px;
+  border-radius: 9px; border: 1px solid var(--paper4);
+  background: var(--paper2);
+  font-family: var(--sans); font-size: 11.5px; font-weight: 400;
+  color: var(--ink2); cursor: pointer; text-align: center;
+  transition: all 0.15s;
+}
+.exp-btn:hover { border-color: var(--warm); color: var(--warm2); background: var(--warm-soft); }
+
+/* ── PROJECT MODAL ── */
+#proj-overlay { position: fixed; inset: 0; z-index: 110; background: rgba(250,247,242,0.9); backdrop-filter: blur(14px); display: none; align-items: center; justify-content: center; padding: 20px; }
+#proj-overlay.show { display: flex; }
+.proj-card { background: white; border: 1px solid var(--paper4); border-radius: 22px; padding: 26px 28px; width: 100%; max-width: 360px; box-shadow: 0 12px 48px rgba(42,38,34,0.1); }
+.proj-card h3 { font-family: var(--serif); font-size: 20px; font-weight: 500; margin-bottom: 18px; letter-spacing: -0.01em; }
+.color-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.cswatch { width: 28px; height: 28px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: transform 0.15s; }
+.cswatch:hover { transform: scale(1.12); }
+.cswatch.sel { border-color: var(--ink); box-shadow: 0 0 0 2px white inset; }
+
+/* ── TOAST ── */
+#toast {
+  position: fixed; bottom: 20px; left: 50%;
+  transform: translateX(-50%) translateY(16px);
+  background: var(--ink); color: white;
+  padding: 10px 22px; border-radius: 100px;
+  font-size: 13px; font-weight: 400;
+  opacity: 0; pointer-events: none; z-index: 300;
+  transition: all 0.22s; white-space: nowrap;
+}
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+@media (max-width: 680px) {
+  #sidebar { position: fixed; left: -230px; top: 0; bottom: 0; z-index: 80; transition: left 0.25s; }
+  #sidebar.open { left: 0; box-shadow: 4px 0 24px rgba(42,38,34,0.12); }
+  #sidebar-backdrop {
+    display: none;
+    position: fixed; inset: 0; z-index: 79;
+    background: rgba(42,38,34,0.3);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
   }
+  #sidebar.open ~ #sidebar-backdrop,
+  body.sidebar-open #sidebar-backdrop { display: block; }
+  #mob-menu { display: flex; width: 36px; height: 36px; align-items: center; justify-content: center; border: 1px solid var(--paper4); border-radius: 9px; background: var(--paper2); cursor: pointer; color: var(--ink2); flex-shrink: 0; }
+  #detail { width: 100%; }
+  #search-input { width: 130px; }
+  #search-input:focus { width: 160px; }
+  #capture-area { padding: 18px 16px 16px; gap: 12px; }
+  #content { padding: 16px; }
+  .stream-day-header { top: 0; }
+  .cards-grid { grid-template-columns: 1fr; }
+  #capture-btn { width: 56px; height: 56px; }
+  #statusbar { padding-bottom: calc(7px + env(safe-area-inset-bottom)); }
+  #topbar { padding-top: calc(18px + env(safe-area-inset-top)); }
+  .heatmap-wrap { margin: 0 10px 14px; padding: 10px 8px 8px; }
+}
 
-  .tabs { display: flex; border-bottom: 1px solid rgba(255,255,255,0.08); }
-  .tab-btn { flex: 1; padding: 11px 0; background: none; border: none; border-bottom: 2px solid transparent;
-    color: #555; cursor: pointer; font-size: 12px; font-family: 'DM Sans', sans-serif;
-    font-weight: 400; margin-bottom: -1px; transition: all .2s; }
-  .tab-btn.active { color: #F5C518; border-bottom-color: #F5C518; font-weight: 600; }
+/* Prevent double-tap zoom on buttons */
+button, .nav-item, .card, .stream-entry, .hm-cell {
+  touch-action: manipulation;
+}
 
-  .content { padding: 14px 14px 0; }
+/* Smooth momentum scroll on iOS */
+#content, .detail-body, .sidebar-scroll, .save-card {
+  -webkit-overflow-scrolling: touch;
+}
 
-  .search-row { display: flex; gap: 8px; margin-bottom: 12px; }
-  .search-row input { flex: 1; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 10px; color: #f0f0f0; font-size: 15px; padding: 11px 14px;
-    font-family: 'DM Sans', sans-serif; outline: none; }
-  .search-row input:focus { border-color: rgba(245,197,24,0.4); }
-  .btn-gold { padding: 11px 16px; border-radius: 10px; background: #F5C518; border: none;
-    color: #111; font-family: 'Bebas Neue', cursive; font-size: 15px; letter-spacing: 1px;
-    cursor: pointer; flex-shrink: 0; transition: opacity .15s; }
-  .btn-gold:hover { opacity: 0.85; }
-  .btn-gold:disabled { background: #2a2a3a; color: #555; cursor: not-allowed; opacity: 1; }
-
-  .empty { text-align: center; color: #444; padding: 50px 0; }
-  .empty .icon { font-size: 36px; margin-bottom: 8px; }
-  .empty .title { font-family: 'Bebas Neue', cursive; font-size: 16px; letter-spacing: 1px; color: #555; }
-  .empty .sub { font-size: 12px; margin-top: 4px; color: #444; }
-
-  .card-list { display: flex; flex-direction: column; gap: 9px; }
-  .card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 12px; padding: 11px; display: flex; gap: 11px;
-    cursor: pointer; transition: background .15s; }
-  .card:hover { background: rgba(255,255,255,0.07); }
-
-  .poster { width: 56px; height: 80px; flex-shrink: 0; border-radius: 8px; overflow: hidden;
-    background: #1a1a2e; display: flex; align-items: center; justify-content: center; font-size: 22px; }
-  .poster img { width: 100%; height: 100%; object-fit: cover; }
-
-  .card-body { flex: 1; min-width: 0; }
-  .card-title { font-family: 'Bebas Neue', cursive; font-size: 16px; letter-spacing: .5px; line-height: 1.2; }
-  .card-meta { color: #666; font-size: 11px; margin-top: 2px; }
-  .card-actions { display: flex; align-items: center; gap: 6px; margin-top: 7px; flex-wrap: wrap; }
-  .btn-watched { padding: 3px 10px; border-radius: 6px; background: transparent;
-    border: 1px solid rgba(255,255,255,0.2); color: #aaa; font-size: 11px; font-weight: 700; cursor: pointer;
-    font-family: 'Bebas Neue', cursive; letter-spacing: 1px; transition: all .15s; }
-  .btn-watched:hover { background: rgba(245,197,24,0.1); border-color: #F5C518; color: #F5C518; }
-  .btn-watchlist { padding: 3px 10px; border-radius: 6px; background: transparent;
-    border: 1px solid rgba(255,255,255,0.2); color: #aaa; font-size: 11px; font-weight: 700; cursor: pointer;
-    font-family: 'Bebas Neue', cursive; letter-spacing: 1px; transition: all .15s; }
-  .btn-watchlist:hover { border-color: #F5C518; color: #F5C518; }
-  .hint { color: #444; font-size: 11px; }
-  .badge-watched { color: #F5C518; font-size: 11px; }
-  .badge-plan { color: #888; font-size: 11px; }
-
-  .why-strip { padding: 6px 12px; background: rgba(245,197,24,0.04);
-    border: 1px solid rgba(255,255,255,0.08); border-top: none;
-    border-radius: 0 0 12px 12px; color: #998; font-size: 12px; font-style: italic; }
-
-  /* Filter pills */
-  .filter-row { display: flex; gap: 8px; margin-bottom: 14px; }
-  .filter-pill { padding: 5px 14px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.1);
-    background: transparent; color: #666; font-size: 12px; cursor: pointer;
-    font-family: 'DM Sans', sans-serif; transition: all .15s; }
-  .filter-pill.active { background: #F5C518; border-color: #F5C518; color: #111; font-weight: 600; }
-
-  /* Loading */
-  .loading-box { margin: 8px 0 20px; padding: 24px 20px;
-    background: rgba(245,197,24,0.04); border: 1px solid rgba(245,197,24,0.15);
-    border-radius: 14px; text-align: center; }
-  .dots { display: flex; justify-content: center; gap: 7px; margin-bottom: 16px; }
-  .dot { width: 9px; height: 9px; border-radius: 50%; background: #F5C518; }
-  .dot:nth-child(1) { animation: bounce 1.2s ease-in-out 0s infinite; }
-  .dot:nth-child(2) { animation: bounce 1.2s ease-in-out .18s infinite; }
-  .dot:nth-child(3) { animation: bounce 1.2s ease-in-out .36s infinite; }
-  .dot:nth-child(4) { animation: bounce 1.2s ease-in-out .54s infinite; }
-  .dot:nth-child(5) { animation: bounce 1.2s ease-in-out .72s infinite; }
-  .progress-track { height: 2px; background: rgba(245,197,24,0.15); border-radius: 2px;
-    margin-bottom: 16px; overflow: hidden; }
-  .progress-bar { height: 100%; width: 40%; background: #F5C518; border-radius: 2px;
-    animation: progressSlide 1.8s ease-in-out infinite; }
-  .loading-quote { color: #ddd; font-style: italic; font-size: 14px; line-height: 1.5; }
-  .loading-source { color: #555; font-size: 11px; margin-top: 5px; letter-spacing: .5px; }
-  .loading-sub { color: #555; font-size: 11px; margin-top: 10px; }
-
-  .skeleton-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 12px; padding: 11px; display: flex; gap: 11px; }
-  .skel-poster { width: 56px; height: 80px; border-radius: 8px;
-    background: rgba(255,255,255,0.06); animation: shimmer 1.5s ease-in-out infinite; }
-  .skel-body { flex: 1; padding-top: 4px; }
-  .skel-line { border-radius: 4px; background: rgba(255,255,255,0.06);
-    animation: shimmer 1.5s ease-in-out infinite; margin-bottom: 8px; }
-
-  /* Detail modal */
-  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 300;
-    display: flex; align-items: flex-end; justify-content: center; }
-  .modal { background: #13131f; border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 20px 20px 0 0; width: 100%; max-width: 480px;
-    max-height: 88vh; overflow-y: auto; padding: 20px 18px 32px; }
-  .modal-title { font-family: 'Bebas Neue', cursive; font-size: 22px;
-    letter-spacing: .5px; line-height: 1.15; color: #fff; }
-  .chips { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 8px; }
-  .chip { padding: 2px 8px; border-radius: 20px; background: rgba(255,255,255,0.07);
-    border: 1px solid rgba(255,255,255,0.08); font-size: 11px; color: #aaa; }
-  .plot { color: #ccc; font-size: 13px; line-height: 1.6; margin-bottom: 16px;
-    padding: 12px; background: rgba(255,255,255,0.03); border-radius: 10px;
-    border: 1px solid rgba(255,255,255,0.08); }
-  .crew-label { color: #555; font-size: 11px; font-weight: 600; margin-bottom: 3px; }
-  .crew-val { color: #ddd; font-size: 13px; margin-bottom: 10px; }
-  .awards-box { margin-bottom: 14px; padding: 8px 12px;
-    background: rgba(245,197,24,0.05); border-radius: 8px;
-    border: 1px solid rgba(245,197,24,0.15); color: #F5C518; font-size: 12px; }
-  .modal-actions { display: flex; gap: 9px; margin-top: 18px; flex-wrap: wrap; }
-  .btn-close { flex: 1; min-width: 80px; padding: 10px; border-radius: 9px;
-    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08);
-    color: #777; cursor: pointer; font-size: 13px; font-family: 'DM Sans', sans-serif; }
-  .btn-add-watched { flex: 2; padding: 10px; border-radius: 9px; background: transparent;
-    border: 1px solid rgba(245,197,24,0.5); color: #F5C518; font-family: 'Bebas Neue', cursive;
-    font-size: 14px; letter-spacing: 1px; cursor: pointer; transition: all .15s; }
-  .btn-add-watched:hover { background: rgba(245,197,24,0.1); border-color: #F5C518; }
-  .btn-save { flex: 2; padding: 10px; border-radius: 9px; background: #F5C518;
-    border: none; color: #111; font-family: 'Bebas Neue', cursive;
-    font-size: 15px; letter-spacing: 1px; cursor: pointer; }
-  .btn-add-plan { flex: 2; padding: 10px; border-radius: 9px;
-    background: transparent; border: 1px solid rgba(255,255,255,0.2);
-    color: #aaa; font-family: 'Bebas Neue', cursive;
-    font-size: 14px; letter-spacing: 1px; cursor: pointer; }
-  .already-badge { flex: 2; padding: 10px; text-align: center; color: #F5C518; font-size: 13px; font-weight: 600; }
-
-  /* Add modal */
-  .add-modal { background: #13131f; border: 1px solid rgba(245,197,24,.2);
-    border-radius: 16px; padding: 22px; width: 100%; max-width: 380px; }
-  .add-label { color: #555; font-size: 11px; margin-bottom: 5px;
-    text-transform: uppercase; letter-spacing: .5px; }
-  .stars-row { display: flex; gap: 4px; margin-bottom: 14px; }
-  .star { font-size: 26px; cursor: pointer; color: #333; transition: color .15s; user-select: none; }
-  .star.on { color: #F5C518; }
-  textarea { width: 100%; background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.08); border-radius: 8px;
-    color: #ddd; font-size: 13px; padding: 9px 11px;
-    resize: vertical; min-height: 65px; font-family: 'DM Sans', sans-serif;
-    outline: none; margin-bottom: 18px; }
-
-  /* History cards */
-  .history-header { display: flex; justify-content: space-between;
-    margin-bottom: 10px; color: #555; font-size: 11px; }
-  .hist-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 12px; padding: 11px; display: flex; gap: 11px;
-    cursor: pointer; transition: background .15s; }
-  .hist-card:hover { background: rgba(255,255,255,0.07); }
-  .hist-card.plan { border-color: rgba(255,255,255,0.05); opacity: 0.85; }
-  .hist-poster { width: 44px; height: 64px; flex-shrink: 0; border-radius: 6px;
-    overflow: hidden; background: #1a1a2e; display: flex; align-items: center;
-    justify-content: center; font-size: 18px; }
-  .hist-poster img { width: 100%; height: 100%; object-fit: cover; }
-  .hist-top { display: flex; justify-content: space-between; align-items: flex-start; }
-  .hist-title { font-family: 'Bebas Neue', cursive; font-size: 15px; letter-spacing: .5px; }
-  .hist-meta { color: #555; font-size: 10px; }
-  .hist-del { background: none; border: none; color: #444; cursor: pointer;
-    font-size: 18px; line-height: 1; padding: 0 0 0 8px; }
-  .hist-del:hover { color: #888; }
-  .hist-note { color: #999; font-size: 12px; margin-top: 3px; font-style: italic; }
-  .status-tag { display: inline-block; padding: 1px 7px; border-radius: 10px;
-    font-size: 10px; font-weight: 600; margin-top: 4px; }
-  .status-tag.watched { background: rgba(245,197,24,0.12); color: #F5C518; }
-  .status-tag.plan { background: rgba(255,255,255,0.06); color: #777; }
-
-  @keyframes bounce { 0%,80%,100%{transform:scale(0.6);opacity:.3} 40%{transform:scale(1);opacity:1} }
-  @keyframes shimmer { 0%,100%{opacity:.5} 50%{opacity:1} }
-  @keyframes progressSlide { 0%{transform:translateX(-200%)} 100%{transform:translateX(350%)} }
-  @keyframes fadeInUp { from{opacity:0;transform:translateX(-50%) translateY(8px)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
+/* Prevent text selection on tap */
+.nav-item, .card, .stream-entry, .attach-btn, .exp-btn {
+  -webkit-user-select: none; user-select: none;
+}
+audio { display: none; }
 </style>
 </head>
 <body>
-<!-- Auth Screen -->
-<!-- ── SIGN IN SCREEN ─────────────────────────────────────────────── -->
-<div id="screen-signin" style="display:none;position:fixed;inset:0;background:#0d0d1a;z-index:500;align-items:center;justify-content:center;padding:20px;overflow-y:auto">
-  <div style="width:100%;max-width:360px;padding:20px 0">
-    <div style="text-align:center;margin-bottom:32px">
-      <div style="font-family:'Bebas Neue',cursive;font-size:36px;letter-spacing:2px;line-height:1">
-        <span style="color:#F5C518">MOVIE</span><span style="color:#fff"> NIGHT</span>
+<div id="app">
+
+<!-- SIDEBAR -->
+<div id="sidebar">
+  <div class="sidebar-top">
+    <div class="brand-wrap">
+      <div class="brand">hum</div>
+      <span class="brand-dot"></span>
+    </div>
+    <div class="brand-sub">capture before it fades</div>
+  </div>
+
+  <div class="view-tabs">
+    <button class="view-tab active" id="vt-grid" onclick="setLayout('grid')">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>
+      Grid
+    </button>
+    <button class="view-tab" id="vt-stream" onclick="setLayout('stream')">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 4h10M3 8h10M3 12h10"/></svg>
+      Stream
+    </button>
+  </div>
+
+  <div class="sidebar-scroll">
+    <div class="nav-section">
+      <span class="nav-label">Browse</span>
+      <div class="nav-item active" onclick="setView('all',this)">
+        <svg class="ni-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/>
+          <rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/>
+        </svg>
+        All <span class="ni-count" id="cnt-all">0</span>
       </div>
-      <div style="color:#555;font-size:13px;margin-top:6px">Welcome back</div>
-    </div>
-    <div id="signin-error" style="display:none;color:#f87171;font-size:13px;margin-bottom:12px;
-      padding:10px 12px;background:rgba(248,113,113,0.08);border-radius:8px;border:1px solid rgba(248,113,113,0.2)"></div>
-    <input id="signin-email" type="email" placeholder="Email" style="width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:10px;color:#f0f0f0;font-size:15px;padding:12px 14px;font-family:'DM Sans',sans-serif;outline:none;margin-bottom:10px;display:block">
-    <input id="signin-password" type="password" placeholder="Password" style="width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:10px;color:#f0f0f0;font-size:15px;padding:12px 14px;font-family:'DM Sans',sans-serif;outline:none;margin-bottom:16px;display:block"
-      onkeydown="if(event.key==='Enter')doSignIn()">
-    <button onclick="doSignIn()" id="signin-btn" style="width:100%;padding:13px;border-radius:10px;background:#F5C518;border:none;color:#111;font-family:'Bebas Neue',cursive;font-size:17px;letter-spacing:1px;cursor:pointer;margin-bottom:20px;display:block">SIGN IN</button>
-    <div style="text-align:center;border-top:1px solid rgba(255,255,255,0.06);padding-top:20px">
-      <div style="color:#555;font-size:13px;margin-bottom:12px">New to Movie Night?</div>
-      <button onclick="showScreen('signup')" style="width:100%;padding:12px;border-radius:10px;background:transparent;border:1px solid rgba(255,255,255,0.15);color:#f0f0f0;font-family:'Bebas Neue',cursive;font-size:16px;letter-spacing:1px;cursor:pointer">CREATE ACCOUNT</button>
-    </div>
-  </div>
-</div>
-
-<!-- ── SIGN UP SCREEN ─────────────────────────────────────────────── -->
-<div id="screen-signup" style="display:none;position:fixed;inset:0;background:#0d0d1a;z-index:500;align-items:center;justify-content:center;padding:20px;overflow-y:auto">
-  <div style="width:100%;max-width:360px;padding:20px 0">
-    <button onclick="showScreen('signin')" style="background:none;border:none;color:#555;font-size:13px;cursor:pointer;margin-bottom:24px;padding:0;display:flex;align-items:center;gap:6px;font-family:'DM Sans',sans-serif">← Back to Sign In</button>
-    <div style="margin-bottom:28px">
-      <div style="font-family:'Bebas Neue',cursive;font-size:28px;letter-spacing:1px;color:#fff">Create Account</div>
-      <div style="color:#555;font-size:13px;margin-top:4px">Track films. Get picks. Share with friends.</div>
-    </div>
-    <div id="signup-error" style="display:none;color:#f87171;font-size:13px;margin-bottom:12px;
-      padding:10px 12px;background:rgba(248,113,113,0.08);border-radius:8px;border:1px solid rgba(248,113,113,0.2)"></div>
-    <input id="signup-name" type="text" placeholder="Your name" style="width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:10px;color:#f0f0f0;font-size:15px;padding:12px 14px;font-family:'DM Sans',sans-serif;outline:none;margin-bottom:10px;display:block">
-    <input id="signup-email" type="email" placeholder="Email" style="width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:10px;color:#f0f0f0;font-size:15px;padding:12px 14px;font-family:'DM Sans',sans-serif;outline:none;margin-bottom:10px;display:block">
-    <input id="signup-password" type="password" placeholder="Password (min 6 characters)" style="width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:10px;color:#f0f0f0;font-size:15px;padding:12px 14px;font-family:'DM Sans',sans-serif;outline:none;margin-bottom:16px;display:block"
-      onkeydown="if(event.key==='Enter')doSignUp()">
-    <button onclick="doSignUp()" id="signup-btn" style="width:100%;padding:13px;border-radius:10px;background:#F5C518;border:none;color:#111;font-family:'Bebas Neue',cursive;font-size:17px;letter-spacing:1px;cursor:pointer;display:block">CREATE ACCOUNT</button>
-  </div>
-</div>
-
-<!-- ── CHECK EMAIL SCREEN ─────────────────────────────────────────── -->
-<div id="screen-check-email" style="display:none;position:fixed;inset:0;background:#0d0d1a;z-index:500;align-items:center;justify-content:center;padding:20px">
-  <div style="width:100%;max-width:360px;text-align:center">
-    <div style="font-size:56px;margin-bottom:20px">📬</div>
-    <div style="font-family:'Bebas Neue',cursive;font-size:26px;letter-spacing:1px;color:#fff;margin-bottom:10px">Check your inbox</div>
-    <div style="color:#aaa;font-size:14px;line-height:1.7;margin-bottom:28px" id="check-email-msg">
-      We sent a confirmation link to your email.<br>Click it to activate your account.
-    </div>
-    <div style="color:#555;font-size:12px;padding:12px;background:rgba(255,255,255,0.04);border-radius:8px;margin-bottom:24px">
-      Didn't get it? Check your spam folder.
-    </div>
-    <button onclick="showScreen('signin')" style="background:none;border:none;color:#F5C518;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif">← Back to Sign In</button>
-  </div>
-</div>
-
-<!-- legacy placeholder kept for JS compat -->
-<div id="auth-screen" style="display:none"></div>
-
-<div class="app" id="main-app" style="display:none">
-  <div class="header">
-    <h1><span class="gold">MOVIE</span> NIGHT</h1>
-    <div class="header-grid">
-      <p style="grid-column:1;grid-row:2;margin:0">TMDB · AI Picks · Watch History</p>
-      <span id="header-username" style="grid-column:3;grid-row:1;color:#aaa;font-size:12px;font-weight:600;text-align:right;min-height:12px">.</span>
-      <button onclick="openFeedback()" style="grid-column:2;grid-row:2;justify-self:end;background:none;border:none;cursor:pointer;padding:0;display:inline-flex;align-items:baseline;gap:3px;color:#555;font-family:'DM Sans',sans-serif;font-size:11px">
-        <span id="feedback-icon" style="font-size:13px;transition:all .2s">✉</span><span id="feedback-label" style="color:#555">Feedback</span>
-      </button>
-      <button onclick="signOut()" style="grid-column:3;grid-row:2;justify-self:end;background:none;border:none;color:#444;font-size:11px;cursor:pointer;font-family:'DM Sans',sans-serif;padding:0">Sign out</button>
-    </div>
-  </div>
-
-  <div class="tabs">
-    <button class="tab-btn active" onclick="switchTab('search')">🔍 Search</button>
-    <button class="tab-btn" onclick="switchTab('recs')">✨ Picks</button>
-    <button class="tab-btn" onclick="switchTab('history')">📋 My List</button>
-    <button class="tab-btn" id="tab-btn-inbox" onclick="switchTab('inbox')">📬 <span id="inbox-badge" style="display:none;background:#F5C518;color:#111;border-radius:10px;padding:0 5px;font-size:10px;font-weight:700;margin-left:2px">0</span>Inbox</button>
-  </div>
-
-  <div class="content">
-    <!-- SEARCH -->
-    <div id="tab-search">
-      <div class="search-row">
-        <input id="search-input" type="text" placeholder="Movie or series title..." onkeydown="if(event.key==='Enter')doSearch()">
-        <button class="btn-gold" onclick="doSearch()">SEARCH</button>
+      <div class="nav-item" onclick="setView('inbox',this)">
+        <svg class="ni-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M2 9h3l1.5 2h3L11 9h3V5l-2-3H4L2 5v4z"/>
+        </svg>
+        Inbox <span class="ni-count" id="cnt-inbox">0</span>
       </div>
-      <div id="search-results"></div>
+      <div class="nav-item" onclick="setView('today',this)">
+        <svg class="ni-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="2" y="3" width="12" height="11" rx="1.5"/><path d="M2 6h12M5 1.5v3M11 1.5v3"/>
+        </svg>
+        Today <span class="ni-count" id="cnt-today">0</span>
+      </div>
     </div>
 
-    <!-- PICKS -->
-    <div id="tab-recs" style="display:none">
-      <div style="margin-bottom:12px">
-        <div class="search-row">
-          <input id="rec-input" type="text" placeholder="Mood, genre, or anything...">
-          <button class="btn-gold" id="rec-btn" onclick="loadRecs()">FIND</button>
+    <div class="nav-section">
+      <span class="nav-label">Type</span>
+      <div class="nav-item" onclick="setView('audio',this)">
+        <!-- Microphone — classical -->
+        <svg class="ni-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="6" y="2" width="4" height="7" rx="2"/>
+          <path d="M3.5 8a4.5 4.5 0 009 0M8 12.5v2M5.5 14.5h5"/>
+        </svg>
+        Audio
+      </div>
+      <div class="nav-item" onclick="setView('text',this)">
+        <!-- Text lines -->
+        <svg class="ni-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+          <path d="M3 4h10M3 8h7M3 12h5"/>
+        </svg>
+        Text & Lyrics
+      </div>
+      <div class="nav-item" onclick="setView('idea',this)">
+        <!-- Lightbulb -->
+        <svg class="ni-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5 6.5a3 3 0 116 0c0 1.5-1 2-1.5 3-.3.6-.5 1.5-.5 2.5h-2c0-1-.2-1.9-.5-2.5C6 8.5 5 8 5 6.5z"/>
+          <path d="M6.5 14h3"/>
+        </svg>
+        Ideas
+      </div>
+      <div class="nav-item" onclick="setView('dream',this)">
+        <!-- Cloud (clear, readable) -->
+        <svg class="ni-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round">
+          <path d="M4 12h7.5a2.5 2.5 0 100-5 .8.8 0 01-.05 0 3.5 3.5 0 00-6.7-.3A2.6 2.6 0 004 12z"/>
+        </svg>
+        Dreams
+      </div>
+    </div>
+
+    <div class="nav-section">
+      <span class="nav-label">Activity</span>
+      <div class="heatmap-wrap">
+        <div class="heatmap-head">
+          <span class="heatmap-title" id="hm-title">Last 12 weeks</span>
+          <span class="heatmap-sub" id="hm-sub">—</span>
         </div>
-        <button onclick="surpriseMe()" style="width:100%;margin-top:8px;padding:9px;border-radius:10px;background:#7c3aed;border:none;color:#fff;font-family:'Bebas Neue',cursive;font-size:14px;letter-spacing:1px;cursor:pointer;transition:opacity .15s" onmouseover="this.style.opacity=.85" onmouseout="this.style.opacity=1">✨ SURPRISE ME</button>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:5px">
-          <div id="rec-history-hint" style="color:#444;font-size:11px"></div>
-          <div id="ai-counter" style="color:#555;font-size:11px"></div>
-        </div>
-      </div>
-      <div id="rec-results"></div>
-    </div>
-
-    <!-- MY LIST -->
-    <div id="tab-history" style="display:none">
-      <div class="filter-row">
-        <button class="filter-pill active" id="pill-all" onclick="setFilter('all')">All</button>
-        <button class="filter-pill" id="pill-plan" onclick="setFilter('plan')">🕐 Watchlist</button>
-        <button class="filter-pill" id="pill-watched" onclick="setFilter('watched')">✓ Watched</button>
-      </div>
-      <div id="history-list"></div>
-    </div>
-
-    <!-- INBOX -->
-    <div id="tab-inbox" style="display:none">
-      <div id="inbox-list"></div>
-    </div>
-  </div>
-</div>
-
-<!-- Share Modal -->
-<div id="share-overlay" class="overlay" style="display:none" onclick="closeShare()">
-  <div style="padding:20px;width:100%;display:flex;justify-content:center;cursor:default" onclick="event.stopPropagation();event.preventDefault()">
-    <div class="add-modal" onclick="event.stopPropagation()">
-      <div style="font-family:'Bebas Neue',cursive;color:#7c3aed;font-size:12px;letter-spacing:2px;margin-bottom:3px">RECOMMEND A FILM</div>
-      <div id="share-movie-title" style="font-family:'Bebas Neue',cursive;font-size:19px;margin-bottom:14px;line-height:1.2"></div>
-      <div class="add-label">Send to (search by name)</div>
-      <div style="position:relative;margin-bottom:10px">
-        <input id="share-search" type="text" placeholder="Enter exact name..." 
-          style="width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:10px;color:#f0f0f0;font-size:14px;padding:10px 14px;font-family:'DM Sans',sans-serif;outline:none"
-          oninput="searchUsers(this.value)" placeholder="Enter exact name...">
-        <div id="share-user-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:#1a1a2e;border:1px solid rgba(255,255,255,0.1);border-radius:8px;margin-top:4px;z-index:10;max-height:150px;overflow-y:auto"></div>
-      </div>
-      <div id="share-to-display" style="display:none;padding:8px 12px;background:rgba(124,58,237,0.1);border:1px solid rgba(124,58,237,0.3);border-radius:8px;margin-bottom:10px;font-size:13px;color:#a78bfa"></div>
-      <div class="add-label">Message (optional)</div>
-      <textarea id="share-message" placeholder="Why you'd love this..." style="min-height:55px;margin-bottom:18px"></textarea>
-      <div style="display:flex;gap:9px">
-        <button class="btn-close" onclick="closeShare()">Cancel</button>
-        <button id="share-confirm-btn" onclick="confirmShare()" style="flex:2;padding:9px;border-radius:8px;background:#7c3aed;border:none;color:#fff;font-family:'Bebas Neue',cursive;font-size:15px;letter-spacing:1px;cursor:pointer">SEND</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Edit Modal -->
-<div id="edit-overlay" class="overlay" style="display:none" onclick="closeEdit()">
-  <div style="padding:20px;width:100%;display:flex;justify-content:center;cursor:default" onclick="event.stopPropagation();event.preventDefault()">
-    <div class="add-modal">
-      <div style="font-family:'Bebas Neue',cursive;color:#F5C518;font-size:12px;letter-spacing:2px;margin-bottom:3px">EDIT REVIEW</div>
-      <div id="edit-movie-title" style="font-family:'Bebas Neue',cursive;font-size:19px;margin-bottom:14px;line-height:1.2"></div>
-      <div class="add-label">Rating</div>
-      <div class="stars-row" id="edit-stars-row">
-        <span class="star" id="edit-star-1" onclick="setEditStar(1)">★</span>
-        <span class="star" id="edit-star-2" onclick="setEditStar(2)">★</span>
-        <span class="star" id="edit-star-3" onclick="setEditStar(3)">★</span>
-        <span class="star" id="edit-star-4" onclick="setEditStar(4)">★</span>
-        <span class="star" id="edit-star-5" onclick="setEditStar(5)">★</span>
-      </div>
-      <div class="add-label">Notes</div>
-      <textarea id="edit-note" placeholder="What did you think?"></textarea>
-      <div style="display:flex;gap:9px">
-        <button class="btn-close" onclick="closeEdit()">Cancel</button>
-        <button class="btn-save" id="edit-confirm-btn" onclick="confirmEdit()">SAVE</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Detail Modal -->
-<div id="detail-overlay" class="overlay" style="display:none" onclick="closeDetail()">
-  <div class="modal" onclick="event.stopPropagation();event.preventDefault()">
-    <div id="detail-content"></div>
-  </div>
-</div>
-
-<!-- Person filmography modal -->
-<div id="person-overlay" class="overlay" style="display:none" onclick="closePerson()">
-  <div class="modal" onclick="event.stopPropagation();event.preventDefault()">
-    <div id="person-content"></div>
-  </div>
-</div>
-
-<!-- Add Modal -->
-<div id="add-overlay" class="overlay" style="display:none" onclick="closeAdd()">
-  <div style="padding:20px;width:100%;display:flex;justify-content:center;cursor:default" onclick="event.stopPropagation();event.preventDefault()">
-    <div class="add-modal" onclick="event.stopPropagation()">
-      <div style="font-family:'Bebas Neue',cursive;color:#F5C518;font-size:12px;letter-spacing:2px;margin-bottom:3px" id="add-modal-label">ADD TO HISTORY</div>
-      <div id="add-movie-title" style="font-family:'Bebas Neue',cursive;font-size:19px;margin-bottom:14px;line-height:1.2"></div>
-      <div id="add-stars-section">
-        <div class="add-label">Your Rating</div>
-        <div class="stars-row" id="stars-row">
-          <span class="star" onclick="setStar(1)">★</span>
-          <span class="star" onclick="setStar(2)">★</span>
-          <span class="star" onclick="setStar(3)">★</span>
-          <span class="star" onclick="setStar(4)">★</span>
-          <span class="star" onclick="setStar(5)">★</span>
-        </div>
-        <div class="add-label">Notes</div>
-        <textarea id="add-note" placeholder="What did you think?"></textarea>
-      </div>
-      <div style="display:flex;gap:9px">
-        <button class="btn-close" onclick="closeAdd()">Cancel</button>
-        <button class="btn-save" id="add-confirm-btn" onclick="confirmAdd()">SAVE</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<script>
-// ── Config ────────────────────────────────────────────────────────────────────
-// TMDB_TOKEN removed — now stored in Cloudflare Worker secret
-const TMDB_BASE = "https://movie-night-proxy.dafa4me.workers.dev/tmdb";
-const TMDB_IMG  = "https://image.tmdb.org/t/p/w300";
-const ANTHROPIC_KEY = "enabled"; // Key stored securely in Cloudflare Worker
-const PROXY_URL = "https://movie-night-proxy.dafa4me.workers.dev";
-
-const SB_URL = "https://ubjafkxdybiwgcupassu.supabase.co";
-const SB_KEY = "sb_publishable_Ep9kQs8XcfgUoK2ACiIo8w_CLDGkZJf";
-
-// ── Supabase Auth client ──────────────────────────────────────────────────────
-let sbClient = null;
-let currentUser = null;
-
-function showScreen(name) {
-  ["signin","signup","check-email"].forEach(s => {
-    const el = document.getElementById("screen-"+s);
-    if (el) el.style.display = s === name ? "flex" : "none";
-  });
-  document.getElementById("main-app").style.display = "none";
-}
-
-async function doSignIn() {
-  const email = document.getElementById("signin-email").value.trim();
-  const password = document.getElementById("signin-password").value;
-  const btn = document.getElementById("signin-btn");
-  const errEl = document.getElementById("signin-error");
-  errEl.style.display = "none";
-  if (!email || !password) { showSignInError("Please enter your email and password."); return; }
-  btn.textContent = "..."; btn.disabled = true;
-  try {
-    const { data, error } = await sbClient.auth.signInWithPassword({ email, password });
-    if (error) throw error;
-    await onSignedIn(data.user);
-  } catch(e) {
-    showSignInError(e.message);
-    btn.textContent = "SIGN IN"; btn.disabled = false;
-  }
-}
-
-function showSignInError(msg) {
-  const el = document.getElementById("signin-error");
-  el.textContent = msg; el.style.display = "block";
-}
-
-async function findUniqueName(baseName) {
-  // Check if name is taken, if so try baseName 1, baseName 2, etc.
-  const { data } = await sbClient.from("profiles")
-    .select("display_name")
-    .ilike("display_name", `${baseName}%`);
-  const taken = new Set((data || []).map(r => r.display_name?.toLowerCase()));
-  if (!taken.has(baseName.toLowerCase())) return baseName;
-  let i = 1;
-  while (taken.has(`${baseName.toLowerCase()} ${i}`)) i++;
-  return `${baseName} ${i}`;
-}
-
-async function doSignUp() {
-  const name = document.getElementById("signup-name").value.trim();
-  const email = document.getElementById("signup-email").value.trim();
-  const password = document.getElementById("signup-password").value;
-  const btn = document.getElementById("signup-btn");
-  const errEl = document.getElementById("signup-error");
-  errEl.style.display = "none";
-  if (!name) { showSignUpError("Please enter your name."); return; }
-  if (!email) { showSignUpError("Please enter your email."); return; }
-  if (password.length < 6) { showSignUpError("Password must be at least 6 characters."); return; }
-  btn.textContent = "..."; btn.disabled = true;
-  try {
-    // Find a unique display name
-    const uniqueName = await findUniqueName(name);
-    if (uniqueName !== name) {
-      // Let user know their name was adjusted
-      document.getElementById("signup-name").value = uniqueName;
-      showSignUpError(`"${name}" is taken — your name will be "${uniqueName}". Press Create Account again to confirm.`);
-      btn.textContent = "CREATE ACCOUNT"; btn.disabled = false;
-      return;
-    }
-    const { data, error } = await sbClient.auth.signUp({
-      email, password,
-      options: { data: { display_name: uniqueName } }
-    });
-    if (error) throw error;
-    if (data.user) {
-      try { await sbClient.from("profiles").upsert({ id: data.user.id, display_name: uniqueName }); } catch(e2) {}
-    }
-    document.getElementById("check-email-msg").innerHTML =
-      `We sent a confirmation link to<br><strong style="color:#f0f0f0">${email}</strong><br><br>Click it to activate your account.`;
-    showScreen("check-email");
-  } catch(e) {
-    showSignUpError(e.message);
-    btn.textContent = "CREATE ACCOUNT"; btn.disabled = false;
-  }
-}
-
-function showSignUpError(msg) {
-  const el = document.getElementById("signup-error");
-  el.textContent = msg; el.style.display = "block";
-}
-
-// keep for legacy compat
-function showAuthError(msg) { showSignInError(msg); }
-
-async function onSignedIn(user) {
-  currentUser = user;
-  ["signin","signup","check-email"].forEach(s => {
-    const el = document.getElementById("screen-"+s);
-    if (el) el.style.display = "none";
-  });
-  document.getElementById("main-app").style.display = "block";
-  try { watchHistory = await loadHistoryFromDB(); } catch(e) { console.warn(e); }
-  // Load display name: profile table first, user_metadata as fallback
-  try {
-    const metaName = user.user_metadata?.display_name || "";
-    const { data: pd } = await sbClient.from("profiles").select("display_name").eq("id", user.id).limit(1);
-    const profileName = pd?.[0]?.display_name || "";
-    currentUser.displayName = profileName || metaName;
-    if (!profileName && metaName) {
-      try { await sbClient.from("profiles").upsert({ id: user.id, display_name: metaName }); } catch(e2) {}
-    }
-  } catch(e) { console.warn("[profile]", e.message); }
-  // Check inbox for pending invites (sets badge, no notification on first load)
-  await checkPendingInvites(false);
-  await checkFeedbackBadge();
-  startInboxPolling();
-  initUI();
-}
-
-async function signOut() {
-  stopInboxPolling();
-  await sbClient.auth.signOut();
-  currentUser = null;
-  watchHistory = [];
-  document.getElementById("main-app").style.display = "none";
-  showScreen("signin");
-  document.getElementById("signin-email").value = "";
-  document.getElementById("signin-password").value = "";
-}
-
-// ── Quotes ────────────────────────────────────────────────────────────────────
-const QUOTES = [
-  { text: "I'll be back.", source: "The Terminator (1984)" },
-  { text: "You can't handle the truth!", source: "A Few Good Men (1992)" },
-  { text: "May the Force be with you.", source: "Star Wars (1977)" },
-  { text: "There's no place like home.", source: "The Wizard of Oz (1939)" },
-  { text: "To infinity and beyond!", source: "Toy Story (1995)" },
-  { text: "Why so serious?", source: "The Dark Knight (2008)" },
-  { text: "You talking to me?", source: "Taxi Driver (1976)" },
-  { text: "I see dead people.", source: "The Sixth Sense (1999)" },
-  { text: "Houston, we have a problem.", source: "Apollo 13 (1995)" },
-  { text: "My precious.", source: "The Lord of the Rings: The Two Towers (2002)" },
-  { text: "Life is like a box of chocolates.", source: "Forrest Gump (1994)" },
-  { text: "Just keep swimming.", source: "Finding Nemo (2003)" },
-  { text: "I am your father.", source: "The Empire Strikes Back (1980)" },
-  { text: "Here's looking at you, kid.", source: "Casablanca (1942)" },
-  { text: "Get busy living, or get busy dying.", source: "The Shawshank Redemption (1994)" },
-];
-const randQuote = () => QUOTES[Math.floor(Math.random() * QUOTES.length)];
-
-// ── Worker fetch (any path) ───────────────────────────────────────────────────
-async function workerFetch(path, body) {
-  const { data: { session } } = await sbClient.auth.getSession();
-  if (!session) return;
-  await fetch(PROXY_URL.replace(/\/$/, "") + path, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": "Bearer " + session.access_token,
-    },
-    body: JSON.stringify(body),
-  });
-}
-
-// ── AI JSON parser (robust) ──────────────────────────────────────────────────
-function extractJSON(text) {
-  const cleaned = text.replace(/```json|```/g, "").trim();
-  const match = cleaned.match(/\[[\s\S]*\]/);
-  if (!match) throw new Error("No JSON array in response");
-  return JSON.parse(match[0]);
-}
-
-async function proxyFetchWithRetry(body) {
-  let data = await proxyFetch(body);
-  let text = (data.content||[]).map(b=>b.text||"").join("");
-  try {
-    return extractJSON(text);
-  } catch(e) {
-    // One retry with explicit JSON instruction
-    const retryMessages = [
-      ...body.messages,
-      { role: "assistant", content: text },
-      { role: "user", content: "Your response was not valid JSON. Reply ONLY with a valid JSON array, no prose, no markdown." }
-    ];
-    data = await proxyFetch({ ...body, messages: retryMessages });
-    text = (data.content||[]).map(b=>b.text||"").join("");
-    return extractJSON(text);
-  }
-}
-
-// ── Proxy wrapper (JWT + 429 handling) ────────────────────────────────────────
-async function proxyFetch(body) {
-  const { data: { session } } = await sbClient.auth.getSession();
-  if (!session) throw new Error("Not signed in");
-  const res = await fetch(PROXY_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": "Bearer " + session.access_token,
-    },
-    body: JSON.stringify(body),
-  });
-  const remaining = res.headers.get("X-RateLimit-Remaining");
-  const limit = res.headers.get("X-RateLimit-Limit");
-  if (remaining !== null && limit !== null) updateAICounter(+remaining, +limit);
-  if (res.status === 429) {
-    const data = await res.json().catch(() => ({}));
-    handleRateLimitHit(data);
-    throw new Error("rate_limited");
-  }
-  if (res.status === 401) {
-    showToast("Session expired — please sign in again", true);
-    throw new Error("unauthorized");
-  }
-  if (!res.ok) throw new Error("Proxy error " + res.status);
-  return res.json();
-}
-
-function formatReset(iso) {
-  if (!iso) return "midnight UTC";
-  const reset = new Date(iso);
-  const diffMs = reset - Date.now();
-  if (diffMs <= 0) return "soon";
-  const hours = Math.floor(diffMs / 3600000);
-  const minutes = Math.floor((diffMs % 3600000) / 60000);
-  return hours > 0 ? `in ${hours}h ${minutes}m` : `in ${minutes}m`;
-}
-
-function handleRateLimitHit(data) {
-  const resetStr = formatReset(data.reset_at);
-  const seen = localStorage.getItem("seenLimitExplainer") === "1";
-  if (!seen) {
-    showLimitExplainer(data, resetStr);
-    localStorage.setItem("seenLimitExplainer", "1");
-  } else {
-    showToast(`AI limit reached (${data.limit||20}/day) — resets ${resetStr} 🌙`, true);
-  }
-}
-
-function showLimitExplainer(data, resetStr) {
-  const ov = document.createElement("div");
-  ov.className = "overlay";
-  ov.style.display = "flex";
-  ov.onclick = () => ov.remove();
-  ov.innerHTML = `
-    <div style="padding:20px;width:100%;display:flex;justify-content:center" onclick="event.stopPropagation()">
-      <div class="add-modal" style="max-width:340px">
-        <div style="font-family:'Bebas Neue',cursive;color:#F5C518;font-size:13px;letter-spacing:2px;margin-bottom:4px">DAILY AI LIMIT REACHED</div>
-        <div style="font-family:'Bebas Neue',cursive;font-size:20px;margin-bottom:14px;line-height:1.2">You've used all ${data.limit||20} AI picks for today</div>
-        <div style="color:#bbb;font-size:13px;line-height:1.6;margin-bottom:14px">
-          Resets ${resetStr}. Search and watchlist still work — only AI picks are paused.
-        </div>
-        <div style="color:#666;font-size:12px;line-height:1.6;margin-bottom:18px;padding:10px 12px;background:rgba(255,255,255,0.03);border-radius:8px;border:1px solid rgba(255,255,255,0.06)">
-          I'm building this solo and each AI pick costs real money. The daily cap keeps the app free and sustainable — thanks for understanding.
-        </div>
-        <button class="btn-save" style="width:100%" onclick="this.closest('.overlay').remove()">GOT IT</button>
-      </div>
-    </div>`;
-  document.body.appendChild(ov);
-}
-
-let _aiQuota = { remaining: null, limit: null };
-function updateAICounter(remaining, limit) {
-  _aiQuota = { remaining, limit };
-  const el = document.getElementById("ai-counter");
-  if (!el) return;
-  if (remaining === null || limit === null) { el.textContent = ""; return; }
-  const low = remaining <= 3;
-  el.textContent = `${remaining}/${limit} AI picks left today`;
-  el.style.color = low ? "#f87171" : "#555";
-}
-
-// ── Supabase ──────────────────────────────────────────────────────────────────
-async function sbFetch(path, opts = {}) {
-  const { data: { session } } = await sbClient.auth.getSession();
-  const token = session ? session.access_token : SB_KEY;
-  const res = await fetch(SB_URL + "/rest/v1/" + path, {
-    ...opts,
-    headers: {
-      "apikey": SB_KEY,
-      "Authorization": "Bearer " + token,
-      "Content-Type": "application/json",
-      "Prefer": opts.prefer || "",
-      ...(opts.headers || {})
-    }
-  });
-  if (!res.ok) throw new Error(await res.text());
-  const text = await res.text();
-  return text ? JSON.parse(text) : [];
-}
-
-async function loadHistoryFromDB() {
-  const rows = await sbFetch("watchlist?order=created_at.desc");
-  if (!Array.isArray(rows)) { console.warn("[loadHistory] bad response:", rows); return watchHistory; }
-  return rows.map(r => ({
-    id: r.id, tmdbID: r.imdb_id, title: r.title, year: r.year,
-    poster: r.poster, stars: r.stars || 0, comment: r.comment || "",
-    status: r.status || "watched", mediaType: r.media_type || "movie",
-    composer: r.composer || "",
-    director: r.director || "",
-    date: new Date(r.created_at).toLocaleDateString("en-GB")
-  }));
-}
-
-async function saveEntryToDB(entry) {
-  await sbFetch("watchlist", {
-    method: "POST",
-    prefer: "return=representation",
-    body: JSON.stringify({
-      imdb_id: entry.tmdbID,
-      title: entry.title,
-      year: entry.year,
-      poster: entry.poster,
-      stars: entry.stars,
-      comment: entry.comment,
-      status: entry.status,
-      media_type: entry.mediaType || "movie",
-      composer: entry.composer || null,
-      director: entry.director || null,
-      user_id: currentUser ? currentUser.id : null
-    })
-  });
-}
-
-async function deleteEntryFromDB(id) {
-  await sbFetch(`watchlist?id=eq.${id}`, { method: "DELETE" });
-}
-
-async function updateEntryInDB(id, fields) {
-  await sbFetch(`watchlist?id=eq.${id}`, {
-    method: "PATCH",
-    prefer: "return=representation",
-    body: JSON.stringify(fields)
-  });
-}
-
-// ── TMDB ──────────────────────────────────────────────────────────────────────
-async function tmdbFetch(path) {
-  const { data: { session } } = await sbClient.auth.getSession();
-  const headers = { "accept": "application/json" };
-  if (session) headers["Authorization"] = "Bearer " + session.access_token;
-  const res = await fetch(TMDB_BASE + path, { headers });
-  return res.json();
-}
-
-// Detect if query contains Cyrillic
-function hasCyrillic(str) { return /[а-яёА-ЯЁ]/.test(str); }
-
-async function translateQuery(q) {
-  if (!ANTHROPIC_KEY) return q;
-  try {
-    const d = await proxyFetch({
-      model: "claude-haiku-4-5-20251001", max_tokens: 100,
-      messages: [{ role: "user", content: `Translate this movie/show title to English for searching. Reply with ONLY the English title, nothing else: "${q}"` }]
-    });
-    return d.content?.[0]?.text?.trim() || q;
-  } catch { return q; }
-}
-
-async function tmdbSearch(q) {
-  // Search in both English and original language simultaneously
-  const [enRes, multiRes] = await Promise.all([
-    tmdbFetch(`/search/multi?query=${encodeURIComponent(q)}&include_adult=false&language=en-US`),
-    tmdbFetch(`/search/multi?query=${encodeURIComponent(q)}&include_adult=false`)
-  ]);
-  // Merge and deduplicate
-  const all = [...(enRes.results||[]), ...(multiRes.results||[])];
-  const seen = new Set();
-  return all.filter(r => {
-    if ((r.media_type !== "movie" && r.media_type !== "tv") || seen.has(r.id)) return false;
-    seen.add(r.id);
-    return true;
-  }).slice(0, 10).map(r => ({
-    id: r.id,
-    tmdbID: String(r.id),
-    type: r.media_type,
-    Title: r.title || r.name,
-    Year: (r.release_date || r.first_air_date || "").slice(0,4),
-    Poster: r.poster_path ? TMDB_IMG + r.poster_path : "",
-    Rating: r.vote_average ? r.vote_average.toFixed(1) : null,
-    Genre: ""
-  }));
-}
-
-async function tmdbDetail(id, type) {
-  type = type || "movie";
-  // If type is wrong, TMDB returns success=false or empty title — auto-detect
-  let detail = await tmdbFetch(`/${type}/${id}?language=en-US`);
-  if (!detail.title && !detail.name) {
-    const alt = type === "movie" ? "tv" : "movie";
-    const altDetail = await tmdbFetch(`/${alt}/${id}?language=en-US`);
-    if (altDetail.title || altDetail.name) { detail = altDetail; type = alt; }
-  }
-  const credits = await tmdbFetch(`/${type}/${id}/credits?language=en-US`);
-  const director = credits.crew?.filter(c => c.job === "Director").map(c => c.name).join(", ") || "";
-  const cast = credits.cast?.slice(0,6).map(c => c.name).join(", ") || "";
-  const writers = credits.crew?.filter(c => ["Screenplay","Writer","Story"].includes(c.job)).slice(0,3).map(c => c.name).join(", ") || "";
-  const composerJobs = ["Original Music Composer", "Music", "Composer"];
-  const composer = credits.crew
-    ?.filter(c => composerJobs.includes(c.job))
-    .map(c => c.name)
-    .filter((v, i, a) => a.indexOf(v) === i)
-    .join(", ") || "";
-  return {
-    tmdbID: String(id),
-    type,
-    Title: detail.title || detail.name || "",
-    OriginalTitle: detail.original_title || detail.original_name || "",
-    Year: (detail.release_date || detail.first_air_date || "").slice(0,4),
-    Poster: detail.poster_path ? TMDB_IMG + detail.poster_path : "",
-    Runtime: detail.runtime ? `${detail.runtime} min` : (detail.episode_run_time?.[0] ? `${detail.episode_run_time[0]} min/ep` : ""),
-    Rating: detail.vote_average ? detail.vote_average.toFixed(1) : null,
-    Plot: detail.overview || "",
-    Genre: (detail.genres||[]).map(g=>g.name).join(", "),
-    Director: director,
-    Cast: cast,
-    Writers: writers,
-    Composer: composer,
-    Country: (detail.production_countries||[]).map(c=>c.name).join(", "),
-    Language: (detail.spoken_languages||[]).map(l=>l.english_name).join(", "),
-    Tagline: detail.tagline || "",
-    Status: detail.status || "",
-    Seasons: detail.number_of_seasons || null,
-    Episodes: detail.number_of_episodes || null,
-    Networks: (detail.networks||[]).map(n=>n.name).join(", "),
-  };
-}
-
-// ── State ─────────────────────────────────────────────────────────────────────
-let watchHistory = [];
-let currentAddMovie = null;
-let currentAddStatus = "watched";
-let currentStars = 0;
-let historyFilter = "all";
-
-// ── Tabs ──────────────────────────────────────────────────────────────────────
-function switchTab(name) {
-  ["search","recs","history","inbox"].forEach(t => {
-    document.getElementById("tab-"+t).style.display = t === name ? "block" : "none";
-  });
-  document.querySelectorAll(".tab-btn").forEach((btn, i) => {
-    btn.classList.toggle("active", ["search","recs","history","inbox"][i] === name);
-  });
-  if (name === "history") renderHistory();
-  if (name === "inbox") renderInbox();
-  if (name === "recs") {
-    const watched = watchHistory.filter(h => h.status === "watched");
-    document.getElementById("rec-history-hint").textContent = watched.length > 0
-      ? `Based on ${watched.length} watched film${watched.length > 1 ? "s" : ""}`
-      : "Add watched films for personalised picks";
-  }
-}
-
-// ── Sharing ───────────────────────────────────────────────────────────────────
-let currentShareMovie = null;
-let currentShareToUser = null;
-
-function openShare(movie) {
-  currentShareMovie = movie;
-  currentShareToUser = null;
-  document.getElementById("share-movie-title").textContent = `${movie.Title} (${movie.Year})`;
-  document.getElementById("share-message").value = "";
-  document.getElementById("share-search").value = "";
-  document.getElementById("share-user-results").style.display = "none";
-  document.getElementById("share-to-display").style.display = "none";
-  document.getElementById("share-overlay").style.display = "flex";
-}
-
-function closeShare() {
-  document.getElementById("share-overlay").style.display = "none";
-}
-
-async function searchUsers(q) {
-  const el = document.getElementById("share-user-results");
-  if (!q.trim() || q.length < 2) { el.style.display = "none"; return; }
-  el.innerHTML = `<div style="padding:10px 12px;color:#555;font-size:13px">Searching...</div>`;
-  el.style.display = "block";
-  try {
-    const { data, error } = await sbClient.rpc("search_profiles", {
-      search_query: q, exclude_id: currentUser.id
-    });
-    if (error) throw new Error(error.message);
-    if (!data || !data.length) {
-      el.innerHTML = `<div style="padding:10px 12px;color:#555;font-size:13px">Not found — enter exact name</div>`;
-      return;
-    }
-    el.innerHTML = data.map(u => {
-      const safeName = (u.display_name || "").replace(/\\/g, "\\\\").replace(/'/g, "\\'");
-      return `<div onclick="selectUser('${u.id}','${safeName}')" style="padding:10px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid rgba(255,255,255,0.05)"
-        onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background='none'">
-        ${u.display_name}
-      </div>`;
-    }).join("");
-  } catch(e) {
-    el.innerHTML = `<div style="padding:10px 12px;color:#f87171;font-size:12px">⚠ ${e.message}</div>`;
-  }
-}
-
-function selectUser(id, name) {
-  currentShareToUser = { id, name };
-  document.getElementById("share-search").value = name;
-  document.getElementById("share-user-results").style.display = "none";
-  const disp = document.getElementById("share-to-display");
-  disp.textContent = `→ Sending to ${name}`;
-  disp.style.display = "block";
-}
-
-async function confirmShare() {
-  if (!currentShareToUser) { showToast("Select a user first", true); return; }
-  const m = currentShareMovie;
-  const btn = document.getElementById("share-confirm-btn");
-  btn.textContent = "SENDING..."; btn.disabled = true;
-  try {
-    const { error } = await sbClient.from("invites").insert({
-      from_user_id: currentUser.id,
-      to_user_id: currentShareToUser.id,
-      tmdb_id: String(m.tmdbID || m.id || ""),
-      title: m.Title || "",
-      year: m.Year || "",
-      poster: m.Poster || "",
-      media_type: m.type || m.mediaType || "movie",
-      message: document.getElementById("share-message").value || null,
-      status: "pending",
-      from_name: currentUser.displayName || currentUser.email?.split("@")[0] || "someone",
-      to_name: currentShareToUser.name || ""
-    });
-    if (error) throw new Error(error.message);
-    closeShare();
-    showToast(`Sent to ${currentShareToUser.name} 🎬`);
-  } catch(e) {
-    showToast("Could not send: " + e.message, true);
-  }
-  btn.textContent = "SEND"; btn.disabled = false;
-}
-
-async function renderInbox() {
-  const el = document.getElementById("inbox-list");
-  el.innerHTML = `<div style="color:#555;text-align:center;padding:30px 0">Loading...</div>`;
-  try {
-    const { data: received, error: recErr } = await sbClient.from("invites")
-      .select("*")
-      .eq("to_user_id", currentUser.id)
-      .order("created_at", { ascending: false });
-
-    const { data: sent, error: sentErr } = await sbClient.from("invites")
-      .select("*")
-      .eq("from_user_id", currentUser.id)
-      .order("created_at", { ascending: false })
-      .limit(20);
-
-    console.log("[inbox] received:", received, recErr, "| sent:", sent, sentErr);
-
-    const allItems = [
-      ...(received || []).map(inv => ({ ...inv, _dir: "in" })),
-      ...(sent || []).map(inv => ({ ...inv, _dir: "out" }))
-    ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-
-    const seen = new Set();
-    const items = allItems.filter(inv => {
-      if (seen.has(inv.id)) return false;
-      seen.add(inv.id); return true;
-    });
-
-    const pending = items.filter(i => i._dir === "in" && i.status === "pending");
-
-    if (!items.length) {
-      el.innerHTML = `<div class="empty"><div class="icon">📬</div><div class="title">YOUR INBOX IS EMPTY</div><div class="sub">Share a film from search results or your list</div></div>`;
-      document.getElementById("inbox-badge").style.display = "none";
-      return;
-    }
-
-    const statusColor = s => s === "accepted" ? "#4ade80" : s === "declined" ? "#f87171" : "#888";
-    const statusLabel = s => s === "accepted" ? "✓ accepted" : s === "declined" ? "✕ declined" : "pending";
-
-    el.innerHTML = `
-      <div style="color:#555;font-size:11px;margin-bottom:14px">${items.length} message${items.length!==1?"s":""} · ${pending.length} pending</div>
-      <div class="card-list">
-        ${items.map(inv => {
-          const isIn = inv._dir === "in";
-          const isPending = isIn && inv.status === "pending";
-          const invKey = regMovie({ tmdbID: inv.tmdb_id, Title: inv.title, Year: inv.year, Poster: inv.poster, type: inv.media_type || "movie", _invId: inv.id, _invFull: inv });
-          return `
-          <div style="background:${isPending ? "rgba(124,58,237,0.06)" : "rgba(255,255,255,0.02)"};border:1px solid ${isPending ? "rgba(124,58,237,0.3)" : "rgba(255,255,255,0.06)"};border-radius:12px;padding:11px;display:flex;gap:11px;align-items:flex-start;position:relative">
-            <div onclick="${inv.tmdb_id ? `openDetail('${inv.tmdb_id}','${inv.media_type||"movie"}')` : ""}" style="cursor:${inv.tmdb_id ? "pointer" : "default"};flex-shrink:0">
-              ${posterHTML(inv.poster, inv.title, 46, 66)}
-            </div>
-            <div style="flex:1;min-width:0">
-              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px">
-                <div>
-                  <div onclick="${inv.tmdb_id ? `openDetail('${inv.tmdb_id}','${inv.media_type||"movie"}')` : ""}" style="font-family:'Bebas Neue',cursive;font-size:15px;line-height:1.2;cursor:${inv.tmdb_id ? "pointer" : "default"}">${inv.title}${inv.year ? ` (${inv.year})` : ""}</div>
-                  <div style="font-size:11px;margin-top:2px">
-                    ${isIn
-                      ? `<span style="color:#a78bfa">↓ from ${inv.from_name || "someone"}</span>`
-                      : `<span style="color:#555">↑ to ${inv.to_name || "?"}</span>`}
-                    <span style="color:${statusColor(inv.status)};margin-left:8px">${statusLabel(inv.status)}</span>
-                  </div>
-                </div>
-                <button onclick="deleteInvite('${inv.id}')" class="hist-del" style="flex-shrink:0;font-size:18px;padding:0;line-height:1">×</button>
-              </div>
-              ${inv.message ? `<div style="color:#aaa;font-size:12px;font-style:italic;margin-top:5px">"${inv.message}"</div>` : ""}
-              ${inv.tmdb_id ? `<div style="color:#444;font-size:11px;margin-top:4px">tap poster or title for details →</div>` : ""}
-              ${isPending ? `
-              <div style="display:flex;gap:8px;margin-top:9px">
-                <button onclick="respondInviteByKey('${invKey}','accepted')"
-                  style="padding:4px 12px;border-radius:6px;background:#F5C518;border:none;color:#111;font-family:'Bebas Neue',cursive;font-size:12px;cursor:pointer;letter-spacing:1px">+ Watchlist</button>
-                <button onclick="respondInviteByKey('${invKey}','declined')"
-                  style="padding:4px 12px;border-radius:6px;background:transparent;border:1px solid rgba(255,255,255,0.15);color:#666;font-family:'Bebas Neue',cursive;font-size:12px;cursor:pointer;letter-spacing:1px">✕ DECLINE</button>
-              </div>` : ""}
-            </div>
-          </div>`;
-        }).join("")}
-      </div>`;
-
-    const badge = document.getElementById("inbox-badge");
-    if (pending.length > 0) { badge.textContent = pending.length; badge.style.display = "inline"; }
-    else { badge.style.display = "none"; }
-
-  } catch(e) {
-    console.error("[inbox]", e);
-    el.innerHTML = `<div class="empty"><div class="title">ERROR</div><div class="sub">${e.message}</div></div>`;
-  }
-}
-
-async function respondInviteByKey(key, status) {
-  const inv = _movieRegistry[key]?._invFull;
-  if (!inv) { showToast("Error: invite not found", true); return; }
-  await respondInvite(inv.id, status, status === "accepted" ? inv : null);
-}
-
-async function deleteInvite(id) {
-  try {
-    await sbFetch(`invites?id=eq.${id}`, { method: "DELETE" });
-    renderInbox();
-  } catch(e) {
-    console.error("[deleteInvite]", e.message);
-    showToast("Could not delete: " + e.message, true);
-  }
-}
-
-async function respondInvite(id, status, inv) {
-  try {
-    const { error } = await sbClient.from("invites").update({ status }).eq("id", id);
-    if (error) throw new Error(error.message);
-    if (status === "accepted" && inv) {
-      await saveEntryToDB({
-        tmdbID: inv.tmdb_id, title: inv.title, year: inv.year,
-        poster: inv.poster, stars: 0, comment: "",
-        status: "plan", mediaType: inv.media_type || "movie"
-      });
-      const newHistory = await loadHistoryFromDB();
-      if (newHistory.length > 0 || watchHistory.length === 0) watchHistory = newHistory;
-      showToast(`"${inv.title}" added to your watchlist`);
-    } else {
-      showToast("Recommendation declined");
-    }
-  } catch(e) { showToast("Error: " + e.message, true); }
-  renderInbox();
-}
-
-// ── Notifications ─────────────────────────────────────────────────────────────
-let _lastKnownPendingCount = 0;
-let _realtimeChannel = null;
-
-// iOS requires AudioContext to be created/resumed after a user gesture
-let _audioCtx = null;
-function getAudioCtx() {
-  if (!_audioCtx) {
-    _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  }
-  // Resume if suspended (iOS puts it in suspended state until user interaction)
-  if (_audioCtx.state === "suspended") _audioCtx.resume();
-  return _audioCtx;
-}
-
-// Unlock audio on first touch (required for iOS)
-document.addEventListener("touchstart", () => {
-  try { getAudioCtx(); } catch(e) {}
-}, { once: true });
-document.addEventListener("click", () => {
-  try { getAudioCtx(); } catch(e) {}
-}, { once: true });
-
-function playNotificationSound() {
-  try {
-    const ctx = getAudioCtx();
-    if (!ctx) return;
-    const notes = [
-      { freq: 880,  start: 0,    dur: 0.15 },
-      { freq: 1320, start: 0.12, dur: 0.28 },
-    ];
-    notes.forEach(({ freq, start, dur }) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(freq, ctx.currentTime + start);
-      gain.gain.setValueAtTime(0, ctx.currentTime + start);
-      gain.gain.linearRampToValueAtTime(0.2, ctx.currentTime + start + 0.01);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + dur);
-      osc.start(ctx.currentTime + start);
-      osc.stop(ctx.currentTime + start + dur + 0.05);
-    });
-  } catch(e) { console.warn("[sound]", e.message); }
-}
-
-function triggerVibration() {
-  try {
-    if (navigator.vibrate) navigator.vibrate([80, 60, 120]);
-  } catch(e) {}
-}
-
-function notifyNewInvite(count) {
-  playNotificationSound();
-  triggerVibration();
-  showToast(`🎬 You have ${count} new film recommendation${count > 1 ? "s" : ""}!`);
-}
-
-async function checkPendingInvites(notify = false) {
-  if (!currentUser) return;
-  try {
-    const { data } = await sbClient.from("invites")
-      .select("id")
-      .eq("to_user_id", currentUser.id)
-      .eq("status", "pending");
-    const count = data?.length || 0;
-    const badge = document.getElementById("inbox-badge");
-    if (badge) { badge.textContent = count; badge.style.display = count > 0 ? "inline" : "none"; }
-    if (notify && count > _lastKnownPendingCount) {
-      notifyNewInvite(count - _lastKnownPendingCount);
-    }
-    _lastKnownPendingCount = count;
-  } catch(e) {}
-}
-
-function startInboxPolling() {
-  stopInboxPolling();
-  // Use Supabase Realtime for instant notifications (much better than polling)
-  _realtimeChannel = sbClient
-    .channel("inbox-" + currentUser.id)
-    .on("postgres_changes", {
-      event: "INSERT",
-      schema: "public",
-      table: "invites",
-      filter: `to_user_id=eq.${currentUser.id}`
-    }, (payload) => {
-      console.log("[realtime] new invite:", payload);
-      _lastKnownPendingCount++;
-      notifyNewInvite(1);
-      // Update badge
-      const badge = document.getElementById("inbox-badge");
-      if (badge) { badge.textContent = _lastKnownPendingCount; badge.style.display = "inline"; }
-      // If inbox tab is open, refresh it
-      if (document.getElementById("tab-inbox")?.style.display !== "none") renderInbox();
-    })
-    .subscribe((status) => {
-      console.log("[realtime] status:", status);
-    });
-}
-
-function stopInboxPolling() {
-  if (_realtimeChannel) {
-    sbClient.removeChannel(_realtimeChannel);
-    _realtimeChannel = null;
-  }
-}
-
-
-// ── Toast ─────────────────────────────────────────────────────────────────────
-function showToast(msg, isError = false) {
-  const existing = document.getElementById("toast");
-  if (existing) existing.remove();
-  const t = document.createElement("div");
-  t.id = "toast";
-  t.textContent = msg;
-  t.style.cssText = `position:fixed;bottom:90px;left:50%;transform:translateX(-50%);
-    background:${isError ? "#3b0a0a" : "#0a2010"};
-    border:1px solid ${isError ? "rgba(248,113,113,0.4)" : "rgba(74,222,128,0.3)"};
-    color:${isError ? "#fca5a5" : "#86efac"};
-    padding:10px 18px;border-radius:10px;font-size:13px;z-index:9999;
-    white-space:nowrap;pointer-events:none;transition:opacity .3s;
-    animation:fadeInUp .2s ease`;
-  document.body.appendChild(t);
-  setTimeout(() => { t.style.opacity = "0"; }, 2200);
-  setTimeout(() => t.remove(), 2500);
-}
-
-// ── UI helpers ────────────────────────────────────────────────────────────────
-function posterHTML(src, title, w=56, h=80) {
-  const s = `width:${w}px;height:${h}px;flex-shrink:0;border-radius:8px;overflow:hidden;background:#1a1a2e;display:flex;align-items:center;justify-content:center;font-size:22px`;
-  if (src && src !== "N/A") return `<div style="${s}"><img src="${src}" alt="${title||''}" style="width:100%;height:100%;object-fit:cover;object-position:top" onerror="this.parentNode.innerHTML='🎬'"></div>`;
-  return `<div style="${s}">🎬</div>`;
-}
-
-function starsHTML(n, size=13) {
-  return [1,2,3,4,5].map(s => `<span style="font-size:${size}px;color:${s<=n?'#F5C518':'#333'}">★</span>`).join("");
-}
-
-function loadingHTML(quote, withSkeletons) {
-  const skels = withSkeletons ? Array(5).fill(0).map((_,i) => `
-    <div class="skeleton-card" style="margin-top:9px">
-      <div class="skel-poster"></div>
-      <div class="skel-body">
-        <div class="skel-line" style="height:16px;width:60%;animation-delay:${i*.1}s"></div>
-        <div class="skel-line" style="height:11px;width:35%;animation-delay:${i*.1+.1}s"></div>
-      </div>
-    </div>`).join("") : "";
-  return `
-    <div class="loading-box">
-      <div class="dots">${[0,1,2,3,4].map(()=>`<div class="dot"></div>`).join("")}</div>
-      <div class="progress-track"><div class="progress-bar"></div></div>
-      <div class="loading-quote">"${quote.text}"</div>
-      <div class="loading-source">— ${quote.source}</div>
-      <div class="loading-sub">Searching...</div>
-    </div>${skels}`;
-}
-
-function getEntryStatus(tmdbID) {
-  const e = watchHistory.find(h => h.tmdbID === String(tmdbID));
-  return e ? e.status : null;
-}
-
-// Movie registry to avoid JSON-in-onclick issues
-const _movieRegistry = {};
-let _regCounter = 0;
-function regMovie(m) {
-  const key = 'mv' + (_regCounter++);
-  _movieRegistry[key] = m;
-  return key;
-}
-
-function movieCardHTML(m, why) {
-  const status = getEntryStatus(m.tmdbID || m.id);
-  const rating = m.Rating ? ` · ★ ${m.Rating}` : "";
-  const genre = m.Genre ? ` · ${m.Genre.split(",")[0]}` : "";
-  const mediaTag = m.type === "tv" ? ` · TV` : "";
-  const key = regMovie(m);
-  let actionBtns = "";
-  if (status === "watched") {
-    actionBtns = `<span class="badge-watched">✓ Watched</span>`;
-  } else if (status === "plan") {
-    actionBtns = `
-      <span class="badge-plan" style="margin-bottom:2px">🕐 Watchlist</span>
-      <button class="btn-watched" onclick="openAdd(_movieRegistry['${key}'],'watched')">✓ Watched</button>`;
-  } else {
-    actionBtns = `
-      <button class="btn-watchlist" onclick="openAdd(_movieRegistry['${key}'],'plan')">+ Watchlist</button>
-      <button class="btn-watched" onclick="openAdd(_movieRegistry['${key}'],'watched')">✓ Watched</button>`;
-  }
-  const topRadius = why ? "12px 12px 0 0" : "12px";
-  const idVal = m.tmdbID || m.id;
-  const typeVal = m.type || "movie";
-  // Share button
-  const shareBtn = idVal ? `<button onclick="openShare(_movieRegistry['${key}'])" style="padding:3px 8px;border-radius:6px;background:transparent;border:1px solid rgba(124,58,237,0.4);color:#a78bfa;font-size:11px;cursor:pointer;font-family:'Bebas Neue',cursive;letter-spacing:1px;transition:all .15s" onmouseover="this.style.borderColor='#7c3aed'" onmouseout="this.style.borderColor='rgba(124,58,237,0.4)'">↗ SHARE</button>` : "";
-  return `
-    <div>
-      <div class="card" style="border-radius:${topRadius};cursor:default;align-items:center">
-        <div onclick="${idVal ? `openDetail('${idVal}','${typeVal}')` : ''}" style="display:flex;gap:11px;flex:1;min-width:0;cursor:${idVal?'pointer':'default'}">
-          ${posterHTML(m.Poster, m.Title)}
-          <div class="card-body">
-            <div class="card-title">${m.Title||""}</div>
-            <div class="card-meta">${m.Year||""}${rating}${genre}${mediaTag}</div>
-            ${idVal ? `<div class="hint" style="margin-top:5px">tap for details →</div>` : ""}
+        <div class="heatmap-grid" id="heatmap-grid"></div>
+        <div class="heatmap-foot">
+          <button class="heatmap-clear" id="hm-clear" onclick="clearDateFilter()" style="display:none">clear filter</button>
+          <div class="heatmap-scale" id="hm-scale-wrap">
+            <span style="margin-right:2px">less</span>
+            <div class="heatmap-scale-cell" style="background:var(--paper)"></div>
+            <div class="heatmap-scale-cell hm-l1"></div>
+            <div class="heatmap-scale-cell hm-l2"></div>
+            <div class="heatmap-scale-cell hm-l3"></div>
+            <div class="heatmap-scale-cell hm-l4"></div>
+            <span style="margin-left:2px">more</span>
           </div>
         </div>
-        <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;margin-left:6px">
-          ${actionBtns}
-          ${shareBtn}
-        </div>
       </div>
-      ${why ? `<div class="why-strip">💡 ${why}</div>` : ""}
-    </div>`;
-}
+    </div>
 
-// ── Search ────────────────────────────────────────────────────────────────────
+    <div class="nav-section">
+      <span class="nav-label">Projects</span>
+      <div id="proj-list"></div>
+    </div>
+  </div>
 
-// Parse query: extract year if present, return { title, year }
-function parseQuery(raw) {
-  const yearOnly = raw.match(/^(\d{4})$/);
-  if (yearOnly) return { title: "", year: yearOnly[1] };
-  const withYear = raw.match(/^(.+?)\s+(\d{4})$/);
-  if (withYear) return { title: withYear[1].trim(), year: withYear[2] };
-  return { title: raw, year: null };
-}
+  <div class="sidebar-bottom">
+    <button id="new-proj-btn" onclick="openProjModal()">+ New project</button>
+  </div>
+</div>
 
-async function tmdbSearchWithYear(title, year) {
-  // If year-only, search popular movies/shows of that year
-  if (!title && year) {
-    const [movies, tv] = await Promise.all([
-      tmdbFetch(`/discover/movie?sort_by=popularity.desc&primary_release_year=${year}&language=en-US`),
-      tmdbFetch(`/discover/tv?sort_by=popularity.desc&first_air_date_year=${year}&language=en-US`)
-    ]);
-    const all = [
-      ...(movies.results||[]).map(r => ({ ...r, media_type: "movie" })),
-      ...(tv.results||[]).map(r => ({ ...r, media_type: "tv" }))
-    ].sort((a,b) => b.popularity - a.popularity).slice(0, 12);
-    return all.map(r => ({
-      id: r.id, tmdbID: String(r.id), type: r.media_type,
-      Title: r.title || r.name,
-      Year: (r.release_date || r.first_air_date || "").slice(0,4),
-      Poster: r.poster_path ? TMDB_IMG + r.poster_path : "",
-      Rating: r.vote_average ? r.vote_average.toFixed(1) : null,
-      Genre: ""
-    }));
+<!-- MAIN -->
+<div id="main">
+  <div id="topbar">
+    <button id="mob-menu" onclick="toggleSidebar()">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4h10M2 7h10M2 10h10"/></svg>
+    </button>
+    <div id="view-title">All captures</div>
+    <div id="search-wrap">
+      <svg class="search-icon-svg" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5l3 3"/></svg>
+      <input id="search-input" type="text" placeholder="Search..." oninput="render()">
+    </div>
+  </div>
+
+  <!-- CAPTURE -->
+  <div id="capture-area">
+    <button id="capture-btn" onclick="handleCapture()" title="Press to capture">
+      <!-- Microphone icon, big -->
+      <svg id="cap-mic" class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="9" y="3" width="6" height="11" rx="3"/>
+        <path d="M5 12a7 7 0 0014 0M12 19v3M8 22h8"/>
+      </svg>
+      <div id="cap-stop" class="btn-stop" style="display:none"></div>
+    </button>
+
+    <div class="capture-right">
+      <div class="capture-label">
+        <span class="capture-label-strong">Tap</span> the orb to record · or write below
+      </div>
+      <textarea id="quick-input" placeholder="A thought, a lyric, a plan, a memory… press Enter to save" onkeydown="handleTextEnter(event)"></textarea>
+      <div class="attach-row">
+        <button class="attach-btn" onclick="openFile('image/*,video/*')">
+          <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round">
+            <rect x="1.5" y="2.5" width="11" height="9" rx="1.5"/>
+            <circle cx="5" cy="6" r="1"/>
+            <path d="M1.5 10l3-3 2 2 3-3 3 3"/>
+          </svg>
+          Photo / Video
+        </button>
+        <button class="attach-btn" onclick="openSaveModal('midi')">
+          <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4">
+            <rect x="1.5" y="3.5" width="11" height="7" rx="1"/>
+            <path d="M5 3.5v7M9 3.5v7M1.5 7h11"/>
+          </svg>
+          MIDI note
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="content"></div>
+
+  <div id="statusbar">
+    <div class="sb-item"><div class="sb-dot"></div>Stored locally</div>
+    <div class="sb-item" id="sb-count">0 captures</div>
+    <div class="sb-item" style="margin-left:auto" id="sb-filter"></div>
+  </div>
+</div>
+</div>
+
+<!-- RECORDING -->
+<div id="rec-overlay">
+  <div class="rec-card">
+    <div class="rec-label">Listening</div>
+    <div class="rec-sub">Capture in progress</div>
+    <div class="rec-waves">
+      <div class="rwave" style="height:8px"></div>
+      <div class="rwave" style="height:18px"></div>
+      <div class="rwave" style="height:30px"></div>
+      <div class="rwave" style="height:14px"></div>
+      <div class="rwave" style="height:38px"></div>
+      <div class="rwave" style="height:22px"></div>
+      <div class="rwave" style="height:10px"></div>
+    </div>
+    <div class="rec-time" id="rec-time">0:00</div>
+    <button class="rec-stop" onclick="stopRecording()"><div class="rec-stop-sq"></div></button>
+    <button class="rec-cancel" onclick="cancelRecording()">cancel</button>
+  </div>
+</div>
+
+<!-- SAVE -->
+<div id="save-overlay">
+  <div class="save-card">
+    <div class="save-heading" id="save-heading">Save capture</div>
+    <div class="fg">
+      <label class="flabel">Title (optional)</label>
+      <input class="finput" id="s-name" type="text" placeholder="Auto-generated if blank">
+    </div>
+    <div class="frow2">
+      <div class="fg">
+        <label class="flabel">Type</label>
+        <select class="fselect" id="s-type">
+          <option value="audio">Audio</option>
+          <option value="idea">Idea</option>
+          <option value="text">Text / Lyrics</option>
+          <option value="dream">Dream</option>
+          <option value="photo">Photo</option>
+          <option value="video">Video</option>
+          <option value="midi">MIDI</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label class="flabel">Project</label>
+        <select class="fselect" id="s-proj"><option value="">— Inbox</option></select>
+      </div>
+    </div>
+    <div class="frow3">
+      <div class="fg"><label class="flabel">BPM</label><input class="finput" id="s-bpm" type="number" placeholder="120"></div>
+      <div class="fg"><label class="flabel">Key</label><input class="finput" id="s-key" type="text" placeholder="C min"></div>
+      <div class="fg"><label class="flabel">Mood</label><input class="finput" id="s-mood" type="text" placeholder="dark"></div>
+    </div>
+    <div class="fg">
+      <label class="flabel">Tags</label>
+      <div class="tags-wrap" id="tags-wrap" onclick="document.getElementById('tag-in').focus()">
+        <input class="tinput" id="tag-in" placeholder="#tag…" onkeydown="handleTag(event)">
+      </div>
+    </div>
+    <div class="fg">
+      <label class="flabel">Note</label>
+      <textarea class="ftextarea" id="s-note" placeholder="Describe the idea, the feeling, the context…"></textarea>
+    </div>
+    <div class="frow2">
+      <div class="fg"><label class="flabel">Status</label>
+        <select class="fselect" id="s-status">
+          <option value="raw">Raw sketch</option>
+          <option value="dev">In progress</option>
+          <option value="done">Done</option>
+          <option value="archived">Archived</option>
+        </select>
+      </div>
+      <div class="fg"><label class="flabel">Genre</label><input class="finput" id="s-genre" type="text" placeholder="ambient"></div>
+    </div>
+    <div class="save-actions">
+      <button class="btn-cancel" onclick="closeSave()">Cancel</button>
+      <button class="btn-save" onclick="confirmSave()">Save →</button>
+    </div>
+  </div>
+</div>
+
+<!-- PROJECT MODAL -->
+<div id="proj-overlay">
+  <div class="proj-card">
+    <h3>New project</h3>
+    <div class="fg"><label class="flabel">Name</label><input class="finput" id="p-name" type="text" placeholder="Project name…"></div>
+    <div class="fg"><label class="flabel">Description</label><textarea class="ftextarea" id="p-desc" placeholder="What's this project about?" style="min-height:52px"></textarea></div>
+    <div class="fg">
+      <label class="flabel">Colour</label>
+      <div class="color-row" id="color-row">
+        <div class="cswatch sel" data-c="#e8a87c" style="background:#e8a87c" onclick="pickColor(this)"></div>
+        <div class="cswatch" data-c="#88a896" style="background:#88a896" onclick="pickColor(this)"></div>
+        <div class="cswatch" data-c="#7fa0c0" style="background:#7fa0c0" onclick="pickColor(this)"></div>
+        <div class="cswatch" data-c="#c47878" style="background:#c47878" onclick="pickColor(this)"></div>
+        <div class="cswatch" data-c="#9580a8" style="background:#9580a8" onclick="pickColor(this)"></div>
+        <div class="cswatch" data-c="#94a878" style="background:#94a878" onclick="pickColor(this)"></div>
+        <div class="cswatch" data-c="#c69968" style="background:#c69968" onclick="pickColor(this)"></div>
+      </div>
+    </div>
+    <div class="fg"><label class="flabel">Template</label>
+      <select class="fselect" id="p-tpl">
+        <option value="composition">Composition</option>
+        <option value="album">Album / EP</option>
+        <option value="collab">Collab</option>
+        <option value="sounddesign">Sound design</option>
+        <option value="diary">Diary</option>
+        <option value="free">Free form</option>
+      </select>
+    </div>
+    <div class="save-actions">
+      <button class="btn-cancel" onclick="closeProjModal()">Cancel</button>
+      <button class="btn-save" onclick="createProj()">Create →</button>
+    </div>
+  </div>
+</div>
+
+<!-- DETAIL -->
+<div id="detail">
+  <div class="detail-top">
+    <div id="detail-pill" class="type-pill">—</div>
+    <button class="detail-close" onclick="closeDetail()">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 2l8 8M10 2l-8 8"/></svg>
+    </button>
+  </div>
+  <div class="detail-body" id="detail-body"></div>
+  <div class="detail-foot">
+    <button class="exp-btn" onclick="expTxt()">TXT</button>
+    <button class="exp-btn" onclick="expMd()">MD</button>
+    <button class="exp-btn" onclick="expJson()">JSON</button>
+    <button class="exp-btn" onclick="expAudio()">Audio</button>
+  </div>
+</div>
+
+<div id="sidebar-backdrop" onclick="closeSidebar()"></div>
+<div id="toast"></div>
+<div id="hm-tooltip" class="hm-tooltip"></div>
+<input type="file" id="file-in" style="display:none" onchange="handleFile(this)">
+
+<script>
+const DB='hum_entries', PJ='hum_projects', LV='hum_layout';
+let entries=JSON.parse(localStorage.getItem(DB)||'[]');
+let projects=JSON.parse(localStorage.getItem(PJ)||'[]');
+let layout=localStorage.getItem(LV)||'grid';
+let view='all', curEntry=null, pendingBlob=null, pendingDataUrl=null;
+let currentTags=[], selColor='#e8a87c';
+let mr=null, recChunks=[], recSec=0, recInterval=null;
+let dateFilter=null; // YYYY-MM-DD or null
+
+function persist(){ localStorage.setItem(DB,JSON.stringify(entries)); localStorage.setItem(PJ,JSON.stringify(projects)); localStorage.setItem(LV,layout); }
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,5); }
+function fmtDate(ts){ const d=new Date(ts); return d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})+' · '+d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}); }
+function fmtDur(s){ return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
+function escHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function autoTitle(e){ const d=new Date(e.ts); const pfx={audio:'Recording',text:'Note',idea:'Idea',dream:'Dream',photo:'Photo',video:'Video',midi:'MIDI'}[e.type]||'Capture'; return pfx+' · '+d.toLocaleDateString('en-GB',{day:'numeric',month:'short'}); }
+function isToday(ts){ const d=new Date(ts), n=new Date(); return d.toDateString()===n.toDateString(); }
+function dayKey(ts){ return new Date(ts).toDateString(); }
+function dateKey(ts){ const d=new Date(ts); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+
+// ── HEATMAP ──
+function renderHeatmap(){
+  const WEEKS = 12;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const dayOfWeek = (today.getDay() + 6) % 7; // 0=Mon, 6=Sun
+  const totalDays = WEEKS * 7;
+  const start = new Date(today);
+  start.setDate(today.getDate() - dayOfWeek - (WEEKS - 1) * 7);
+
+  const counts = {};
+  entries.forEach(e => { const k = dateKey(e.ts); counts[k] = (counts[k] || 0) + 1; });
+
+  const allDays = [];
+  for (let i = 0; i < totalDays; i++) {
+    const d = new Date(start); d.setDate(start.getDate() + i);
+    allDays.push({ date: d, key: dateKey(d), count: counts[dateKey(d)] || 0, future: d > today });
   }
-  // Title + optional year: search normally then filter by year
-  let results = await tmdbSearch(title);
-  if (year) results = results.filter(r => r.Year === year);
-  // If year filter left nothing, fall back to unfiltered (year may be slightly off)
-  if (year && !results.length) results = await tmdbSearch(title);
-  return results;
-}
 
-async function doSearch() {
-  const raw = document.getElementById("search-input").value.trim();
-  if (!raw) return;
-  const el = document.getElementById("search-results");
-  el.innerHTML = loadingHTML(randQuote(), false);
-  try {
-    const { title, year } = parseQuery(raw);
-    let q = title;
-    if (hasCyrillic(q) && ANTHROPIC_KEY) q = await translateQuery(q);
-
-    let results = await tmdbSearchWithYear(q, year);
-
-    // Also search original Cyrillic if translated
-    if (hasCyrillic(title) && q !== title) {
-      const ruResults = await tmdbSearchWithYear(title, year);
-      const seen = new Set(results.map(r => r.tmdbID));
-      ruResults.forEach(r => { if (!seen.has(r.tmdbID)) results.push(r); });
-    }
-
-    if (!results.length) {
-      el.innerHTML = `<div class="empty"><div class="icon">🤷</div><div class="title">NO RESULTS</div><div class="sub">Try just the title without the year</div></div>`;
-      return;
-    }
-    el.innerHTML = `<div class="card-list">${results.map(m => movieCardHTML(m)).join("")}</div>`;
-  } catch(e) {
-    el.innerHTML = `<div class="empty"><div class="title">CONNECTION ERROR</div><div class="sub">${e.message}</div></div>`;
+  const max = Math.max(2, ...Object.values(counts));
+  function level(c) {
+    if (c === 0) return '';
+    const r = c / max;
+    if (r <= 0.25) return 'hm-l1';
+    if (r <= 0.5)  return 'hm-l2';
+    if (r <= 0.75) return 'hm-l3';
+    return 'hm-l4';
   }
-}
 
-// ── Detail ────────────────────────────────────────────────────────────────────
-// Helper: render comma-separated names as clickable search tags
-function clickableNames(str, closeModal) {
-  if (!str) return "";
-  return str.split(", ").map(name => {
-    const safe = name.trim().replace(/'/g, "\\'");
-    const close = closeModal ? "closeDetail();" : "";
-    return `<span onclick="${close}openPerson('${safe}')" style="cursor:pointer;color:#ddd;border-bottom:1px dotted rgba(255,255,255,0.2);transition:color .15s;white-space:nowrap" onmouseover="this.style.color='#F5C518';this.style.borderBottomColor='#F5C518'" onmouseout="this.style.color='#ddd';this.style.borderBottomColor='rgba(255,255,255,0.2)'">${name.trim()}</span>`;
-  }).join('<span style="color:#555">, </span>');
-}
-
-async function openDetail(id, type) {
-  document.getElementById("detail-overlay").style.display = "flex";
-  document.getElementById("detail-content").innerHTML = loadingHTML(randQuote(), false);
-  try {
-    const d = await tmdbDetail(id, type || "movie");
-    const status = getEntryStatus(id);
-    const chips = d.Genre.split(", ").filter(Boolean).map(g => `<span class="chip">${g}</span>`).join("");
-    const crew = [
-      d.Director ? `<div class="crew-label">🎬 Director</div><div class="crew-val">${clickableNames(d.Director, true)}</div>` : "",
-      d.Composer ? `<div class="crew-label">🎵 Composer</div><div class="crew-val">${clickableNames(d.Composer, true)}${streamingLinks(`${d.Title} soundtrack`)}</div>` : "",
-      d.Writers  ? `<div class="crew-label">✍️ Screenplay</div><div class="crew-val">${clickableNames(d.Writers, true)}</div>` : "",
-      d.Cast     ? `<div class="crew-label">🌟 Cast</div><div class="crew-val">${clickableNames(d.Cast, true)}</div>` : "",
-    ].join("");
-    const tvInfo = d.Seasons ? `<div class="crew-label">SEASONS / EPISODES</div><div class="crew-val">${d.Seasons} seasons · ${d.Episodes} episodes${d.Networks ? ` · ${d.Networks}` : ""}</div>` : "";
-
-    // Auto-backfill composer/director for existing watchlist entries that have them empty
-    const existing = watchHistory.find(h => h.tmdbID === String(id));
-    if (existing) {
-      const patch = {};
-      if (!existing.composer && d.Composer) patch.composer = d.Composer;
-      if (!existing.director && d.Director) patch.director = d.Director;
-      if (Object.keys(patch).length) {
-        updateEntryInDB(existing.id, patch).then(async () => {
-          watchHistory = await loadHistoryFromDB();
-        }).catch(() => {});
+  const todayKey = dateKey(today);
+  // build weeks (columns)
+  const grid = document.getElementById('heatmap-grid');
+  let html = '';
+  for (let w = 0; w < WEEKS; w++) {
+    html += '<div class="hm-week">';
+    for (let d = 0; d < 7; d++) {
+      const day = allDays[w * 7 + d];
+      if (!day || day.future) {
+        html += `<div class="hm-cell hidden-day"></div>`;
+      } else {
+        const cls = ['hm-cell', level(day.count), day.key === todayKey ? 'today' : '', day.key === dateFilter ? 'selected' : ''].filter(Boolean).join(' ');
+        html += `<div class="${cls}" data-key="${day.key}" data-count="${day.count}" data-iso="${day.date.toISOString()}" onclick="toggleDateFilter('${day.key}')" onmouseenter="showHmTip(event)" onmouseleave="hideHmTip()"></div>`;
       }
     }
-
-    let actionBtns = `<button class="btn-close" onclick="closeDetail()">Close</button>`;
-    if (status === "watched") {
-      actionBtns += `<div class="already-badge">✓ Already watched</div>`;
-    } else if (status === "plan") {
-      actionBtns += `<div class="already-badge" style="color:#888">🕐 In your watchlist</div>`;
-      actionBtns += `<button class="btn-add-watched" onclick="openAdd(window._detailMovie,'watched')">✓ Watched</button>`;
-    } else {
-      actionBtns += `<button class="btn-add-plan" onclick="openAdd(window._detailMovie,'plan')">+ Watchlist</button>`;
-      actionBtns += `<button class="btn-add-watched" onclick="openAdd(window._detailMovie,'watched')">✓ Watched</button>`;
-    }
-
-    document.getElementById("detail-content").innerHTML = `
-      <div style="display:flex;gap:14px;margin-bottom:16px">
-        ${posterHTML(d.Poster, d.Title, 90, 134)}
-        <div style="flex:1;min-width:0">
-          <div class="modal-title">${d.Title}</div>
-          ${d.OriginalTitle && d.OriginalTitle !== d.Title ? `<div style="color:#555;font-size:11px;margin-top:1px">${d.OriginalTitle}</div>` : ""}
-          <div style="color:#666;font-size:12px;margin-top:3px">${d.Year}${d.Runtime ? ` · ${d.Runtime}` : ""}</div>
-          ${d.Rating ? `<div style="color:#F5C518;font-weight:700;font-size:15px;margin-top:4px">★ ${d.Rating} <span style="color:#555;font-weight:400;font-size:12px">/ 10 TMDB</span></div>` : ""}
-          ${d.Tagline ? `<div style="color:#555;font-size:12px;margin-top:3px;font-style:italic">"${d.Tagline}"</div>` : ""}
-          <div class="chips">${chips}</div>
-        </div>
-      </div>
-      ${d.Plot ? `<div class="plot">${d.Plot}</div>` : ""}
-      ${crew}${tvInfo}
-      ${d.Country ? `<div style="margin-bottom:14px"><div class="crew-label">COUNTRY / LANGUAGE</div><div class="crew-val">${d.Country} · ${d.Language}</div></div>` : ""}
-      <div class="modal-actions">${actionBtns}</div>`;
-    window._detailMovie = d;
-  } catch(e) {
-    document.getElementById("detail-content").innerHTML = `<div class="empty"><div class="title">ERROR</div><div class="sub">${e.message}</div></div>`;
+    html += '</div>';
   }
+  grid.innerHTML = html;
+
+  const last7 = allDays.slice(-7).reduce((s, d) => s + d.count, 0);
+  document.getElementById('hm-sub').textContent = last7 + ' this week';
+  document.getElementById('hm-clear').style.display = dateFilter ? '' : 'none';
 }
 
-function closeDetail() { document.getElementById("detail-overlay").style.display = "none"; }
+function toggleDateFilter(key){
+  if(dateFilter === key) dateFilter = null;
+  else dateFilter = key;
+  renderHeatmap();
+  render();
+}
 
-// ── Person filmography ────────────────────────────────────────────────────────
-function closePerson() { document.getElementById("person-overlay").style.display = "none"; }
+function clearDateFilter(){ dateFilter = null; renderHeatmap(); render(); }
 
-// ── Streaming links ───────────────────────────────────────────────────────────
-function streamingLinks(query, compact) {
-  const q = encodeURIComponent(query);
-  const links = [
-    {
-      label: "Spotify",
-      icon: `<svg width="16" height="16" viewBox="0 0 168 168"><circle cx="84" cy="84" r="84" fill="#1DB954"/><path d="M120.7 116.4c-1.6 2.7-5.1 3.5-7.7 1.9-21.2-13-47.9-15.9-79.3-8.7-3 .7-6.1-1.2-6.8-4.2-.7-3 1.2-6.1 4.2-6.8 34.4-7.9 64-4.5 87.8 10.1 2.7 1.6 3.5 5.1 1.9 7.7zm10.2-22.8c-2 3.4-6.4 4.5-9.8 2.5-24.3-14.9-61.3-19.3-90-10.5-3.7 1.1-7.6-1-8.7-4.7-1.1-3.7 1-7.6 4.7-8.7 32.8-10 73.5-5.1 101.3 12 3.4 2 4.5 6.4 2.5 9.8zm.9-23.8c-29.1-17.3-77.2-18.9-105-10.5-4.5 1.4-9.2-1.2-10.5-5.6-1.4-4.5 1.2-9.2 5.6-10.5 31.9-9.7 84.9-7.8 118.4 12.1 4 2.4 5.4 7.6 3 11.6-2.4 4.1-7.6 5.4-11.6 3z" fill="white"/></svg>`,
-      iconLg: `<svg width="20" height="20" viewBox="0 0 168 168"><circle cx="84" cy="84" r="84" fill="#1DB954"/><path d="M120.7 116.4c-1.6 2.7-5.1 3.5-7.7 1.9-21.2-13-47.9-15.9-79.3-8.7-3 .7-6.1-1.2-6.8-4.2-.7-3 1.2-6.1 4.2-6.8 34.4-7.9 64-4.5 87.8 10.1 2.7 1.6 3.5 5.1 1.9 7.7zm10.2-22.8c-2 3.4-6.4 4.5-9.8 2.5-24.3-14.9-61.3-19.3-90-10.5-3.7 1.1-7.6-1-8.7-4.7-1.1-3.7 1-7.6 4.7-8.7 32.8-10 73.5-5.1 101.3 12 3.4 2 4.5 6.4 2.5 9.8zm.9-23.8c-29.1-17.3-77.2-18.9-105-10.5-4.5 1.4-9.2-1.2-10.5-5.6-1.4-4.5 1.2-9.2 5.6-10.5 31.9-9.7 84.9-7.8 118.4 12.1 4 2.4 5.4 7.6 3 11.6-2.4 4.1-7.6 5.4-11.6 3z" fill="white"/></svg>`,
-      deep: `spotify:search:${query}`,
-      web: `https://open.spotify.com/search/${q}`
-    },
-    {
-      label: "Apple Music",
-      icon: `<svg width="16" height="16" viewBox="0 0 16 16"><defs><linearGradient id="apmG" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#f984a0"/><stop offset="100%" stop-color="#d3001a"/></linearGradient></defs><rect width="16" height="16" rx="3.5" fill="url(#apmG)"/><path fill-rule="evenodd" d="M10.9 2.5 6.13 3.46a.5.5 0 0 0-.46.49v5.95c0 .14-.01.27-.1.39-.1.11-.22.15-.35.18l-.31.06c-.5.1-.91.56-.91 1.1 0 .6.5 1.1 1.1 1.1.17 0 .34-.04.5-.12.43-.2.72-.64.72-1.13V5.2l3.83-.77v3.96c0 .14-.01.28-.1.39-.1.12-.22.15-.35.18l-.31.06c-.5.1-.91.56-.91 1.1 0 .6.5 1.1 1.1 1.1.17 0 .34-.04.5-.12.43-.2.72-.64.72-1.13V3.0a.5.5 0 0 0-.6-.49z" fill="white"/></svg>`,
-      iconLg: `<svg width="20" height="20" viewBox="0 0 16 16"><defs><linearGradient id="apmG" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#f984a0"/><stop offset="100%" stop-color="#d3001a"/></linearGradient></defs><rect width="20" height="20" rx="3.5" fill="url(#apmG)"/><path fill-rule="evenodd" d="M10.9 2.5 6.13 3.46a.5.5 0 0 0-.46.49v5.95c0 .14-.01.27-.1.39-.1.11-.22.15-.35.18l-.31.06c-.5.1-.91.56-.91 1.1 0 .6.5 1.1 1.1 1.1.17 0 .34-.04.5-.12.43-.2.72-.64.72-1.13V5.2l3.83-.77v3.96c0 .14-.01.28-.1.39-.1.12-.22.15-.35.18l-.31.06c-.5.1-.91.56-.91 1.1 0 .6.5 1.1 1.1 1.1.17 0 .34-.04.5-.12.43-.2.72-.64.72-1.13V3.0a.5.5 0 0 0-.6-.49z" fill="white"/></svg>`,
-      deep: `music://music.apple.com/search?term=${q}`,
-      web: `https://music.apple.com/search?term=${q}`
-    },
-    {
-      label: "YT Music",
-      icon: `<svg width="16" height="16" viewBox="0 0 24 24"><rect width="24" height="24" rx="5" fill="#FF0000"/><path d="M21.6 7.2s-.2-1.4-.8-2c-.8-.8-1.7-.8-2.1-.9C16.2 4 12 4 12 4s-4.2 0-6.7.3c-.4.1-1.3.1-2.1.9-.6.6-.8 2-.8 2S2 8.8 2 10.4v1.5c0 1.6.2 3.2.2 3.2s.2 1.4.8 2c.8.8 1.8.8 2.3.8C7 18 12 18 12 18s4.2 0 6.7-.3c.4-.1 1.3-.1 2.1-.9.6-.6.8-2 .8-2s.2-1.6.2-3.2v-1.5c0-1.6-.2-3.2-.2-3.2zm-12.4 6.5V8.3l5.7 2.7-5.7 2.7z" fill="white"/></svg>`,
-      iconLg: `<svg width="20" height="20" viewBox="0 0 24 24"><rect width="24" height="24" rx="5" fill="#FF0000"/><path d="M21.6 7.2s-.2-1.4-.8-2c-.8-.8-1.7-.8-2.1-.9C16.2 4 12 4 12 4s-4.2 0-6.7.3c-.4.1-1.3.1-2.1.9-.6.6-.8 2-.8 2S2 8.8 2 10.4v1.5c0 1.6.2 3.2.2 3.2s.2 1.4.8 2c.8.8 1.8.8 2.3.8C7 18 12 18 12 18s4.2 0 6.7-.3c.4-.1 1.3-.1 2.1-.9.6-.6.8-2 .8-2s.2-1.6.2-3.2v-1.5c0-1.6-.2-3.2-.2-3.2zm-12.4 6.5V8.3l5.7 2.7-5.7 2.7z" fill="white"/></svg>`,
-      deep: null,
-      web: `https://music.youtube.com/search?q=${q}`
-    }
-  ];
-  if (compact) {
-    return `<div style="display:flex;gap:7px;margin-top:8px">
-      ${links.map(s => {
-        const onclick = s.deep
-          ? `openStreaming('${s.deep.replace(/'/g, "\\'")}','${s.web.replace(/'/g, "\\'")}')`
-          : `window.open('${s.web.replace(/'/g, "\\'")}','_blank')`;
-        return `<button title="${s.label}" onclick="${onclick}" style="width:30px;height:30px;border-radius:${s.label==='Spotify'?'50%':'8px'};background:transparent;border:1px solid rgba(255,255,255,0.12);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;transition:border-color .15s" onmouseover="this.style.borderColor='rgba(255,255,255,0.4)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.12)'">${s.iconLg}</button>`;
-      }).join("")}
-    </div>`;
+function showHmTip(ev){
+  const cell = ev.currentTarget;
+  const count = parseInt(cell.dataset.count)||0;
+  const d = new Date(cell.dataset.iso);
+  const dateStr = d.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});
+  const txt = count===0 ? `${dateStr} · nothing captured` : `${dateStr} · ${count} capture${count===1?'':'s'}`;
+  const tip = document.getElementById('hm-tooltip');
+  tip.textContent = txt;
+  tip.classList.add('show');
+  const rect = cell.getBoundingClientRect();
+  tip.style.left = Math.round(rect.left + rect.width/2) + 'px';
+  tip.style.top  = Math.round(rect.top - 32) + 'px';
+  tip.style.transform = 'translateX(-50%)';
+}
+function hideHmTip(){ document.getElementById('hm-tooltip').classList.remove('show'); }
+function relDay(ts){
+  const d=new Date(ts), n=new Date();
+  const diff=Math.floor((n-d)/(86400000));
+  const dn=new Date(d); dn.setHours(0,0,0,0);
+  const nn=new Date(n); nn.setHours(0,0,0,0);
+  const dd=Math.floor((nn-dn)/86400000);
+  if(dd===0) return 'Today';
+  if(dd===1) return 'Yesterday';
+  if(dd<7) return dd+' days ago';
+  return d.toLocaleDateString('en-GB',{weekday:'long'});
+}
+function formatDayHeader(ts){
+  const d=new Date(ts); const dn=new Date(d); dn.setHours(0,0,0,0);
+  const nn=new Date(); nn.setHours(0,0,0,0);
+  const dd=Math.floor((nn-dn)/86400000);
+  if(dd===0||dd===1) return d.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'});
+  return d.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:dd>365?'numeric':undefined});
+}
+
+// ── LAYOUT ──
+function setLayout(l){
+  layout=l; persist();
+  document.getElementById('vt-grid').classList.toggle('active',l==='grid');
+  document.getElementById('vt-stream').classList.toggle('active',l==='stream');
+  render();
+}
+
+// ── SIDEBAR (mobile) ──
+function toggleSidebar(){
+  const sb = document.getElementById('sidebar');
+  const bd = document.getElementById('sidebar-backdrop');
+  sb.classList.toggle('open');
+  bd.style.display = sb.classList.contains('open') ? 'block' : 'none';
+}
+function closeSidebar(){
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebar-backdrop').style.display = 'none';
+}
+
+// ── VIEW ──
+function setView(v,el){
+  view=v;
+  document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
+  if(el) el.classList.add('active');
+  const titles={all:'All captures',inbox:'Inbox',today:'Today',audio:'Audio',text:'Text & Lyrics',idea:'Ideas',dream:'Dreams'};
+  const proj=projects.find(p=>p.id===v);
+  document.getElementById('view-title').textContent=proj?proj.name:(titles[v]||v);
+  dateFilter = null; // clear date filter on view change
+  renderHeatmap();
+  render();
+  closeSidebar();
+}
+
+// ── RENDER ──
+function render(){
+  const q=document.getElementById('search-input').value.toLowerCase();
+  let f=entries.slice();
+  if(view==='inbox') f=f.filter(e=>!e.project);
+  else if(view==='today') f=f.filter(e=>isToday(e.ts));
+  else if(!['all','audio','text','idea','dream'].includes(view)) f=f.filter(e=>e.project===view);
+  else if(view!=='all') f=f.filter(e=>e.type===view);
+  if(dateFilter) f=f.filter(e=>dateKey(e.ts)===dateFilter);
+  if(q) f=f.filter(e=>(e.name||'').toLowerCase().includes(q)||(e.note||'').toLowerCase().includes(q)||(e.tags||[]).some(t=>t.toLowerCase().includes(q)));
+  f.sort((a,b)=>b.ts-a.ts);
+
+  document.getElementById('cnt-all').textContent=entries.length;
+  document.getElementById('cnt-inbox').textContent=entries.filter(e=>!e.project).length;
+  document.getElementById('cnt-today').textContent=entries.filter(e=>isToday(e.ts)).length;
+  document.getElementById('sb-count').textContent=f.length+' capture'+(f.length===1?'':'s');
+  let filterText = '';
+  if(q) filterText += `"${q}"`;
+  if(dateFilter){
+    const d = new Date(dateFilter);
+    if(filterText) filterText += ' · ';
+    filterText += d.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});
   }
-  return `<div style="display:flex;gap:7px;margin-top:8px;flex-wrap:wrap">
-    ${links.map(s => {
-      const onclick = s.deep
-        ? `openStreaming('${s.deep.replace(/'/g, "\\'")}','${s.web.replace(/'/g, "\\'")}')`
-        : `window.open('${s.web.replace(/'/g, "\\'")}','_blank')`;
-      return `<button onclick="${onclick}" style="display:flex;align-items:center;gap:7px;padding:6px 13px;border-radius:20px;background:transparent;border:1px solid rgba(255,255,255,0.12);cursor:pointer;transition:border-color .15s" onmouseover="this.style.borderColor='rgba(255,255,255,0.4)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.12)'">${s.icon}<span style="color:#ddd;font-size:11px;font-weight:500;white-space:nowrap">${s.label}</span></button>`;
-    }).join("")}
+  document.getElementById('sb-filter').textContent=filterText;
+
+  const c=document.getElementById('content');
+  if(!f.length){
+    c.innerHTML=`<div class="empty"><div class="empty-circle"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="3"/></svg></div><div class="empty-title">Nothing here yet</div><div class="empty-sub">Tap the orb above to capture something</div>${entries.length===0?'<button onclick="loadDemo()" style="margin-top:16px;padding:8px 16px;border-radius:10px;border:1px dashed var(--ink4);background:none;font-family:var(--sans);font-size:12px;color:var(--ink3);cursor:pointer;">Load demo data</button>':''}</div>`;
+    return;
+  }
+
+  if(layout==='stream'){ c.innerHTML=streamHtml(f); }
+  else { c.innerHTML=`<div class="cards-grid">${f.map(cardHtml).join('')}</div>`; }
+}
+
+function cardHtml(e){
+  const proj=projects.find(p=>p.id===e.project);
+  const acc=proj?`<div class="card-accent" style="background:${proj.color}"></div>`:'';
+  const tlabel={audio:'audio',text:'text',idea:'idea',dream:'dream',photo:'photo',video:'video',midi:'midi'}[e.type]||e.type;
+  const ticon=typeIconSvg(e.type);
+  const tpill=`<span class="type-pill tp-${e.type}">${ticon}${tlabel}</span>`;
+  let body='';
+  if(e.type==='audio'&&e.data){
+    const bars=Array.from({length:28},(_,i)=>{const h=4+Math.abs(Math.sin(i*0.65+(e.ts%80))*20); return `<div class="wbar" style="height:${h.toFixed(0)}px"></div>`;}).join('');
+    body=`<div class="card-wave">${bars}</div>`;
+    if(e.note) body+=`<div class="card-preview">${escHtml(e.note)}</div>`;
+  } else if(e.type==='photo'&&e.data){
+    body=`<img class="card-photo" src="${e.data}" loading="lazy">`;
+    if(e.note) body+=`<div class="card-preview">${escHtml(e.note)}</div>`;
+  } else {
+    const t=e.note||e.text||'';
+    if(t) body=`<div class="card-preview">${escHtml(t)}</div>`;
+  }
+  const foot=[
+    `<span class="card-date">${fmtDate(e.ts)}</span>`,
+    e.bpm?`<span class="card-bpm">${e.bpm} bpm</span>`:'',
+    e.key?`<span class="card-tag">${escHtml(e.key)}</span>`:'',
+    ...(e.tags||[]).slice(0,2).map(t=>`<span class="card-tag">#${escHtml(t)}</span>`),
+    e.duration?`<span class="card-dur">${fmtDur(e.duration)}</span>`:''
+  ].filter(Boolean).join('');
+  return `<div class="card" onclick="openDetail('${e.id}')">${acc}<div class="card-head"><div class="card-title">${escHtml(e.name||autoTitle(e))}</div>${tpill}</div>${body}<div class="card-foot">${foot}</div></div>`;
+}
+
+function streamHtml(entries){
+  const groups={};
+  entries.forEach(e=>{ const k=dayKey(e.ts); if(!groups[k]) groups[k]=[]; groups[k].push(e); });
+  const keys=Object.keys(groups).sort((a,b)=>new Date(b)-new Date(a));
+  return `<div class="stream">${keys.map(k=>{
+    const items=groups[k];
+    const first=items[0];
+    return `<div class="stream-day">
+      <div class="stream-day-header">
+        <div class="stream-day-date">${formatDayHeader(first.ts)}</div>
+        <div class="stream-day-rel">${relDay(first.ts)} · ${items.length} capture${items.length===1?'':'s'}</div>
+        <div class="stream-day-line"></div>
+      </div>
+      ${items.map(streamItemHtml).join('')}
+    </div>`;
+  }).join('')}</div>`;
+}
+
+function streamItemHtml(e){
+  const time=new Date(e.ts).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  const tlabel=e.type;
+  const tpill=`<span class="type-pill tp-${e.type}">${typeIconSvg(e.type)}${tlabel}</span>`;
+  const proj=projects.find(p=>p.id===e.project);
+  const acc=proj?`<div class="card-accent" style="background:${proj.color}"></div>`:'';
+  let body='';
+  if(e.type==='audio'&&e.data){
+    const bars=Array.from({length:36},(_,i)=>{const h=4+Math.abs(Math.sin(i*0.55+(e.ts%80))*22); return `<div class="wbar" style="height:${h.toFixed(0)}px"></div>`;}).join('');
+    body=`<div class="card-wave">${bars}</div>`;
+  } else if(e.type==='photo'&&e.data){
+    body=`<img class="card-photo" src="${e.data}" loading="lazy">`;
+  }
+  const txt=e.note||e.text||'';
+  const foot=[
+    e.bpm?`<span class="card-bpm">${e.bpm} bpm</span>`:'',
+    e.key?`<span class="card-tag">${escHtml(e.key)}</span>`:'',
+    ...(e.tags||[]).slice(0,3).map(t=>`<span class="card-tag">#${escHtml(t)}</span>`),
+    e.duration?`<span class="card-dur">${fmtDur(e.duration)}</span>`:''
+  ].filter(Boolean).join('');
+  return `<div class="stream-entry" onclick="openDetail('${e.id}')">${acc}
+    <div class="stream-time">${time}${proj?` · <span style="color:${proj.color}">●</span> ${escHtml(proj.name)}`:''} ${tpill}</div>
+    ${e.name?`<div class="stream-entry-title">${escHtml(e.name)}</div>`:''}
+    ${body}
+    ${txt?`<div class="stream-entry-body">${escHtml(txt)}</div>`:''}
+    ${foot?`<div class="stream-entry-foot">${foot}</div>`:''}
   </div>`;
 }
 
-function openStreaming(deepLink, webUrl) {
-  // Try deep link first, fall back to web after 600ms
-  window.location.href = deepLink;
-  setTimeout(() => { window.open(webUrl, "_blank"); }, 600);
+function typeIconSvg(t){
+  const icons={
+    audio:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="6" y="2" width="4" height="7" rx="2"/><path d="M3.5 8a4.5 4.5 0 009 0M8 12.5v2"/></svg>',
+    text:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3 4h10M3 8h7M3 12h5"/></svg>',
+    idea:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M5 6.5a3 3 0 116 0c0 1.5-1 2-1.5 3-.3.6-.5 1.5-.5 2.5h-2c0-1-.2-1.9-.5-2.5C6 8.5 5 8 5 6.5z"/><path d="M6.5 14h3"/></svg>',
+    dream:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M4 12h7.5a2.5 2.5 0 100-5 .8.8 0 01-.05 0 3.5 3.5 0 00-6.7-.3A2.6 2.6 0 004 12z"/></svg>',
+    photo:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3.5" width="12" height="9" rx="1.5"/><circle cx="8" cy="8" r="2.5"/></svg>',
+    video:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="4" width="9" height="8" rx="1.5"/><path d="M11 7l3-2v6l-3-2"/></svg>',
+    midi:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="4" width="12" height="8" rx="1"/><path d="M5 4v8M9 4v8M2 8h12"/></svg>'
+  };
+  return icons[t]||'';
 }
 
-async function openPerson(name) {
-  const el = document.getElementById("person-content");
-  document.getElementById("person-overlay").style.display = "flex";
-  el.innerHTML = loadingHTML(randQuote(), false);
-  try {
-    // Search for person by name
-    const searchRes = await tmdbFetch(`/search/person?query=${encodeURIComponent(name)}&language=en-US`);
-    const person = searchRes.results?.[0];
-    if (!person) {
-      el.innerHTML = `<div class="empty"><div class="icon">🤷</div><div class="title">NOT FOUND</div><div class="sub">No results for "${name}"</div></div>
-        <div style="margin-top:16px"><button class="btn-close" onclick="closePerson()">Close</button></div>`;
-      return;
-    }
-    // Get combined credits (movies + tv)
-    const credits = await tmdbFetch(`/person/${person.id}/combined_credits?language=en-US`);
-    const photo = person.profile_path ? `https://image.tmdb.org/t/p/w300${person.profile_path}` : "";
-
-    // Combine cast + crew, deduplicate by id, sort by popularity
-    const allWorks = [...(credits.cast || []), ...(credits.crew || [])];
-    const seen = new Set();
-    const works = allWorks
-      .filter(r => {
-        if ((r.media_type !== "movie" && r.media_type !== "tv") || seen.has(r.id)) return false;
-        if (!r.poster_path || (r.vote_count || 0) < 10) return false; // skip entries without poster or data
-        seen.add(r.id); return true;
-      })
-      .sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
-
-    // Known for: top 3 by vote_count
-    const knownFor = [...works].sort((a,b) => (b.vote_count||0) - (a.vote_count||0)).slice(0,3)
-      .map(r => r.title || r.name).join(", ");
-
-    const dept = person.known_for_department || "";
-    const bio = person.biography ? person.biography.slice(0, 220) + (person.biography.length > 220 ? "…" : "") : "";
-
-    el.innerHTML = `
-      <div style="display:flex;gap:14px;margin-bottom:16px;align-items:flex-start">
-        ${photo
-          ? `<div style="width:72px;height:100px;flex-shrink:0;border-radius:8px;background:#1a1a2e url('${photo}') center top/cover no-repeat"></div>`
-          : `<div style="width:72px;height:100px;flex-shrink:0;border-radius:8px;background:#1a1a2e;display:flex;align-items:center;justify-content:center;font-size:28px">👤</div>`}
-        <div style="flex:1;min-width:0">
-          <div class="modal-title">${name}</div>
-          ${dept ? `<div style="color:#666;font-size:12px;margin-top:2px">${dept}</div>` : ""}
-          ${knownFor ? `<div style="color:#888;font-size:11px;margin-top:4px">Known for: ${knownFor}</div>` : ""}
-          ${dept === "Sound" || dept === "Music" ? streamingLinks(name, true) : ""}
-          ${bio ? `<div style="color:#777;font-size:11px;margin-top:6px;line-height:1.5">${bio}</div>` : ""}
-        </div>
-      </div>
-      <div style="color:#555;font-size:11px;margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px">Filmography · ${works.length} titles</div>
-      <div class="card-list">
-        ${works.map(r => {
-          const m = {
-            id: r.id, tmdbID: String(r.id), type: r.media_type,
-            Title: r.title || r.name,
-            Year: (r.release_date || r.first_air_date || "").slice(0,4),
-            Poster: r.poster_path ? `https://image.tmdb.org/t/p/w300${r.poster_path}` : "",
-            Rating: r.vote_average ? r.vote_average.toFixed(1) : null,
-            Genre: ""
-          };
-          const key = regMovie(m);
-          const status = getEntryStatus(m.tmdbID);
-          const role = r.character || r.job || "";
-          let actionBtns = "";
-          if (status === "watched") {
-            actionBtns = `<span class="badge-watched" style="font-size:10px">✓</span>`;
-          } else if (status === "plan") {
-            actionBtns = `<span style="color:#666;font-size:10px">🕐</span>`;
-          } else {
-            actionBtns = `
-              <button class="btn-watchlist" style="font-size:10px;padding:2px 7px" onclick="openAdd(_movieRegistry['${key}'],'plan')">+</button>
-              <button class="btn-watched" style="font-size:10px;padding:2px 7px" onclick="openAdd(_movieRegistry['${key}'],'watched')">✓</button>`;
-          }
-          return `
-          <div class="card" style="cursor:default;align-items:center">
-            <div onclick="closePerson();openDetail('${m.tmdbID}','${m.type}')" style="display:flex;gap:11px;flex:1;min-width:0;cursor:pointer">
-              ${posterHTML(m.Poster, m.Title)}
-              <div class="card-body">
-                <div class="card-title">${m.Title}</div>
-                <div class="card-meta">${m.Year}${m.Rating ? ` · ★ ${m.Rating}` : ""}${m.type === "tv" ? " · TV" : ""}</div>
-                ${role ? `<div style="color:#555;font-size:11px;margin-top:2px;font-style:italic">${role}</div>` : ""}
-              </div>
-            </div>
-            <div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0;margin-left:6px">${actionBtns}</div>
-          </div>`;
-        }).join("")}
-      </div>
-      <div style="margin-top:16px"><button class="btn-close" style="width:100%" onclick="closePerson()">Close</button></div>`;
-  } catch(e) {
-    el.innerHTML = `<div class="empty"><div class="title">ERROR</div><div class="sub">${e.message}</div></div>
-      <div style="margin-top:16px"><button class="btn-close" onclick="closePerson()">Close</button></div>`;
-  }
+// ── CAPTURE ──
+function handleCapture(){
+  if(mr&&mr.state==='recording'){ stopRecording(); return; }
+  startRecording();
 }
 
-// ── Add modal ─────────────────────────────────────────────────────────────────
-function openAdd(movie, status) {
-  if (typeof movie === "string") movie = JSON.parse(decodeURIComponent(movie));
-  currentAddMovie = movie;
-  currentAddStatus = status || "watched";
-  currentStars = 0;
-  document.getElementById("add-movie-title").textContent = `${movie.Title} (${movie.Year})`;
-  document.getElementById("add-modal-label").textContent = status === "plan" ? "ADD TO WATCHLIST" : "ADD TO HISTORY";
-  document.getElementById("add-confirm-btn").textContent = status === "plan" ? "SAVE" : "SAVE";
-  // Hide stars/notes for plan entries
-  document.getElementById("add-stars-section").style.display = status === "plan" ? "none" : "block";
-  document.getElementById("add-note").value = "";
-  renderStars(0);
-  document.getElementById("add-overlay").style.display = "flex";
-}
-
-function closeAdd() { document.getElementById("add-overlay").style.display = "none"; }
-function setStar(n) { currentStars = n; renderStars(n); }
-function renderStars(n) {
-  document.querySelectorAll("#stars-row .star").forEach((s, i) => s.classList.toggle("on", i < n));
-}
-
-async function confirmAdd() {
-  const m = currentAddMovie;
-  const btn = document.getElementById("add-confirm-btn");
-  btn.textContent = "SAVING..."; btn.disabled = true;
-
-  if (!sbClient) { alert("Not connected. Please sign out and sign in again."); btn.textContent = "SAVE"; btn.disabled = false; return; }
-  if (!currentUser) { alert("Session expired. Please sign in again."); btn.textContent = "SAVE"; btn.disabled = false; return; }
-
-  const tmdbID = String(m.tmdbID || m.id || "");
-  const existing = watchHistory.find(h => h.tmdbID === tmdbID);
-
-  // Composer/Director: from currentAddMovie if present, else from _detailMovie fallback
-  let composer = m.Composer || "";
-  let director = m.Director || "";
-  if (window._detailMovie && String(window._detailMovie.tmdbID) === tmdbID) {
-    if (!composer) composer = window._detailMovie.Composer || "";
-    if (!director) director = window._detailMovie.Director || "";
-  }
-
-  try {
-    if (existing) {
-      // Update existing entry instead of creating a duplicate
-      const fields = { status: currentAddStatus };
-      if (currentAddStatus === "watched") {
-        fields.stars = currentStars;
-        fields.comment = document.getElementById("add-note").value;
-      }
-      // Backfill composer/director if we now know them and row was empty
-      if (composer && !existing.composer) fields.composer = composer;
-      if (director && !existing.director) fields.director = director;
-      await updateEntryInDB(existing.id, fields);
-    } else {
-      await saveEntryToDB({
-        tmdbID,
-        title: m.Title || "",
-        year: m.Year || "",
-        poster: m.Poster || "",
-        stars: currentAddStatus === "plan" ? 0 : currentStars,
-        comment: currentAddStatus === "plan" ? "" : document.getElementById("add-note").value,
-        status: currentAddStatus,
-        mediaType: m.type || m.mediaType || "movie",
-        composer: composer || null,
-        director: director || null
-      });
-    }
-    const newHistory = await loadHistoryFromDB();
-    if (newHistory.length > 0 || watchHistory.length === 0) watchHistory = newHistory;
-  } catch(e) {
-    alert("Could not save: " + e.message);
-    btn.textContent = "SAVE"; btn.disabled = false;
+async function startRecording(){
+  // Check if getUserMedia is available (requires HTTPS or localhost)
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    toast('Audio requires HTTPS — use a local server or install as PWA');
     return;
   }
-  closeAdd();
-  closeDetail();
-  renderHistory();
-  btn.textContent = "SAVE"; btn.disabled = false;
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    recChunks=[]; recSec=0;
+    mr=new MediaRecorder(stream);
+    mr.ondataavailable=e=>recChunks.push(e.data);
+    mr.onstop=()=>{
+      stream.getTracks().forEach(t=>t.stop());
+      const blob=new Blob(recChunks,{type:'audio/webm'});
+      pendingBlob=blob;
+      document.getElementById('rec-overlay').classList.remove('show');
+      document.getElementById('capture-btn').classList.remove('recording');
+      document.getElementById('cap-mic').style.display='block';
+      document.getElementById('cap-stop').style.display='none';
+      openSaveModal('audio');
+    };
+    mr.start();
+    recInterval=setInterval(()=>{ recSec++; document.getElementById('rec-time').textContent=fmtDur(recSec); },1000);
+    document.getElementById('rec-overlay').classList.add('show');
+    document.getElementById('capture-btn').classList.add('recording');
+    document.getElementById('cap-mic').style.display='none';
+    document.getElementById('cap-stop').style.display='block';
+  }catch(err){
+    console.error('Mic error:', err);
+    if (err.name === 'NotAllowedError') {
+      toast('Allow microphone access in browser settings');
+    } else if (err.name === 'NotFoundError') {
+      toast('No microphone detected');
+    } else {
+      toast('Microphone error — try HTTPS');
+    }
+  }
 }
 
-// ── Picks ─────────────────────────────────────────────────────────────────────
-const _shownSurprises = JSON.parse(sessionStorage.getItem("shownSurprises") || "[]");
-
-const _surpriseModes = ["taste","taste","random","seasonal","taste","random"];
-let _surpriseModeIdx = Math.floor(Math.random() * _surpriseModes.length);
-
-function getSurpriseMode() {
-  return _surpriseModes[(_surpriseModeIdx++) % _surpriseModes.length];
+function stopRecording(){ if(mr&&mr.state==='recording'){ mr.stop(); clearInterval(recInterval); } }
+function cancelRecording(){
+  if(mr&&mr.state==='recording'){ mr.stop(); recChunks=[]; pendingBlob=null; }
+  clearInterval(recInterval);
+  document.getElementById('rec-overlay').classList.remove('show');
+  document.getElementById('capture-btn').classList.remove('recording');
+  document.getElementById('cap-mic').style.display='block';
+  document.getElementById('cap-stop').style.display='none';
 }
 
-function getSeasonalContext() {
-  const now = new Date();
-  const month = now.getMonth() + 1;
-  const day = now.getDay();
-  const hour = now.getHours();
-  const parts = [];
-  if (month === 12 || month === 1) parts.push("winter / holiday season");
-  else if (month >= 3 && month <= 5) parts.push("spring");
-  else if (month >= 6 && month <= 8) parts.push("summer");
-  else parts.push("autumn");
-  if (day === 5 || day === 6) parts.push("weekend");
-  else if (day === 0) parts.push("Sunday");
-  else parts.push("weekday evening");
-  if (hour >= 22) parts.push("late night");
-  else if (hour >= 20) parts.push("evening");
-  return parts.join(", ");
+function handleTextEnter(e){
+  if(e.key==='Enter'&&!e.shiftKey){
+    e.preventDefault();
+    const v=document.getElementById('quick-input').value.trim();
+    if(!v) return;
+    document.getElementById('s-note').value=v;
+    document.getElementById('quick-input').value='';
+    openSaveModal('text');
+  }
 }
 
-async function surpriseMe() {
-  const el = document.getElementById("rec-results");
-  el.innerHTML = loadingHTML(randQuote(), true);
-  try {
-    const mode = getSurpriseMode();
-    const recentlyShown = _shownSurprises.slice(-9).join(", ");
-    const watched = watchHistory.filter(h=>h.status==="watched").slice(-12)
-      .map(m => `${m.title} (${m.year})${m.stars?" "+m.stars+"\u2605":""}`).join(", ");
-    const planned = watchHistory.filter(h=>h.status==="plan").slice(-6)
-      .map(m => m.title).join(", ");
+function openFile(accept){ const f=document.getElementById('file-in'); f.accept=accept; f.click(); }
+function handleFile(input){
+  const file=input.files[0]; if(!file) return;
+  const type=file.type.startsWith('image')?'photo':'video';
+  const r=new FileReader();
+  r.onload=e=>{ pendingDataUrl=e.target.result; openSaveModal(type); };
+  r.readAsDataURL(file);
+  input.value='';
+}
 
-  let prompt = "";
+function openSaveModal(type){
+  currentTags=[]; renderTags();
+  ['s-name','s-note','s-bpm','s-key','s-mood','s-genre'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('s-status').value='raw';
+  document.getElementById('s-type').value=type;
+  const sel=document.getElementById('s-proj');
+  sel.innerHTML='<option value="">— Inbox</option>'+projects.map(p=>`<option value="${p.id}">${escHtml(p.name)}</option>`).join('');
+  const heads={audio:'Save recording',text:'Save note',idea:'Save idea',dream:'Save dream',photo:'Save photo',video:'Save video',midi:'Save MIDI'};
+  document.getElementById('save-heading').textContent=heads[type]||'Save capture';
+  document.getElementById('save-overlay').classList.add('show');
+  setTimeout(()=>document.getElementById('s-name').focus(),80);
+}
 
-  // Random angles to force variety each call
-  const angles = [
-    "Focus on films from non-English speaking countries.",
-    "Focus on films from the 1970s or 1980s.",
-    "Focus on documentary or animated films.",
-    "Focus on recent films from the last 3 years.",
-    "Focus on cult classics or underrated gems.",
-    "Focus on films from Asia or Latin America.",
-    "Focus on short films or miniseries under 4 episodes.",
-    "Include at least one silent era or black-and-white film.",
-    "Focus on films with female directors.",
-    "Mix decades: one classic, one from 90s-2000s, one recent.",
+function closeSave(){ document.getElementById('save-overlay').classList.remove('show'); pendingBlob=null; pendingDataUrl=null; }
+
+function handleTag(e){
+  if(['Enter',' ',','].includes(e.key)){
+    e.preventDefault();
+    const v=e.target.value.replace(/[#,\s]/g,'').trim();
+    if(v&&!currentTags.includes(v)) currentTags.push(v);
+    e.target.value=''; renderTags();
+  } else if(e.key==='Backspace'&&!e.target.value&&currentTags.length){
+    currentTags.pop(); renderTags();
+  }
+}
+function renderTags(){
+  const w=document.getElementById('tags-wrap'), inp=document.getElementById('tag-in');
+  w.innerHTML=currentTags.map((t,i)=>`<span class="tchip">#${escHtml(t)}<span class="tchip-x" onclick="rmTag(${i})">×</span></span>`).join('');
+  w.appendChild(inp);
+}
+function rmTag(i){ currentTags.splice(i,1); renderTags(); }
+
+async function confirmSave(){
+  const type=document.getElementById('s-type').value;
+  const name=document.getElementById('s-name').value.trim();
+  const proj=document.getElementById('s-proj').value;
+  const note=document.getElementById('s-note').value.trim();
+  const entry={
+    id:uid(), ts:Date.now(), type,
+    name:name||null, project:proj||null, note,
+    tags:[...currentTags],
+    bpm:document.getElementById('s-bpm').value?parseInt(document.getElementById('s-bpm').value):null,
+    key:document.getElementById('s-key').value.trim()||null,
+    mood:document.getElementById('s-mood').value.trim()||null,
+    genre:document.getElementById('s-genre').value.trim()||null,
+    status:document.getElementById('s-status').value,
+    duration:recSec||null
+  };
+  if(pendingBlob&&type==='audio'){ entry.data=await blobToDataUrl(pendingBlob); entry.mimeType=pendingBlob.type; }
+  if(pendingDataUrl&&(type==='photo'||type==='video')) entry.data=pendingDataUrl;
+  entries.unshift(entry);
+  persist(); closeSave(); render(); renderProjects(); renderHeatmap();
+  recSec=0; pendingBlob=null; pendingDataUrl=null;
+  toast('Saved');
+}
+function blobToDataUrl(b){ return new Promise(r=>{ const fr=new FileReader(); fr.onload=e=>r(e.target.result); fr.readAsDataURL(b); }); }
+
+// ── DETAIL ──
+function openDetail(id){
+  const e=entries.find(x=>x.id===id); if(!e) return;
+  curEntry=e;
+  const panel=document.getElementById('detail');
+  const body=document.getElementById('detail-body');
+  const pill=document.getElementById('detail-pill');
+  pill.innerHTML=typeIconSvg(e.type)+(e.type);
+  pill.className=`type-pill tp-${e.type}`;
+  let h=`<div class="detail-title">${escHtml(e.name||autoTitle(e))}</div><div class="detail-date">${fmtDate(e.ts)}</div>`;
+  if(e.type==='audio'&&e.data){
+    const bars=Array.from({length:44},(_,i)=>{const hh=4+Math.abs(Math.sin(i*0.5+(e.ts%80))*36); return `<div class="pwbar" style="height:${hh.toFixed(0)}px;flex:1;max-width:7px"></div>`;}).join('');
+    h+=`<div class="dsec"><span class="dsec-label">Recording</span>
+      <div class="detail-player">
+        <audio id="da" src="${e.data}"></audio>
+        <div class="player-wave">${bars}</div>
+        <div class="player-row">
+          <button class="play-btn2" id="play-btn" onclick="togglePlay()"><svg viewBox="0 0 12 12"><polygon points="2,1 11,6 2,11"/></svg></button>
+          <div class="player-prog" onclick="seekA(event)"><div class="player-fill" id="pfill"></div></div>
+          <span class="player-t" id="ptim">${e.duration?fmtDur(e.duration):'—'}</span>
+        </div>
+      </div></div>`;
+  }
+  if(e.type==='photo'&&e.data) h+=`<div class="dsec"><img src="${e.data}" style="width:100%;border-radius:14px"></div>`;
+  if(e.note||e.text) h+=`<div class="dsec"><span class="dsec-label">Note</span><div class="detail-text">${escHtml(e.note||e.text)}</div></div>`;
+  const metas=[];
+  if(e.bpm) metas.push(['BPM',e.bpm]);
+  if(e.key) metas.push(['Key',e.key]);
+  if(e.mood) metas.push(['Mood',e.mood]);
+  if(e.genre) metas.push(['Genre',e.genre]);
+  if(e.status) metas.push(['Status',{raw:'Raw sketch',dev:'In progress',done:'Done',archived:'Archived'}[e.status]||e.status]);
+  if(e.duration) metas.push(['Duration',fmtDur(e.duration)]);
+  const proj=projects.find(p=>p.id===e.project);
+  if(proj) metas.push(['Project',proj.name]);
+  if(metas.length) h+=`<div class="dsec"><span class="dsec-label">Details</span><div class="meta-grid">${metas.map(([k,v])=>`<div class="meta-cell"><div class="meta-k">${k}</div><div class="meta-v">${escHtml(String(v))}</div></div>`).join('')}</div></div>`;
+  if(e.tags&&e.tags.length) h+=`<div class="dsec"><span class="dsec-label">Tags</span><div class="dtags">${e.tags.map(t=>`<span class="card-tag">#${escHtml(t)}</span>`).join('')}</div></div>`;
+  h+=`<div style="margin-top:24px"><button onclick="delEntry('${e.id}')" style="width:100%;padding:10px;background:var(--rose-soft);border:1px solid #f0d0d0;border-radius:10px;font-family:var(--sans);font-size:12px;font-weight:400;color:var(--rose);cursor:pointer">Delete this capture</button></div>`;
+  body.innerHTML=h; panel.classList.add('open');
+  const da=document.getElementById('da');
+  if(da){
+    da.ontimeupdate=()=>{ const pct=da.duration?(da.currentTime/da.duration*100):0; const f=document.getElementById('pfill'); if(f) f.style.width=pct.toFixed(1)+'%'; const t2=document.getElementById('ptim'); if(t2) t2.textContent=fmtDur(Math.floor(da.currentTime)); };
+    da.onended=()=>{ const b=document.getElementById('play-btn'); if(b) b.innerHTML='<svg viewBox="0 0 12 12"><polygon points="2,1 11,6 2,11"/></svg>'; };
+  }
+}
+
+function togglePlay(){ const a=document.getElementById('da'),b=document.getElementById('play-btn'); if(!a) return; if(a.paused){ a.play(); b.innerHTML='<svg viewBox="0 0 12 12" fill="white"><rect x="2" y="1" width="3" height="10"/><rect x="7" y="1" width="3" height="10"/></svg>'; } else { a.pause(); b.innerHTML='<svg viewBox="0 0 12 12"><polygon points="2,1 11,6 2,11"/></svg>'; } }
+function seekA(ev){ const a=document.getElementById('da'); if(!a||!a.duration) return; const r=ev.currentTarget.getBoundingClientRect(); a.currentTime=((ev.clientX-r.left)/r.width)*a.duration; }
+function closeDetail(){ const a=document.getElementById('da'); if(a) a.pause(); document.getElementById('detail').classList.remove('open'); curEntry=null; }
+function delEntry(id){ if(!confirm('Delete this capture?')) return; entries=entries.filter(e=>e.id!==id); persist(); closeDetail(); render(); renderHeatmap(); toast('Deleted'); }
+
+function renderProjects(){
+  document.getElementById('proj-list').innerHTML=projects.map(p=>{
+    const cnt=entries.filter(e=>e.project===p.id).length;
+    return `<div class="nav-item" onclick="setView('${p.id}',this)"><div class="proj-dot" style="background:${p.color}"></div>${escHtml(p.name)}<span class="ni-count">${cnt}</span></div>`;
+  }).join('');
+}
+
+function openProjModal(){ document.getElementById('p-name').value=''; document.getElementById('p-desc').value=''; document.getElementById('proj-overlay').classList.add('show'); setTimeout(()=>document.getElementById('p-name').focus(),80); }
+function closeProjModal(){ document.getElementById('proj-overlay').classList.remove('show'); }
+function pickColor(el){ document.querySelectorAll('.cswatch').forEach(x=>x.classList.remove('sel')); el.classList.add('sel'); selColor=el.dataset.c; }
+function createProj(){
+  const name=document.getElementById('p-name').value.trim(); if(!name){toast('Enter a name');return;}
+  projects.push({id:uid(),name,desc:document.getElementById('p-desc').value.trim(),color:selColor,template:document.getElementById('p-tpl').value,ts:Date.now()});
+  persist(); closeProjModal(); renderProjects(); toast('Project created');
+}
+
+function expTxt(){
+  if(!curEntry) return; const e=curEntry;
+  const s=[`HUM — ${e.name||autoTitle(e)}`,`Date: ${fmtDate(e.ts)}`,`Type: ${e.type}`,e.bpm?`BPM: ${e.bpm}`:null,e.key?`Key: ${e.key}`:null,e.mood?`Mood: ${e.mood}`:null,e.genre?`Genre: ${e.genre}`:null,e.tags?.length?`Tags: ${e.tags.map(t=>'#'+t).join(' ')}`:null,'',e.note||e.text||''].filter(x=>x!==null).join('\n');
+  dl(new Blob([s],{type:'text/plain'}),(e.name||autoTitle(e))+'.txt');
+}
+function expMd(){
+  if(!curEntry) return; const e=curEntry;
+  const s=[`# ${e.name||autoTitle(e)}`,`*${fmtDate(e.ts)}* · ${e.type}`,'',e.bpm||e.key||e.mood?`> BPM: ${e.bpm||'—'} · Key: ${e.key||'—'} · Mood: ${e.mood||'—'}`:null,e.tags?.length?e.tags.map(t=>'`#'+t+'`').join(' '):null,'',e.note||e.text||''].filter(x=>x!==null).join('\n');
+  dl(new Blob([s],{type:'text/markdown'}),(e.name||autoTitle(e))+'.md');
+}
+function expJson(){
+  if(!curEntry) return; const e={...curEntry}; if(e.data&&e.data.length>80000) e.data='[binary — export audio separately]';
+  dl(new Blob([JSON.stringify(e,null,2)],{type:'application/json'}),(e.name||autoTitle(e))+'.json');
+}
+function expAudio(){ if(!curEntry||!curEntry.data){toast('No audio data');return;} const a=document.createElement('a'); a.href=curEntry.data; a.download=(curEntry.name||autoTitle(curEntry))+'.webm'; a.click(); }
+function dl(blob,name){ const u=URL.createObjectURL(blob),a=document.createElement('a'); a.href=u; a.download=name; a.click(); URL.revokeObjectURL(u); }
+
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2200); }
+
+function loadDemo(){
+  entries = []; projects = [];
+  persist();
+  seed();
+  render(); renderProjects(); renderHeatmap();
+  toast('Demo data loaded');
+}
+
+function seed(){
+  if(entries.length) return;
+  const pid=uid();
+  projects.push({id:pid,name:'Dream Symphony',desc:'',color:'#9580a8',template:'composition',ts:Date.now()-86400000*30});
+  const pid2=uid();
+  projects.push({id:pid2,name:'Field Recordings',desc:'',color:'#88a896',template:'sounddesign',ts:Date.now()-86400000*45});
+  const now=Date.now();
+  const D = 86400000;
+  const samples = [
+    // today
+    [1.5*3600000,'audio','Main theme sketch',pid,'Hummed melody — somewhere between drone and lyrical. Major but with a strange fourth.',['melody','drone'],74,'E maj','ethereal','raw',47],
+    [4*3600000,'idea','Heartbeat rhythm section',pid,'Use a recorded heartbeat as the rhythmic foundation. Record it through a sensor or just fingertapping the chest.',['rhythm','concept'],null,null,null,'dev',null],
+    [8*3600000,'text','Morning page',null,'Woke up earlier than usual. Light through the curtain made everything feel slowed down. Thinking about how silence has texture too.',['diary','morning'],null,null,null,'raw',null],
+    // yesterday
+    [D-2*3600000,'dream','Orchestra in the subway',null,'A full orchestra playing in the metro carriage. Sound was perfect — no reverb. The double-bassist stared right at me. Then everyone disappeared except a cello.',['dream','orchestra','surreal'],null,null,null,'raw',null],
+    [D+10*3600000,'text','Empty station',null,'Empty station at 3am\necho of footsteps — only rhythm\nthe train goes nowhere\nand I stand at the edge\n\na ticket for tomorrow\nbut there is no tomorrow',['lyrics','poetry'],null,null,null,'dev',null],
+    // 2 days ago
+    [2*D+2*3600000,'audio','Drone texture #3',pid,'Detuned drone layers. Need to check on big monitors.',['drone','sounddesign'],null,'F# min','dark','dev',183],
+    // 3 days ago
+    [3*D+4*3600000,'idea','Generative video collab',null,'Ask Artyom about real-time visualisation tied to the audio amplitude and frequency. Could open a whole new direction for live sets.',['collab','video'],null,null,null,'raw',null],
+    [3*D+8*3600000,'audio','Field recording — rain',pid2,'Heavy rain on the metal roof. Could layer it under string parts.',['field','rain','texture'],null,null,'wet','raw',92],
+    // 5 days ago
+    [5*D+5*3600000,'text','Diary',null,'Spent the whole day in the studio. Stuck on the bridge — every version feels too obvious. Maybe I need to step away for a day.',['diary'],null,null,null,'raw',null],
+    [5*D+10*3600000,'idea','Bridge as silence',pid,'What if the bridge is just silence? Or one held note?',['structure'],null,null,null,'dev',null],
+    // 7 days ago
+    [7*D+3*3600000,'dream','Tuning a piano underwater',null,'Trying to tune a piano while underwater. Each note bent strangely.',['dream','piano','surreal'],null,null,null,'raw',null],
+    // 10 days ago
+    [10*D+4*3600000,'audio','Voice memo — café',null,'Recorded ambient noise from the café. Cup clinks, distant conversations.',['field','ambient'],null,null,null,'raw',61],
+    // 14 days ago
+    [14*D+6*3600000,'text','Morning page',null,'Three pages of just unfiltered thought. Mostly nonsense but two lines might become a song.',['diary','morning'],null,null,null,'raw',null],
+    // 18, 22, 25, 30, 38, 50 days
+    [18*D+5*3600000,'idea','Album concept — "Quiet Engines"',pid,'Six tracks, each starting with mechanical sound, ending with breath.',['album','concept'],null,null,null,'dev',null],
+    [22*D+8*3600000,'audio','Cello loop',pid,'Played by Lena. C minor, pulled out to 90 bpm.',['cello','collab'],90,'C min','warm','done',124],
+    [25*D+3*3600000,'text','Dream fragment',null,'There was a window. Light came through it sideways.',['dream','fragment'],null,null,null,'raw',null],
+    [30*D+12*3600000,'photo','Reference: cloud shape',null,'Caught this on a walk. Reminded me of a waveform.',['reference','visual'],null,null,null,'raw',null],
+    [38*D+6*3600000,'audio','First sketch',pid,'The very first version of the main theme.',['archive'],72,'E maj',null,'archived',38],
+    [50*D+9*3600000,'text','Project intent',pid,'Why I am making this. The album should feel like waking up slowly.',['intent','manifesto'],null,null,null,'done',null],
   ];
-  const angle = angles[Math.floor(Math.random() * angles.length)];
-
-  if (mode === "random") {
-      prompt = `Pick 3 great films or shows completely at random — pure instinct, no context. ${angle} Make them wildly different in genre, era, country.${recentlyShown ? "\nDO NOT repeat: "+recentlyShown : ""}\n\nReply ONLY with JSON array: [{"title":"...","year":"...","type":"movie or tv","why":"one sentence why it's a must-watch"},{"title":"...","year":"...","type":"movie or tv","why":"..."},{"title":"...","year":"...","type":"movie or tv","why":"..."}]`;
-    } else if (mode === "seasonal") {
-      const ctx = getSeasonalContext();
-      prompt = `Suggest 3 films perfectly suited for right now: ${ctx}. Match the mood of the moment. ${angle}${recentlyShown ? "\nDO NOT repeat: "+recentlyShown : ""}${watched ? "\nAlready watched — skip: "+watched : ""}\n\nReply ONLY with JSON array: [{"title":"...","year":"...","type":"movie or tv","why":"one sentence why it fits tonight"},{"title":"...","year":"...","type":"movie or tv","why":"..."},{"title":"...","year":"...","type":"movie or tv","why":"..."}]`;
-    } else {
-      prompt = `Suggest 3 films based on taste. ${angle} Vary genre, era, country.${watched ? "\nWatch history: "+watched : "No history — use acclaimed films."}${planned ? "\nDO NOT suggest from watchlist: "+planned : ""}${recentlyShown ? "\nDO NOT repeat recently shown: "+recentlyShown : ""}${watched ? "\nDO NOT suggest already watched: "+watched : ""}\n\nReply ONLY with JSON array: [{"title":"...","year":"...","type":"movie or tv","why":"one sentence why they'd love it"},{"title":"...","year":"...","type":"movie or tv","why":"..."},{"title":"...","year":"...","type":"movie or tv","why":"..."}]`;
-    }
-
-    let suggestions;
-    try {
-      suggestions = await proxyFetchWithRetry({ model: "claude-haiku-4-5-20251001", max_tokens: 700, messages: [{ role: "user", content: prompt }] });
-    } catch(e) {
-      if (e.message === "rate_limited") { el.innerHTML = ""; return; }
-      throw e;
-    }
-    if (!Array.isArray(suggestions)) suggestions = [suggestions];
-
-    // Parallel TMDB search
-    const details = await Promise.all(suggestions.map(async s => {
-      let found = await tmdbSearch(s.title + (s.year ? " " + s.year : ""));
-      if (!found.length) found = await tmdbSearch(s.title);
-      const pick = found.find(r => s.type === "tv" ? r.type === "tv" : r.type === "movie") || found[0];
-      return pick ? { ...pick, why: s.why } : { Title: s.title, Year: s.year||"", Poster: "", tmdbID: null, type: s.type||"movie", why: s.why };
-    }));
-
-    details.forEach(m => { if (m.Title) _shownSurprises.push(m.Title); });
-    localStorage.setItem("shownSurprises", JSON.stringify(_shownSurprises.slice(-30)));
-
-    const modeLabel = mode === "random" ? "✨ RANDOM PICKS" : mode === "seasonal" ? "✨ PICKS FOR TONIGHT" : "✨ PICKS FOR YOU";
-    el.innerHTML = `
-      <div style="margin-bottom:12px;padding:10px 14px;background:rgba(124,58,237,0.08);border:1px solid rgba(124,58,237,0.25);border-radius:12px">
-        <div style="color:#a78bfa;font-size:11px;font-weight:600;letter-spacing:1px">${modeLabel}</div>
-      </div>
-      <div class="card-list">${details.map(m => movieCardHTML(m, m.why)).join("")}</div>`;
-  } catch(e) {
-    el.innerHTML = `<div class="empty"><div class="title">ERROR</div><div class="sub">${e.message}</div></div>`;
-  }
-}
-async function loadRecs() {
-  const q = document.getElementById("rec-input").value.trim();
-  const btn = document.getElementById("rec-btn");
-  const el = document.getElementById("rec-results");
-  btn.disabled = true; btn.textContent = "THINKING...";
-  el.innerHTML = loadingHTML(randQuote(), true);
-
-  try {
-    let suggestions = [];
-
-    if (ANTHROPIC_KEY) {
-      const watched = watchHistory.filter(h=>h.status==="watched").slice(-12)
-        .map(m => `${m.title} (${m.year})${m.stars ? " "+m.stars+"★" : ""}${m.comment ? ` — "${m.comment}"` : ""}`)
-        .join("\n");
-      const planned = watchHistory.filter(h=>h.status==="plan").slice(-6)
-        .map(m => m.title).join(", ");
-
-      const prompt = `You are a film expert helping pick what to watch tonight.
-
-${watched ? `Already watched — DO NOT suggest any of these:\n${watched}` : "No watch history yet."}
-${planned ? `\nAlready on watchlist — DO NOT suggest any of these: ${planned}` : ""}
-
-User request: "${q || "Surprise me with something great"}"
-
-Based on their taste and request, suggest exactly 5 films or TV shows.
-CRITICAL: None of your suggestions may appear in the watched or watchlist above. Suggesting anything already seen or saved is a failure.
-- Interpret the request broadly: if they say "something funny", find comedy films; "cozy evening" means light feel-good content; "mind-bending" means psychological thrillers etc.
-- Vary genres/eras unless the request is specific.
-- For each, write one sentence explaining WHY it fits their taste or request specifically.
-
-Reply ONLY with a JSON array, no other text:
-[{"title":"...","year":"...","type":"movie or tv","why":"..."}]`;
-
-      try {
-        suggestions = await proxyFetchWithRetry({ model: "claude-haiku-4-5-20251001", max_tokens: 1000, messages: [{ role: "user", content: prompt }] });
-      } catch(e) {
-        if (e.message === "rate_limited") { el.innerHTML = ""; btn.disabled = false; btn.textContent = "FIND"; return; }
-        throw e;
-      }
-    } else {
-      el.innerHTML = `<div class="empty"><div class="icon">🔑</div><div class="title">API KEY NEEDED</div><div class="sub">Add your Anthropic key to enable smart picks</div></div>`;
-      btn.disabled = false; btn.textContent = "FIND";
-      return;
-    }
-
-    // Parallel TMDB search
-    const details = await Promise.all(suggestions.map(async s => {
-      let found = await tmdbSearch(s.title + (s.year ? " " + s.year : ""));
-      if (!found.length) found = await tmdbSearch(s.title);
-      const pick = found.find(r => s.type === "tv" ? r.type === "tv" : r.type === "movie") || found[0];
-      return pick ? { ...pick, why: s.why } : { Title: s.title, Year: s.year||"", Poster: "", tmdbID: null, type: s.type||"movie", why: s.why };
-    }));
-
-    el.innerHTML = details.length
-      ? `<div class="card-list">${details.map(m => { console.log("pick:", m.Title, "tmdbID:", m.tmdbID, "Poster:", m.Poster?.slice(0,40)); return movieCardHTML(m, m.why); }).join("")}</div>`
-      : `<div class="empty"><div class="icon">🤷</div><div class="title">NO PICKS FOUND</div><div class="sub">Try a different prompt</div></div>`;
-
-  } catch(e) {
-    el.innerHTML = `<div class="empty"><div class="title">ERROR</div><div class="sub">${e.message}</div></div>`;
-  }
-  btn.disabled = false; btn.textContent = "FIND";
+  entries = samples.map(([offset,type,name,project,note,tags,bpm,key,mood,status,duration])=>({
+    id:uid(), ts:now-offset, type, name, project, note,
+    tags, bpm, key, mood, status, duration
+  }));
+  persist();
 }
 
-// ── History ───────────────────────────────────────────────────────────────────
-function setFilter(f) {
-  historyFilter = f;
-  ["all","watched","plan"].forEach(p => {
-    document.getElementById("pill-"+p).classList.toggle("active", p === f);
-  });
-  renderHistory();
-}
+seed();
+setLayout(layout);
+renderProjects();
+renderHeatmap();
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){closeDetail();closeSave();closeProjModal();cancelRecording();} });
 
-function renderHistory() {
-  const el = document.getElementById("history-list");
-  const filtered = historyFilter === "all" ? watchHistory
-    : watchHistory.filter(h => h.status === historyFilter);
-
-  if (!watchHistory.length) {
-    el.innerHTML = `<div class="empty"><div class="icon">📋</div><div class="title">YOUR LIST IS EMPTY</div><div class="sub">Search for films and add them</div></div>`;
-    return;
-  }
-  if (!filtered.length) {
-    el.innerHTML = `<div class="empty"><div class="icon">🔍</div><div class="title">NOTHING HERE YET</div><div class="sub">${historyFilter === "watched" ? "Mark films as watched" : "Add films to your watchlist"}</div></div>`;
-    return;
-  }
-
-  const watched = watchHistory.filter(h => h.status === "watched");
-  const plan = watchHistory.filter(h => h.status === "plan");
-  const rated = watched.filter(h => h.stars > 0);
-  const avg = rated.length ? (rated.reduce((a,b)=>a+b.stars,0)/rated.length).toFixed(1)+"★" : "—";
-
-  // Build top-N stats from a field that may contain comma-separated names
-  function buildTopStats(entries, field, minCount, maxItems) {
-    const map = {};
-    entries.forEach(h => {
-      if (!h[field]) return;
-      h[field].split(", ").forEach(name => {
-        name = name.trim();
-        if (name) map[name] = (map[name] || 0) + 1;
-      });
-    });
-    return Object.entries(map)
-      .filter(([, c]) => c >= minCount)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, maxItems);
-  }
-
-  function collapsibleStatsBlock(id, icon, label, items) {
-    if (!items.length) return "";
-    const maxCount = items[0][1];
-    const rows = items.map(([name, count]) => {
-      const pct = Math.round((count / maxCount) * 100);
-      const safe = name.replace(/'/g, "\'");
-      return `
-      <div style="display:flex;align-items:center;gap:9px;margin-bottom:7px;cursor:pointer"
-           onclick="openPerson('${safe}')">
-        <div style="flex:1;min-width:0;font-size:12px;color:#ddd;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${name}</div>
-        <div style="width:80px;height:3px;background:rgba(255,255,255,0.07);border-radius:2px;flex-shrink:0">
-          <div style="width:${pct}%;height:100%;background:#F5C518;border-radius:2px"></div>
-        </div>
-        <div style="font-size:11px;color:#666;flex-shrink:0;width:38px;text-align:right">${count} film${count > 1 ? "s" : ""}</div>
-      </div>`;
-    }).join("");
-    return `
-    <div style="margin-bottom:10px;border:1px solid rgba(245,197,24,0.12);border-radius:12px;overflow:hidden">
-      <div onclick="toggleStatsBlock('${id}')" style="display:flex;justify-content:space-between;align-items:center;padding:10px 13px;cursor:pointer;background:rgba(245,197,24,0.04)">
-        <div style="font-size:11px;color:#F5C518;font-weight:600;letter-spacing:.5px">${icon} ${label}</div>
-        <span id="stats-arrow-${id}" style="color:#F5C518;font-size:10px">▼</span>
-      </div>
-      <div id="stats-body-${id}" style="display:none;padding:11px 13px 4px">
-        ${rows}
-      </div>
-    </div>`;
-  }
-
-  const showStats = historyFilter === "watched";
-  const topDirectors = showStats ? buildTopStats(watched, "director", 2, 5) : [];
-  const topComposers = showStats ? buildTopStats(watched, "composer", 2, 5) : [];
-
-  el.innerHTML = `
-    <div class="history-header">
-      <span>${watched.length} watched · ${plan.length} watchlist</span>
-      <span>Avg: ${avg}</span>
-    </div>
-    ${collapsibleStatsBlock("directors", "🎬", "Your top directors", topDirectors)}
-    ${collapsibleStatsBlock("composers", "🎵", "Your top composers", topComposers)}
-    <div class="card-list">
-      ${filtered.map(item => {
-        const key = regMovie({ tmdbID: item.tmdbID, Title: item.title, Year: item.year, Poster: item.poster, type: item.mediaType || "movie" });
-        return `
-        <div class="hist-card ${item.status === 'plan' ? 'plan' : ''}" onclick="${item.tmdbID ? `openDetail('${item.tmdbID}','${item.mediaType||"movie"}')` : ''}">
-          <div class="hist-poster">${item.poster&&item.poster!=="N/A" ? `<img src="${item.poster}" alt="" onerror="this.parentNode.innerHTML='🎬'">` : "🎬"}</div>
-          <div style="flex:1;min-width:0">
-            <div class="hist-top">
-              <div style="flex:1;min-width:0">
-                <div class="hist-title">${item.title}</div>
-                <div class="hist-meta">${item.year} · ${item.date}</div>
-              </div>
-              <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;margin-left:8px;flex-shrink:0">
-                <div style="display:flex;gap:4px;align-items:center">
-                  ${item.status === "watched" ? `<button class="hist-del" style="font-size:12px;color:#555" onclick="event.stopPropagation();openEdit(${item.id})">✏️</button>` : ""}
-                  <button class="hist-del" onclick="event.stopPropagation();deleteItem(${item.id})">×</button>
-                </div>
-                <button onclick="event.stopPropagation();openShare(_movieRegistry['${key}'])" style="background:none;border:1px solid rgba(124,58,237,0.35);border-radius:5px;color:#9d6ef5;font-size:10px;cursor:pointer;padding:2px 7px;font-family:'Bebas Neue',cursive;letter-spacing:.5px;white-space:nowrap">↗ SHARE</button>
-              </div>
-            </div>
-            ${item.status === "watched"
-              ? `<div style="display:flex;gap:2px;margin-top:3px">${starsHTML(item.stars)}</div>`
-              : `<span class="status-tag plan">🕐 Watchlist</span>`}
-            ${item.comment ? `<div class="hist-note">"${item.comment}" <span style="color:#555;font-style:normal;font-size:10px">— ${item.date}</span></div>` : ""}
-          </div>
-        </div>`;
-      }).join("")}
-    </div>`;
-}
-
-// ── Stats helpers ────────────────────────────────────────────────────────────
-function setSearchAndGo(name) {
-  switchTab("search");
-  document.getElementById("search-input").value = name;
-  doSearch();
-}
-
-function toggleStatsBlock(id) {
-  const body = document.getElementById("stats-body-" + id);
-  const arrow = document.getElementById("stats-arrow-" + id);
-  if (!body) return;
-  const open = body.style.display === "none";
-  body.style.display = open ? "block" : "none";
-  if (arrow) arrow.textContent = open ? "▲" : "▼";
-}
-
-// ── Edit review ───────────────────────────────────────────────────────────────
-let currentEditId = null;
-let currentEditStars = 0;
-
-function openEdit(id) {
-  const item = watchHistory.find(h => h.id === id);
-  if (!item) return;
-  currentEditId = id;
-  currentEditStars = item.stars || 0;
-  document.getElementById("edit-movie-title").textContent = `${item.title} (${item.year})`;
-  document.getElementById("edit-note").value = item.comment || "";
-  renderEditStars(currentEditStars);
-  document.getElementById("edit-overlay").style.display = "flex";
-}
-
-function closeEdit() { document.getElementById("edit-overlay").style.display = "none"; }
-
-function setEditStar(n) { currentEditStars = n; renderEditStars(n); }
-
-function renderEditStars(n) {
-  [1,2,3,4,5].forEach(i => {
-    const s = document.getElementById("edit-star-"+i);
-    if (s) s.classList.toggle("on", i <= n);
-  });
-}
-
-async function confirmEdit() {
-  const btn = document.getElementById("edit-confirm-btn");
-  btn.textContent = "SAVING..."; btn.disabled = true;
-  try {
-    await updateEntryInDB(currentEditId, {
-      stars: currentEditStars,
-      comment: document.getElementById("edit-note").value
-    });
-    watchHistory = await loadHistoryFromDB();
-    closeEdit();
-    renderHistory();
-  } catch(e) {
-    alert("Could not save: " + e.message);
-  }
-  btn.textContent = "SAVE"; btn.disabled = false;
-}
-
-async function deleteItem(id) {
-  try {
-    await deleteEntryFromDB(id);
-    watchHistory = watchHistory.filter(h => h.id !== id);
-    renderHistory();
-  } catch(e) { alert("Could not delete: " + e.message); }
-}
-
-// ── Init ──────────────────────────────────────────────────────────────────────
-
-// ── Feedback ──────────────────────────────────────────────────────────────────
-let _fbType = "other";
-
-function openFeedback() {
-  _fbType = "other";
-  document.getElementById("fb-message").value = "";
-  setFbType("other");
-  // Show loading placeholder immediately, then load replies async
-  const el = document.getElementById("fb-replies");
-  if (el) { el.style.display = "block"; el.innerHTML = `<div style="color:#555;font-size:12px;padding:8px 0">Loading history...</div>`; }
-  document.getElementById("feedback-overlay").style.display = "flex";
-  loadFeedbackReplies();
-}
-
-function setFeedbackUnread(has) {
-  const icon = document.getElementById("feedback-icon");
-  if (icon) icon.textContent = has ? "📩" : "✉";
-}
-
-async function deleteFeedback(id) {
-  try {
-    await sbClient.from("feedback").delete().eq("id", id);
-    loadFeedbackReplies();
-  } catch(e) { showToast("Could not delete: " + e.message, true); }
-}
-
-async function checkFeedbackBadge() {
-  if (!currentUser) return;
-  try {
-    const { data } = await sbClient.from("feedback")
-      .select("id").eq("user_id", currentUser.id)
-      .eq("read_by_user", false).not("reply", "is", null).limit(1);
-    setFeedbackUnread(data?.length > 0);
-  } catch(e) {}
-}
-
-function closeFeedback() {
-  document.getElementById("feedback-overlay").style.display = "none";
-}
-
-function setFbType(type) {
-  _fbType = type;
-  ["bug","idea","other"].forEach(t => {
-    const btn = document.getElementById("fb-type-" + t);
-    if (!btn) return;
-    btn.style.background = t === type ? "rgba(245,197,24,0.15)" : "transparent";
-    btn.style.borderColor = t === type ? "#F5C518" : "rgba(255,255,255,0.15)";
-    btn.style.color = t === type ? "#F5C518" : "#aaa";
-  });
-}
-
-async function submitFeedback() {
-  const message = document.getElementById("fb-message").value.trim();
-  if (!message) { showToast("Please write something first", true); return; }
-  const btn = document.getElementById("fb-submit-btn");
-  btn.textContent = "SENDING..."; btn.disabled = true;
-  try {
-    const { data, error } = await sbClient.from("feedback").insert({
-      user_id: currentUser.id,
-      user_email: currentUser.email || "",
-      user_name: currentUser.displayName || "",
-      type: _fbType,
-      message,
-      app_version: "0.1.0",
-      user_agent: navigator.userAgent
-    }).select();
-    if (error) throw new Error(error.message);
-    const inserted = data?.[0];
-    if (inserted?.id) {
-      workerFetch("/feedback-notify", {
-        feedback_id: inserted.id,
-        type: _fbType,
-        message,
-        user_name: currentUser.displayName || currentUser.email?.split("@")[0] || "someone"
-      }).catch(() => {});
-    }
-    document.getElementById("fb-message").value = "";
-    closeFeedback();
-    showToast("Got it! I read everything personally 🙏");
-  } catch(e) {
-    showToast("Could not send: " + e.message, true);
-  } finally {
-    btn.textContent = "SEND"; btn.disabled = false;
-  }
-}
-
-async function loadFeedbackReplies() {
-  const el = document.getElementById("fb-replies");
-  if (!el) return;
-  try {
-    const { data, error } = await sbClient.from("feedback")
-      .select("id, type, message, reply, replied_at, read_by_user, created_at")
-      .eq("user_id", currentUser.id)
-      .order("created_at", { ascending: false })
-      .limit(10);
-    if (error || !data?.length) { el.style.display = "none"; return; }
-    // Mark unread replies as read
-    const unreadReplies = data.filter(f => f.reply && !f.read_by_user);
-    if (unreadReplies.length) {
-      await sbClient.from("feedback").update({ read_by_user: true }).in("id", unreadReplies.map(f => f.id));
-    }
-    setFeedbackUnread(false);
-
-    const typeEmoji = { bug: "🐛", idea: "💡", other: "💬" };
-    el.style.display = "block";
-    el.innerHTML = `
-      <div style="color:#555;font-size:11px;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">Your previous messages</div>
-      ${data.map(f => `
-        <div style="margin-bottom:10px;padding:10px;background:rgba(255,255,255,0.03);border-radius:8px;border:1px solid rgba(255,255,255,0.06);position:relative">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-            <div style="font-size:11px;color:#555">${typeEmoji[f.type]||"💬"} ${new Date(f.created_at).toLocaleDateString("en-GB")}</div>
-            <button onclick="deleteFeedback('${f.id}')" style="background:none;border:none;color:#444;cursor:pointer;font-size:16px;line-height:1;padding:0">×</button>
-          </div>
-          <div style="font-size:13px;color:#ccc">${f.message}</div>
-          ${f.reply ? `
-            <div style="margin-top:8px;padding:8px;background:rgba(245,197,24,0.05);border-radius:6px;border-left:2px solid #F5C518">
-              <div style="font-size:10px;color:#F5C518;margin-bottom:3px">Reply</div>
-              <div style="font-size:12px;color:#ddd">${f.reply}</div>
-            </div>` : ""}
-        </div>`).join("")}`;
-  } catch(e) { el.style.display = "none"; }
-}
-
-function initUI() {
-  // Show username in header
-  const nameEl = document.getElementById("header-username");
-  if (nameEl && currentUser) {
-    const name = currentUser.displayName || "";
-    nameEl.textContent = name ? `Hi, ${name}` : "";
-  }
-  document.getElementById("search-results").innerHTML = `
-    <div class="empty"><div class="icon">🎬</div>
-    <div class="title">FIND YOUR NEXT FILM</div>
-    <div class="sub">Type a title and press Search</div></div>`;
-  document.getElementById("rec-results").innerHTML = `
-    <div class="empty"><div class="icon">✨</div>
-    <div class="title">GET PERSONALISED PICKS</div>
-    <div class="sub">Enter a prompt or leave blank and hit Find</div></div>`;
-}
-
-(async () => {
-  // Handle email confirmation token from URL
-  const params = new URLSearchParams(window.location.search);
-  const tokenHash = params.get("token_hash");
-  const type = params.get("type");
-  if (tokenHash && type) {
-    // Clean URL
-    window.history.replaceState({}, "", window.location.pathname);
-    sbClient = window.supabase.createClient(SB_URL, SB_KEY);
-    const { data, error } = await sbClient.auth.verifyOtp({ token_hash: tokenHash, type });
-    if (error) {
-      showScreen("signin");
-      showSignInError("Confirmation failed: " + error.message);
-      return;
-    }
-    if (data.user) {
-      await onSignedIn(data.user);
-      return;
-    }
-  }
-
-  // Normal init — Wait for Supabase SDK then initialize
-  sbClient = window.supabase.createClient(SB_URL, SB_KEY);
-
-  // Check if user already has a session
-  const { data: { session } } = await sbClient.auth.getSession();
-  if (session) {
-    await onSignedIn(session.user);
-  } else {
-    showScreen("signin");
-  }
-  // Listen for auth changes
-  sbClient.auth.onAuthStateChange(async (event, session) => {
-    if (event === "SIGNED_IN" && session) {
-      await onSignedIn(session.user);
-    } else if (event === "SIGNED_OUT") {
-      showScreen("signin");
-      document.getElementById("main-app").style.display = "none";
-    }
-  });
-})();
-
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("./sw.js").then(reg => {
-    // Don't call reg.update() manually — browser checks automatically
-    // Only reload when a genuinely new SW activates
-    let reloading = false;
-    navigator.serviceWorker.addEventListener("controllerchange", () => {
-      if (reloading) return;
-      reloading = true;
-      window.location.reload();
-    });
-  }).catch(err => console.warn("SW:", err));
+// ── PWA SERVICE WORKER (inline via blob) ──
+if ('serviceWorker' in navigator) {
+  const swCode = `
+const CACHE = 'hum-v1';
+const FONTS = [
+  'https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&family=Geist:wght@300;400;500&display=swap'
+];
+self.addEventListener('install', e => {
+  e.waitUntil(
+    caches.open(CACHE).then(c => c.addAll(FONTS).catch(()=>{}))
+  );
+  self.skipWaiting();
+});
+self.addEventListener('activate', e => {
+  e.waitUntil(caches.keys().then(keys =>
+    Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+  ));
+  self.clients.claim();
+});
+self.addEventListener('fetch', e => {
+  if (e.request.method !== 'GET') return;
+  e.respondWith(
+    caches.match(e.request).then(cached => {
+      if (cached) return cached;
+      return fetch(e.request).then(res => {
+        if (res && res.status === 200 && e.request.url.includes('fonts.g')) {
+          const clone = res.clone();
+          caches.open(CACHE).then(c => c.put(e.request, clone));
+        }
+        return res;
+      }).catch(() => cached);
+    })
+  );
+});
+`;
+  const swBlob = new Blob([swCode], {type: 'application/javascript'});
+  const swUrl  = URL.createObjectURL(swBlob);
+  navigator.serviceWorker.register(swUrl, {type: 'classic'})
+    .then(() => console.log('Hum SW registered'))
+    .catch(e => console.log('SW skipped (file://):', e.message));
 }
 </script>
-
-<!-- Feedback Modal -->
-<div id="feedback-overlay" class="overlay" style="display:none" onclick="closeFeedback()">
-  <div style="padding:20px;width:100%;display:flex;justify-content:center;cursor:default" onclick="event.stopPropagation()">
-    <div class="add-modal" style="max-width:360px">
-      <div style="font-family:'Bebas Neue',cursive;color:#F5C518;font-size:12px;letter-spacing:2px;margin-bottom:3px">FEEDBACK</div>
-      <div style="font-family:'Bebas Neue',cursive;font-size:19px;margin-bottom:14px;line-height:1.2">Share a thought or report a bug</div>
-      <div class="add-label">Type</div>
-      <div style="display:flex;gap:8px;margin-bottom:14px">
-        <button id="fb-type-bug" onclick="setFbType('bug')" style="flex:1;padding:7px;border-radius:8px;background:transparent;border:1px solid rgba(255,255,255,0.15);color:#aaa;font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer;transition:all .15s">🐛 Bug</button>
-        <button id="fb-type-idea" onclick="setFbType('idea')" style="flex:1;padding:7px;border-radius:8px;background:transparent;border:1px solid rgba(255,255,255,0.15);color:#aaa;font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer;transition:all .15s">💡 Idea</button>
-        <button id="fb-type-other" onclick="setFbType('other')" style="flex:1;padding:7px;border-radius:8px;background:transparent;border:1px solid rgba(255,255,255,0.15);color:#aaa;font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer;transition:all .15s">💬 Other</button>
-      </div>
-      <div class="add-label">Message</div>
-      <textarea id="fb-message" placeholder="Tell me what's on your mind..." style="min-height:90px;margin-bottom:18px"></textarea>
-      <div id="fb-replies" style="display:none;margin-bottom:14px"></div>
-      <div style="display:flex;gap:9px">
-        <button class="btn-close" onclick="closeFeedback()">Cancel</button>
-        <button class="btn-save" id="fb-submit-btn" onclick="submitFeedback()">SEND</button>
-      </div>
-    </div>
-  </div>
-</div>
 </body>
 </html>
