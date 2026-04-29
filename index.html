@@ -776,9 +776,9 @@ body {
 .settings-hint { font-size: 11px; color: var(--ink3); margin-top: 6px; line-height: 1.6; }
 
 .bpm-row { display:flex; align-items:stretch; }
-.bpm-in { border-radius:0 !important; text-align:center; flex:1; min-width:0; }
+.bpm-in { border-radius:0 !important; text-align:center; flex:1; width:0; min-width:30px; }
 .bpm-adj {
-  width:34px; flex-shrink:0;
+  width:30px; flex-shrink:0;
   border:1px solid var(--paper4); background:var(--paper2);
   color:var(--ink2); font-size:20px; font-weight:300; line-height:1;
   cursor:pointer; transition:all 0.15s;
@@ -1736,7 +1736,7 @@ function openSaveModal(type){
   const tmpE={ts:Date.now(), type, project:viewProj};
   document.getElementById('s-name').value=autoTitle(tmpE);
   // default BPM for audio
-  document.getElementById('s-bpm').value=type==='audio'?120:'';
+  document.getElementById('s-bpm').value=type==='audio'?'120':'';
   const heads={audio:'Save recording',text:'Save note',idea:'Save idea',dream:'Save dream',photo:'Save photo',video:'Save video',midi:'Save MIDI'};
   document.getElementById('save-heading').textContent=heads[type]||'Save capture';
   document.getElementById('transcript-fg').style.display='none';
