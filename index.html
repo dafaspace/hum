@@ -1540,8 +1540,7 @@ function cardHtml(e){
   const tpill=`<span class="type-pill tp-${e.type}">${ticon}${tlabel}</span>`;
   let body='';
   if(e.type==='audio'&&e.data){
-    const bars=Array.from({length:28},(_,i)=>{const h=4+Math.abs(Math.sin(i*0.65+(e.ts%80))*20); return `<div class="wbar" style="height:${h.toFixed(0)}px"></div>`;}).join('');
-    body=`<div class="card-wave">${bars}</div>`;
+    body=`<div class="card-wave">${waveformBars(e,28,20,'wbar')}</div>`;
     if(e.note) body+=`<div class="card-preview">${escHtml(e.note)}</div>`;
   } else if(e.type==='photo'&&e.data){
     body=`<img class="card-photo" src="${e.data}" loading="lazy">`;
@@ -1586,8 +1585,7 @@ function streamItemHtml(e){
   const acc=proj?`<div class="card-accent" style="background:${proj.color}"></div>`:'';
   let body='';
   if(e.type==='audio'&&e.data){
-    const bars=Array.from({length:36},(_,i)=>{const h=4+Math.abs(Math.sin(i*0.55+(e.ts%80))*22); return `<div class="wbar" style="height:${h.toFixed(0)}px"></div>`;}).join('');
-    body=`<div class="card-wave">${bars}</div>`;
+    body=`<div class="card-wave">${waveformBars(e,36,20,'wbar')}</div>`;
   } else if(e.type==='photo'&&e.data){
     body=`<img class="card-photo" src="${e.data}" loading="lazy">`;
   }
@@ -1786,12 +1784,21 @@ async function confirmSave(){
     tags:[...currentTags], bpm, key, mood, genre, status,
     duration:recSec||null, transcript
   };
+  const blobForWaveform=(type==='audio'&&pendingBlob)?pendingBlob:null;
   if(pendingBlob&&type==='audio'){ entry.data=await blobToDataUrl(pendingBlob); entry.mimeType=pendingBlob.type; }
   if(pendingDataUrl&&(type==='photo'||type==='video')) entry.data=pendingDataUrl;
+  const savedId=entry.id;
   entries.unshift(entry);
   persist(); closeSave(); render(); renderProjects(); renderHeatmap();
   recSec=0; pendingBlob=null; pendingDataUrl=null;
   toast('Saved');
+  if(blobForWaveform){
+    computeWaveform(blobForWaveform).then(waveform=>{
+      if(!waveform) return;
+      const idx=entries.findIndex(x=>x.id===savedId);
+      if(idx>=0){ entries[idx].waveform=waveform; persist(); render(); }
+    });
+  }
 }
 function blobToDataUrl(b){ return new Promise(r=>{ const fr=new FileReader(); fr.onload=e=>r(e.target.result); fr.readAsDataURL(b); }); }
 
@@ -1806,7 +1813,7 @@ function openDetail(id){
   pill.className=`type-pill tp-${e.type}`;
   let h=`<div class="detail-title">${escHtml(e.name||autoTitle(e))}</div><div class="detail-date">${fmtDate(e.ts)}</div>`;
   if(e.type==='audio'&&e.data){
-    const bars=Array.from({length:44},(_,i)=>{const hh=4+Math.abs(Math.sin(i*0.5+(e.ts%80))*36); return `<div class="pwbar" style="height:${hh.toFixed(0)}px;flex:1;max-width:7px"></div>`;}).join('');
+    const bars=waveformBars(e,44,36,'pwbar',';flex:1;max-width:7px');
     h+=`<div class="dsec"><span class="dsec-label">Recording</span>
       <div class="detail-player">
         <audio id="da" src="${e.data}"></audio>
@@ -1982,6 +1989,44 @@ function saveSettings(){
   localStorage.setItem(ST,JSON.stringify(settings));
   closeSettings();
   toast('Settings saved');
+}
+
+// ── WAVEFORM ──
+async function computeWaveform(blob, buckets=60){
+  try{
+    const ab=await blob.arrayBuffer();
+    const ctx=new AudioContext();
+    const buf=await ctx.decodeAudioData(ab);
+    await ctx.close();
+    const ch=buf.getChannelData(0);
+    const step=Math.max(1,Math.floor(ch.length/buckets));
+    const wave=[];
+    for(let i=0;i<buckets;i++){
+      let sum=0; const s=i*step;
+      for(let j=0;j<step&&s+j<ch.length;j++) sum+=Math.abs(ch[s+j]);
+      wave.push(sum/step);
+    }
+    const max=Math.max(...wave,0.001);
+    return wave.map(v=>parseFloat((v/max).toFixed(3)));
+  }catch(_){ return null; }
+}
+
+function waveformBars(e, count, maxH, cls, extra=''){
+  if(e.waveform&&e.waveform.length>=4){
+    return Array.from({length:count},(_,i)=>{
+      const t=i/(count-1)*(e.waveform.length-1);
+      const lo=Math.floor(t), hi=Math.min(lo+1,e.waveform.length-1);
+      const v=e.waveform[lo]+(e.waveform[hi]-e.waveform[lo])*(t-lo);
+      const h=Math.max(3,Math.round(v*maxH));
+      return `<div class="${cls}" style="height:${h}px${extra}"></div>`;
+    }).join('');
+  }
+  // Unique pseudorandom per entry (seeded by id)
+  const seed=e.id?e.id.split('').reduce((a,c)=>a*31+c.charCodeAt(0),7):e.ts;
+  return Array.from({length:count},(_,i)=>{
+    const h=3+Math.abs(Math.sin(i*0.72+seed*0.0041+i*i*0.009)*maxH*0.88);
+    return `<div class="${cls}" style="height:${h.toFixed(0)}px${extra}"></div>`;
+  }).join('');
 }
 
 // ── WAV ENCODER ──
