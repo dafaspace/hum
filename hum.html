@@ -649,7 +649,7 @@ body {
 .tinput { background: none; border: none; outline: none; font-family: var(--sans); font-size: 12.5px; font-weight: 400; color: var(--ink); min-width: 80px; flex: 1; }
 .tinput::placeholder { color: var(--ink3); }
 
-.save-actions { display: flex; gap: 9px; margin-top: 20px; }
+.save-actions { display: flex; gap: 9px; margin-top: 16px; position: sticky; bottom: 0; background: white; padding: 10px 0 4px; border-top: 1px solid var(--paper4); z-index: 2; }
 .btn-save {
   flex: 1; padding: 11px;
   background: var(--ink); border: none;
@@ -818,7 +818,7 @@ body {
 .modal-media-preview { margin-bottom:14px; border-radius:14px; overflow:hidden; border:1px solid var(--paper4); position:relative; }
 .modal-media-preview img { width:100%; max-height:220px; object-fit:cover; display:block; }
 .modal-media-preview video { width:100%; max-height:220px; object-fit:contain; display:block; background:#111; }
-.modal-audio-preview { display:flex; align-items:center; gap:10px; padding:12px 14px; background:var(--paper2); }
+.modal-audio-preview { display:flex; align-items:center; gap:10px; padding:14px 16px; background:var(--paper2); min-height:64px; }
 .modal-preview-clear {
   position:absolute; top:8px; right:8px;
   width:24px; height:24px; border-radius:50%;
@@ -903,6 +903,9 @@ body {
   padding: 24px 40px; padding-bottom: calc(24px + env(safe-area-inset-bottom));
   background: #000;
 }
+.cam-controls.video-mode { justify-content: center; }
+.cam-controls.video-mode .cam-flip { display: none; }
+.cam-controls.video-mode .cam-shutter { display: none; }
 .cam-shutter {
   width: 68px; height: 68px; border-radius: 50%;
   border: 4px solid white; background: white;
@@ -1284,10 +1287,11 @@ audio { display: none; }
 
     <div class="fg">
       <label class="flabel">Note</label>
-      <textarea class="ftextarea" id="s-note" placeholder="Describe the idea, the feeling, the context…" style="min-height:100px"></textarea>
+      <textarea class="ftextarea" id="s-note" placeholder="Describe the idea, the feeling, the context…" style="min-height:120px"></textarea>
     </div>
-    <!-- Transcription toggle (only relevant when audio present) -->
+    <!-- Transcription toggle + inline status -->
     <div class="transcribe-row" id="transcribe-row" style="display:none">
+      <span id="transcript-status" style="font-size:11px;color:var(--ink3);"></span>
       <button class="transcribe-pill" id="transcribe-pill" onclick="toggleAutoTranscribe()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
           <path d="M12 2a10 10 0 010 20M2 12h20M12 2c-2.5 2.7-4 6.2-4 10s1.5 7.3 4 10M12 2c2.5 2.7 4 6.2 4 10s-1.5 7.3-4 10"/>
@@ -1296,10 +1300,10 @@ audio { display: none; }
         <span id="transcribe-label">Transcribe</span>
       </button>
     </div>
-    <div class="fg" id="transcript-fg" style="display:none">
-      <label class="flabel">Transcript</label>
-      <div id="transcript-status"></div>
-      <textarea class="ftextarea" id="s-transcript" placeholder="Transcript will appear here…" style="display:none;margin-top:6px"></textarea>
+    <!-- transcript-fg kept for WAV conversion status only, always hidden -->
+    <div id="transcript-fg" style="display:none">
+      <div id="transcript-status-wav"></div>
+      <textarea id="s-transcript" style="display:none"></textarea>
     </div>
     <div class="fg">
       <label class="flabel">Title <span style="color:var(--ink3);font-weight:300;text-transform:none;letter-spacing:0;font-size:10px">(optional — auto-generated if blank)</span></label>
@@ -1938,7 +1942,9 @@ function showModalMediaPreview(type, dataUrl, blob){
   } else if(type==='audio'&&blob){
     const url=URL.createObjectURL(blob);
     const wrap=document.createElement('div'); wrap.className='modal-audio-preview';
-    const audio=document.createElement('audio'); audio.src=url; audio.controls=true; audio.style.cssText='flex:1;height:36px';
+    const audio=document.createElement('audio'); audio.src=url; audio.controls=true;
+    audio.style.cssText='width:100%;min-width:0;display:block;height:44px';
+    wrap.style.cssText='display:block;padding:14px 16px;background:var(--paper2)';
     wrap.appendChild(audio); el.appendChild(wrap);
   }
 }
@@ -2313,9 +2319,9 @@ async function startCamVideo(){
   };
   camMR.start(500); // collect data every 500ms
   document.getElementById('cam-vid-btn').classList.add('recording');
-  // Hide shutter so user can't accidentally shoot a photo during video
-  const shutter=document.querySelector('.cam-shutter');
-  if(shutter) shutter.style.visibility='hidden';
+  // Video mode: hide flip+shutter, center stop button
+  const controls=document.querySelector('.cam-controls');
+  if(controls) controls.classList.add('video-mode');
   const timer=document.getElementById('cam-rec-timer');
   timer.classList.add('show');
   camTimer=setInterval(()=>{ camSec++; timer.textContent='● '+fmtDur(camSec); },1000);
@@ -2325,8 +2331,8 @@ function stopCamVideo(){
   clearInterval(camTimer);
   const btn=document.getElementById('cam-vid-btn');
   if(btn) btn.classList.remove('recording');
-  const shutter=document.querySelector('.cam-shutter');
-  if(shutter) shutter.style.visibility='';
+  const controls=document.querySelector('.cam-controls');
+  if(controls) controls.classList.remove('video-mode');
   const timer=document.getElementById('cam-rec-timer');
   if(timer) timer.classList.remove('show');
 }
@@ -2564,17 +2570,23 @@ async function whisperTranscribe(blob){
 }
 
 function updateTranscriptUI(state, errMsg){
-  const fg=document.getElementById('transcript-fg');
   const status=document.getElementById('transcript-status');
-  const ta=document.getElementById('s-transcript');
-  if(!fg) return;
   if(state==='loading'){
-    fg.style.display=''; status.innerHTML='<div class="transcript-loading"><div class="transcript-dot"></div>Transcribing…</div>'; ta.style.display='none';
+    if(status) status.textContent='Transcribing…';
   } else if(state==='error'){
-    const msg=errMsg?`Transcription failed: ${errMsg}`:'Transcription failed. You can type it manually.';
-    fg.style.display=''; status.innerHTML=`<div class="transcript-error">${escHtml(msg)}<br><span style="opacity:0.7;font-size:11px">You can type the transcript manually below</span></div>`; ta.style.display='';
+    if(status) status.textContent='';
+    toast(errMsg?'Transcription failed: '+errMsg:'Transcription failed');
   } else if(state==='done'){
-    fg.style.display=''; status.innerHTML=''; ta.style.display=''; ta.value=pendingTranscript||'';
+    if(status) status.textContent='';
+    // Put transcript directly into note textarea
+    if(pendingTranscript){
+      const note=document.getElementById('s-note');
+      note.value=note.value.trim()
+        ? note.value.trim()+'\n\n'+pendingTranscript
+        : pendingTranscript;
+      // auto-grow the textarea to show content
+      note.style.minHeight=Math.max(120, note.scrollHeight)+'px';
+    }
   }
 }
 
