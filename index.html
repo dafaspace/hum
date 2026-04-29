@@ -326,12 +326,7 @@ body {
 .layout-tab.active { background: white; border-color: var(--paper4); color: var(--ink); box-shadow: 0 1px 2px rgba(42,38,34,0.04); }
 
 /* ── CAPTURE AREA — THE STAR ── */
-#capture-area {
-  padding: 26px 24px 22px;
-  border-bottom: 1px solid var(--paper4);
-  display: flex; align-items: flex-end; gap: 18px;
-  background: linear-gradient(180deg, rgba(232,168,124,0.05) 0%, transparent 100%);
-}
+#capture-area { display:none; } /* legacy — removed */
 
 #capture-btn {
   position: relative;
@@ -368,13 +363,12 @@ body {
   50% { box-shadow: 0 0 0 14px rgba(196,120,120,0), 0 4px 20px rgba(196,120,120,0.4); }
 }
 
-/* Mic icon */
+/* + capture button icon */
 .btn-icon {
-  width: 24px; height: 24px;
+  width: 22px; height: 22px;
   color: white;
   transition: opacity 0.15s, transform 0.2s;
 }
-.btn-icon.hidden { display: none; }
 .btn-stop { width: 16px; height: 16px; border-radius: 3px; background: white; }
 
 .capture-right { flex: 1; display: flex; flex-direction: column; gap: 9px; min-width: 0; }
@@ -776,17 +770,91 @@ body {
 .settings-hint { font-size: 11px; color: var(--ink3); margin-top: 6px; line-height: 1.6; }
 
 .bpm-row { display:flex; align-items:stretch; }
-.bpm-in { border-radius:0 !important; text-align:center; flex:1; width:0; min-width:30px; }
+.bpm-in { border-radius:0 !important; text-align:center; flex:1; width:0; min-width:40px; font-size:14px; font-weight:500; color:var(--ink); }
 .bpm-adj {
-  width:30px; flex-shrink:0;
+  width:36px; flex-shrink:0;
   border:1px solid var(--paper4); background:var(--paper2);
-  color:var(--ink2); font-size:20px; font-weight:300; line-height:1;
+  color:var(--ink2); font-size:18px; font-weight:300; line-height:1;
   cursor:pointer; transition:all 0.15s;
   display:flex; align-items:center; justify-content:center;
+  user-select:none;
 }
 .bpm-adj:first-child { border-radius:10px 0 0 10px; border-right:none; }
 .bpm-adj:last-child { border-radius:0 10px 10px 0; border-left:none; }
 .bpm-adj:hover { background:var(--paper3); color:var(--ink); }
+.bpm-adj:active { background:var(--paper4); }
+
+/* ── MODAL MEDIA ROW ── */
+.modal-media-row { display:flex; gap:8px; margin-bottom:16px; }
+.media-cap-btn {
+  flex:1; display:flex; flex-direction:column; align-items:center; gap:5px;
+  padding:11px 6px 9px;
+  border:1.5px solid var(--paper4); border-radius:14px;
+  background:var(--paper2); cursor:pointer;
+  font-family:var(--sans); font-size:10.5px; font-weight:500; color:var(--ink2);
+  transition:all 0.15s;
+}
+.media-cap-btn:hover { border-color:var(--warm); color:var(--warm2); background:rgba(232,168,124,0.07); }
+.media-cap-btn.active { border-color:var(--warm); color:var(--warm2); background:rgba(232,168,124,0.12); }
+.media-cap-btn.recording { border-color:var(--rose); color:var(--rose); background:rgba(196,120,120,0.09); }
+.media-cap-btn svg { width:20px; height:20px; }
+
+/* Inline recording bar (inside modal) */
+.modal-rec-bar {
+  display:flex; align-items:center; gap:10px;
+  padding:10px 14px; margin-bottom:12px;
+  background:rgba(196,120,120,0.08); border:1px solid rgba(196,120,120,0.2); border-radius:12px;
+}
+.modal-rec-dot { width:7px; height:7px; border-radius:50%; background:var(--rose); animation:blinkdot 1s step-end infinite; flex-shrink:0; }
+@keyframes blinkdot { 50%{opacity:0;} }
+.modal-rec-time { font-size:13px; font-variant-numeric:tabular-nums; color:var(--rose); font-weight:500; flex:1; letter-spacing:0.02em; }
+.modal-rec-stop-btn {
+  width:26px; height:26px; border-radius:7px; background:var(--rose); border:none; cursor:pointer;
+  display:flex; align-items:center; justify-content:center; flex-shrink:0;
+}
+.modal-rec-stop-sq { width:9px; height:9px; border-radius:2px; background:white; }
+
+/* Modal media preview (photo/video above note field) */
+.modal-media-preview { margin-bottom:14px; border-radius:14px; overflow:hidden; border:1px solid var(--paper4); position:relative; }
+.modal-media-preview img { width:100%; max-height:220px; object-fit:cover; display:block; }
+.modal-media-preview video { width:100%; max-height:220px; object-fit:contain; display:block; background:#111; }
+.modal-audio-preview { display:flex; align-items:center; gap:10px; padding:12px 14px; background:var(--paper2); }
+.modal-preview-clear {
+  position:absolute; top:8px; right:8px;
+  width:24px; height:24px; border-radius:50%;
+  background:rgba(0,0,0,0.45); border:none; cursor:pointer; color:white;
+  display:flex; align-items:center; justify-content:center; font-size:14px; line-height:1;
+}
+.modal-preview-clear:hover { background:rgba(0,0,0,0.7); }
+
+/* Auto-transcribe toggle */
+.transcribe-row {
+  display:flex; align-items:center; justify-content:flex-end; gap:7px;
+  margin-top:-6px; margin-bottom:12px;
+}
+.transcribe-pill {
+  display:inline-flex; align-items:center; gap:5px;
+  padding:4px 9px 4px 7px; border-radius:100px;
+  border:1px solid var(--paper4); background:var(--paper2);
+  cursor:pointer; transition:all 0.15s; user-select:none;
+  font-family:var(--sans); font-size:10.5px; font-weight:500; color:var(--ink3);
+}
+.transcribe-pill:hover { border-color:var(--ink4); color:var(--ink2); }
+.transcribe-pill.on { border-color:var(--sage); background:rgba(136,168,150,0.12); color:var(--sage); }
+.transcribe-pill svg { width:12px; height:12px; }
+.t-dot { width:5px; height:5px; border-radius:50%; background:var(--ink4); flex-shrink:0; transition:background 0.15s; }
+.transcribe-pill.on .t-dot { background:var(--sage); }
+
+/* Simplified desktop capture area (just + button) */
+#capture-area-new {
+  padding:20px 24px 18px;
+  border-bottom:1px solid var(--paper4);
+  display:flex; align-items:center; gap:14px;
+  background:linear-gradient(180deg, rgba(232,168,124,0.05) 0%, transparent 100%);
+}
+.capture-hint { font-size:11.5px; color:var(--ink3); letter-spacing:0.02em; }
+.capture-hint strong { color:var(--warm2); font-weight:500; }
+
 
 .transcript-loading {
   display: flex; align-items: center; gap: 8px;
@@ -948,8 +1016,9 @@ body {
   #search-input::placeholder { color: var(--mob-ink3); }
   .search-icon-svg { color: var(--mob-ink3); left: 6px; }
 
-  /* ── HIDE capture area (FAB replaces it) ── */
+  /* ── HIDE capture area on mobile (FAB replaces it) ── */
   #capture-area { display: none; }
+  #capture-area-new { display: none; }
   #statusbar { display: none; }
 
   /* ── CONTENT ── */
@@ -1110,9 +1179,6 @@ audio { display: none; }
         <span class="brand-dot"></span>
       </div>
       <div style="display:flex;align-items:center;gap:4px">
-        <button class="mob-settings-btn" onclick="openCamera()" title="Camera">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
-        </button>
         <button class="mob-settings-btn" onclick="openSettings()" title="Settings">
           <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><line x1="3" y1="6" x2="17" y2="6"/><line x1="3" y1="10" x2="17" y2="10"/><line x1="3" y1="14" x2="17" y2="14"/><circle cx="7" cy="6" r="2" fill="var(--mob-bg)"/><circle cx="13" cy="10" r="2" fill="var(--mob-bg)"/><circle cx="8" cy="14" r="2" fill="var(--mob-bg)"/></svg>
         </button>
@@ -1133,46 +1199,13 @@ audio { display: none; }
   </div>
 
   <!-- CAPTURE -->
-  <div id="capture-area">
-    <button id="capture-btn" onclick="handleCapture()" title="Press to capture">
-      <!-- Microphone icon, big -->
-      <svg id="cap-mic" class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="9" y="3" width="6" height="11" rx="3"/>
-        <path d="M5 12a7 7 0 0014 0M12 19v3M8 22h8"/>
+  <div id="capture-area-new">
+    <button id="capture-btn" onclick="openNewCapture()" title="New capture">
+      <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+        <path d="M12 5v14M5 12h14"/>
       </svg>
-      <div id="cap-stop" class="btn-stop" style="display:none"></div>
     </button>
-
-    <div class="capture-right">
-      <div class="capture-label">
-        <span class="capture-label-strong">Tap</span> the orb to record · or write below
-      </div>
-      <textarea id="quick-input" placeholder="A thought, a lyric, a plan, a memory… press Enter to save" onkeydown="handleTextEnter(event)"></textarea>
-      <div class="attach-row">
-        <button class="attach-btn" onclick="openCamera()">
-          <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round">
-            <rect x="1.5" y="2.5" width="11" height="9" rx="1.5"/>
-            <circle cx="7" cy="7" r="2"/>
-          </svg>
-          Camera
-        </button>
-        <button class="attach-btn" onclick="openFile('image/*,video/*')">
-          <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round">
-            <rect x="1.5" y="2.5" width="11" height="9" rx="1.5"/>
-            <circle cx="5" cy="6" r="1"/>
-            <path d="M1.5 10l3-3 2 2 3-3 3 3"/>
-          </svg>
-          Library
-        </button>
-        <button class="attach-btn" onclick="openSaveModal('midi')">
-          <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4">
-            <rect x="1.5" y="3.5" width="11" height="7" rx="1"/>
-            <path d="M5 3.5v7M9 3.5v7M1.5 7h11"/>
-          </svg>
-          MIDI note
-        </button>
-      </div>
-    </div>
+    <span class="capture-hint"><strong>Tap</strong> to start a new capture</span>
   </div>
 
   <div id="content"></div>
@@ -1208,10 +1241,60 @@ audio { display: none; }
 <!-- SAVE -->
 <div id="save-overlay">
   <div class="save-card">
-    <div class="save-heading" id="save-heading">Save capture</div>
+    <div class="save-heading" id="save-heading">New capture</div>
+
+    <!-- Media capture row (shown in new-entry mode) -->
+    <div class="modal-media-row" id="modal-media-row" style="display:none">
+      <button class="media-cap-btn" id="mbtn-audio" onclick="toggleModalAudio()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="3" width="6" height="11" rx="3"/>
+          <path d="M5 12a7 7 0 0014 0M12 19v3M8 22h8"/>
+        </svg>
+        <span id="mbtn-audio-label">Audio</span>
+      </button>
+      <button class="media-cap-btn" id="mbtn-photo" onclick="openCameraForModal('photo')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+          <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+          <circle cx="12" cy="13" r="4"/>
+        </svg>
+        Photo
+      </button>
+      <button class="media-cap-btn" id="mbtn-video" onclick="openCameraForModal('video')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+          <rect x="2" y="6" width="13" height="12" rx="2"/>
+          <path d="M22 8l-5 4 5 4V8"/>
+        </svg>
+        Video
+      </button>
+    </div>
+
+    <!-- Inline recording bar (shown while recording in modal) -->
+    <div class="modal-rec-bar" id="modal-rec-bar" style="display:none">
+      <div class="modal-rec-dot"></div>
+      <span class="modal-rec-time" id="modal-rec-time">0:00</span>
+      <button class="modal-rec-stop-btn" onclick="stopModalAudio()" title="Stop recording">
+        <div class="modal-rec-stop-sq"></div>
+      </button>
+    </div>
+
+    <!-- Media preview (photo / video / audio wave — before note field) -->
+    <div class="modal-media-preview" id="modal-media-preview" style="display:none">
+      <button class="modal-preview-clear" onclick="clearModalMedia()" title="Remove">✕</button>
+    </div>
+
     <div class="fg">
       <label class="flabel">Note</label>
       <textarea class="ftextarea" id="s-note" placeholder="Describe the idea, the feeling, the context…" style="min-height:100px"></textarea>
+    </div>
+    <!-- Transcription toggle (only relevant when audio present) -->
+    <div class="transcribe-row" id="transcribe-row" style="display:none">
+      <button class="transcribe-pill" id="transcribe-pill" onclick="toggleAutoTranscribe()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+          <path d="M12 2a10 10 0 010 20M2 12h20M12 2c-2.5 2.7-4 6.2-4 10s1.5 7.3 4 10M12 2c2.5 2.7 4 6.2 4 10s-1.5 7.3-4 10"/>
+        </svg>
+        <span class="t-dot"></span>
+        <span id="transcribe-label">Transcribe</span>
+      </button>
     </div>
     <div class="fg" id="transcript-fg" style="display:none">
       <label class="flabel">Transcript</label>
@@ -1240,13 +1323,13 @@ audio { display: none; }
         <select class="fselect" id="s-proj"><option value="">— Inbox</option></select>
       </div>
     </div>
-    <div class="frow3">
+    <div class="frow2">
       <div class="fg">
         <label class="flabel">BPM</label>
         <div class="bpm-row">
-          <button class="bpm-adj" type="button" onclick="adjBpm(-5)">−5</button>
-          <input class="finput bpm-in" id="s-bpm" type="number" placeholder="—" min="20" max="300">
-          <button class="bpm-adj" type="button" onclick="adjBpm(5)">+5</button>
+          <button class="bpm-adj" type="button" onclick="adjBpm(-5)">−</button>
+          <input class="finput bpm-in" id="s-bpm" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="—">
+          <button class="bpm-adj" type="button" onclick="adjBpm(5)">+</button>
         </div>
       </div>
       <div class="fg">
@@ -1283,6 +1366,17 @@ audio { display: none; }
           <option value="B min">B minor</option>
         </select>
       </div>
+    </div>
+    <div class="fg">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <label class="flabel" style="margin-bottom:0">Tags</label>
+        <button type="button" onclick="autoTags()" style="font-size:10px;font-family:var(--sans);font-weight:500;color:var(--ink2);background:var(--paper2);border:1px solid var(--paper4);border-radius:6px;padding:2px 8px;cursor:pointer;transition:all 0.15s" onmouseover="this.style.borderColor='var(--warm)';this.style.color='var(--warm2)'" onmouseout="this.style.borderColor='var(--paper4)';this.style.color='var(--ink2)'">Auto</button>
+      </div>
+      <div class="tags-wrap" id="tags-wrap" onclick="document.getElementById('tag-in').focus()">
+        <input class="tinput" id="tag-in" placeholder="#tag…" onkeydown="handleTag(event)">
+      </div>
+    </div>
+    <div class="frow3">
       <div class="fg">
         <label class="flabel">Mood</label>
         <input class="finput" id="s-mood" type="text" list="mood-list" placeholder="dark">
@@ -1303,17 +1397,7 @@ audio { display: none; }
           <option value="peaceful">
         </datalist>
       </div>
-    </div>
-    <div class="fg">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-        <label class="flabel" style="margin-bottom:0">Tags</label>
-        <button type="button" onclick="autoTags()" style="font-size:10px;font-family:var(--sans);font-weight:500;color:var(--ink2);background:var(--paper2);border:1px solid var(--paper4);border-radius:6px;padding:2px 8px;cursor:pointer;transition:all 0.15s" onmouseover="this.style.borderColor='var(--warm)';this.style.color='var(--warm2)'" onmouseout="this.style.borderColor='var(--paper4)';this.style.color='var(--ink2)'">Auto</button>
-      </div>
-      <div class="tags-wrap" id="tags-wrap" onclick="document.getElementById('tag-in').focus()">
-        <input class="tinput" id="tag-in" placeholder="#tag…" onkeydown="handleTag(event)">
-      </div>
-    </div>
-    <div class="frow2">
+      <div class="fg"><label class="flabel">Genre</label><input class="finput" id="s-genre" type="text" placeholder="ambient"></div>
       <div class="fg"><label class="flabel">Status</label>
         <select class="fselect" id="s-status">
           <option value="raw">Raw sketch</option>
@@ -1322,7 +1406,6 @@ audio { display: none; }
           <option value="archived">Archived</option>
         </select>
       </div>
-      <div class="fg"><label class="flabel">Genre</label><input class="finput" id="s-genre" type="text" placeholder="ambient"></div>
     </div>
     <div class="save-actions">
       <button class="btn-cancel" onclick="closeSave()">Cancel</button>
@@ -1412,10 +1495,9 @@ audio { display: none; }
   </div>
 </div>
 
-<button id="mob-fab" onclick="handleCapture()" aria-label="Capture">
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <rect x="9" y="3" width="6" height="11" rx="3"/>
-    <path d="M5 12a7 7 0 0014 0M12 19v3M8 22h8"/>
+<button id="mob-fab" onclick="openNewCapture()" aria-label="New capture">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+    <path d="M12 5v14M5 12h14"/>
   </svg>
 </button>
 
@@ -1717,43 +1799,58 @@ function typeIconSvg(t){
 }
 
 // ── CAPTURE ──
-function handleCapture(){
-  if(mr&&mr.state==='recording'){ stopRecording(); return; }
-  startRecording();
+// ── OPEN NEW CAPTURE ──
+let cameraReturnMode=null; // 'photo'|'video'|null — camera was opened from modal
+let modalRecording=false, modalRecInterval=null, modalRecSec=0, modalRecStream=null;
+
+function openNewCapture(){
+  pendingBlob=null; pendingDataUrl=null; pendingTranscript=null;
+  cameraReturnMode=null;
+  openSaveModal('idea', true);
 }
 
-async function startRecording(){
-  // Check if getUserMedia is available (requires HTTPS or localhost)
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    toast('Audio requires HTTPS — use a local server or install as PWA');
-    return;
+function handleCapture(){ openNewCapture(); } // legacy alias
+
+// ── INLINE AUDIO RECORDING (in modal) ──
+async function toggleModalAudio(){
+  if(modalRecording){ stopModalAudio(); return; }
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+    toast('Audio requires HTTPS or local install'); return;
   }
   try{
     const stream=await navigator.mediaDevices.getUserMedia({audio:true});
-    clearInterval(recInterval); recChunks=[]; recSec=0;
+    modalRecStream=stream;
+    clearInterval(modalRecInterval); recChunks=[]; modalRecSec=0;
     mr=new MediaRecorder(stream);
     mr.ondataavailable=e=>recChunks.push(e.data);
-    mr.onstop=async ()=>{
+    mr.onstop=async()=>{
       stream.getTracks().forEach(t=>t.stop());
+      modalRecStream=null; modalRecording=false;
+      document.getElementById('modal-rec-bar').style.display='none';
+      const btn=document.getElementById('mbtn-audio');
+      if(btn){ btn.classList.remove('recording'); document.getElementById('mbtn-audio-label').textContent='Audio'; }
+      if(!recChunks.length) return;
       const mimeType=mr.mimeType||'audio/webm';
       let blob=new Blob(recChunks,{type:mimeType});
-      document.getElementById('rec-overlay').classList.remove('show');
-      document.getElementById('capture-btn').classList.remove('recording');
-      document.getElementById('cap-mic').style.display='block';
-      document.getElementById('cap-stop').style.display='none';
-      const fab=document.getElementById('mob-fab'); if(fab) fab.classList.remove('recording');
       if(settings.recFormat==='wav'){
-        openSaveModal('audio');
-        updateTranscriptUI('loading'); // reuse loading UI for conversion
-        document.getElementById('transcript-status').innerHTML='<div class="transcript-loading"><div class="transcript-dot"></div>Converting to WAV…</div>';
         document.getElementById('transcript-fg').style.display='';
+        document.getElementById('transcript-status').innerHTML='<div class="transcript-loading"><div class="transcript-dot"></div>Converting to WAV…</div>';
         try{ blob=await convertToWav(blob); }catch(_){}
         document.getElementById('transcript-fg').style.display='none';
         document.getElementById('transcript-status').innerHTML='';
       }
-      pendingBlob=blob; pendingTranscript=null;
-      if(!document.getElementById('save-overlay').classList.contains('show')) openSaveModal('audio');
-      if(settings.openaiKey&&blob.size>1000){
+      pendingBlob=blob;
+      document.getElementById('s-type').value='audio';
+      document.getElementById('s-bpm').value='120';
+      showModalMediaPreview('audio', null, blob);
+      // update heading & title
+      const viewProj=projects.find(p=>p.id===view)?view:null;
+      document.getElementById('save-heading').textContent='Save recording';
+      document.getElementById('s-name').value=autoTitle({ts:Date.now(),type:'audio',project:viewProj});
+      // Whisper transcription
+      document.getElementById('transcribe-row').style.display='';
+      updateTranscribePill();
+      if(settings.openaiKey&&blob.size>1000&&(settings.autoTranscribe!==false)){
         pendingTranscript='';
         updateTranscriptUI('loading');
         try{ pendingTranscript=await whisperTranscribe(blob); updateTranscriptUI('done'); }
@@ -1761,44 +1858,94 @@ async function startRecording(){
       }
     };
     mr.start();
-    document.getElementById('rec-time').textContent='0:00';
-    recInterval=setInterval(()=>{ recSec++; document.getElementById('rec-time').textContent=fmtDur(recSec); },1000);
-    document.getElementById('rec-overlay').classList.add('show');
-    document.getElementById('capture-btn').classList.add('recording');
-    document.getElementById('cap-mic').style.display='none';
-    document.getElementById('cap-stop').style.display='block';
-    const fab=document.getElementById('mob-fab'); if(fab) fab.classList.add('recording');
+    modalRecording=true;
+    document.getElementById('modal-rec-bar').style.display='';
+    document.getElementById('modal-rec-time').textContent='0:00';
+    modalRecInterval=setInterval(()=>{
+      modalRecSec++;
+      document.getElementById('modal-rec-time').textContent=fmtDur(modalRecSec);
+    },1000);
+    const btn=document.getElementById('mbtn-audio');
+    if(btn){ btn.classList.add('recording'); document.getElementById('mbtn-audio-label').textContent='Recording…'; }
   }catch(err){
-    console.error('Mic error:', err);
-    if (err.name === 'NotAllowedError') {
-      toast('Allow microphone access in browser settings');
-    } else if (err.name === 'NotFoundError') {
-      toast('No microphone detected');
-    } else {
-      toast('Microphone error — try HTTPS');
-    }
+    if(err.name==='NotAllowedError') toast('Allow microphone access in browser settings');
+    else if(err.name==='NotFoundError') toast('No microphone detected');
+    else toast('Microphone error');
   }
 }
 
-function stopRecording(){ if(mr&&mr.state==='recording'){ mr.stop(); clearInterval(recInterval); } }
-function cancelRecording(){
-  if(mr&&mr.state==='recording'){ mr.stop(); recChunks=[]; pendingBlob=null; }
-  clearInterval(recInterval);
-  document.getElementById('rec-overlay').classList.remove('show');
-  document.getElementById('capture-btn').classList.remove('recording');
-  document.getElementById('cap-mic').style.display='block';
-  document.getElementById('cap-stop').style.display='none';
-  const fab=document.getElementById('mob-fab'); if(fab) fab.classList.remove('recording');
+function stopModalAudio(){
+  if(mr&&mr.state==='recording'){ mr.stop(); clearInterval(modalRecInterval); modalRecSec=0; }
 }
 
-function handleTextEnter(e){
-  if(e.key==='Enter'&&!e.shiftKey){
-    e.preventDefault();
-    const v=document.getElementById('quick-input').value.trim();
-    if(!v) return;
-    document.getElementById('s-note').value=v;
-    document.getElementById('quick-input').value='';
-    openSaveModal('text');
+function cancelModalAudio(){
+  if(mr&&mr.state==='recording'){ mr.stop(); recChunks=[]; }
+  clearInterval(modalRecInterval); modalRecSec=0; modalRecording=false;
+  if(modalRecStream){ modalRecStream.getTracks().forEach(t=>t.stop()); modalRecStream=null; }
+  document.getElementById('modal-rec-bar').style.display='none';
+  const btn=document.getElementById('mbtn-audio');
+  if(btn){ btn.classList.remove('recording'); document.getElementById('mbtn-audio-label').textContent='Audio'; }
+}
+
+// ── MODAL MEDIA PREVIEW ──
+function showModalMediaPreview(type, dataUrl, blob){
+  const el=document.getElementById('modal-media-preview');
+  el.style.display='';
+  // clear inner (keep clear button)
+  const clearBtn=el.querySelector('.modal-preview-clear');
+  el.innerHTML=''; el.appendChild(clearBtn||createClearBtn());
+  if(type==='photo'){
+    const img=document.createElement('img'); img.src=dataUrl; el.appendChild(img);
+  } else if(type==='video'){
+    const v=document.createElement('video'); v.src=dataUrl; v.controls=true; v.playsInline=true; el.appendChild(v);
+  } else if(type==='audio'&&blob){
+    const url=URL.createObjectURL(blob);
+    const wrap=document.createElement('div'); wrap.className='modal-audio-preview';
+    const audio=document.createElement('audio'); audio.src=url; audio.controls=true; audio.style.cssText='flex:1;height:36px';
+    wrap.appendChild(audio); el.appendChild(wrap);
+  }
+}
+function createClearBtn(){
+  const b=document.createElement('button'); b.className='modal-preview-clear'; b.textContent='✕';
+  b.title='Remove media'; b.onclick=clearModalMedia; return b;
+}
+function clearModalMedia(){
+  pendingBlob=null; pendingDataUrl=null;
+  document.getElementById('modal-media-preview').style.display='none';
+  document.getElementById('transcribe-row').style.display='none';
+  document.getElementById('transcript-fg').style.display='none';
+  document.getElementById('transcript-status').innerHTML='';
+  document.getElementById('s-transcript').value=''; document.getElementById('s-transcript').style.display='none';
+  // reset type to idea
+  document.getElementById('s-type').value='idea';
+  document.getElementById('s-bpm').value='';
+  document.getElementById('save-heading').textContent='New capture';
+}
+
+// ── AUTO-TRANSCRIBE TOGGLE ──
+function updateTranscribePill(){
+  const pill=document.getElementById('transcribe-pill');
+  const lbl=document.getElementById('transcribe-label');
+  if(!pill) return;
+  const on=(settings.autoTranscribe!==false)&&!!settings.openaiKey;
+  pill.classList.toggle('on',on);
+  lbl.textContent=settings.openaiKey?(on?'Transcribe ON':'Transcribe OFF'):'No API key';
+  if(!settings.openaiKey) pill.title='Add OpenAI key in Settings to enable';
+}
+function toggleAutoTranscribe(){
+  if(!settings.openaiKey){ openSettings(); return; }
+  settings.autoTranscribe=(settings.autoTranscribe===false)?true:false;
+  localStorage.setItem(ST,JSON.stringify(settings));
+  updateTranscribePill();
+}
+
+// ── CAMERA FROM MODAL ──
+function openCameraForModal(mode){
+  cameraReturnMode=mode;
+  openCamera();
+  if(mode==='video'){
+    // auto-switch to video mode once camera opens (small delay for stream)
+    setTimeout(()=>{ if(camStream) toggleCamVideo(); },600);
   }
 }
 
@@ -1807,39 +1954,73 @@ function handleFile(input){
   const file=input.files[0]; if(!file) return;
   const type=file.type.startsWith('image')?'photo':'video';
   const r=new FileReader();
-  r.onload=e=>{ pendingDataUrl=e.target.result; openSaveModal(type); };
+  r.onload=e=>{
+    pendingDataUrl=e.target.result;
+    if(document.getElementById('save-overlay').classList.contains('show')){
+      document.getElementById('s-type').value=type;
+      showModalMediaPreview(type,e.target.result);
+    } else { openSaveModal(type); }
+  };
   r.readAsDataURL(file);
   input.value='';
 }
 
-function openSaveModal(type){
+// ── SAVE MODAL ──
+function openSaveModal(type, isNew){
+  // stop any active inline recording
+  if(modalRecording) cancelModalAudio();
   currentTags=[]; renderTags();
   ['s-note','s-key','s-mood','s-genre'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('s-status').value='raw';
-  document.getElementById('s-type').value=type;
+  document.getElementById('s-type').value=type||'idea';
   const sel=document.getElementById('s-proj');
-  // pre-select current project view if applicable
   const viewProj=projects.find(p=>p.id===view)?view:null;
   sel.innerHTML='<option value="">— Inbox</option>'+projects.map(p=>`<option value="${p.id}">${escHtml(p.name)}</option>`).join('');
   if(viewProj) sel.value=viewProj;
-  // pre-fill title with auto-generated name
-  const tmpE={ts:Date.now(), type, project:viewProj};
+  const tmpE={ts:Date.now(), type:type||'idea', project:viewProj};
   document.getElementById('s-name').value=autoTitle(tmpE);
-  // default BPM for audio
   document.getElementById('s-bpm').value=type==='audio'?'120':'';
-  const heads={audio:'Save recording',text:'Save note',idea:'Save idea',dream:'Save dream',photo:'Save photo',video:'Save video',midi:'Save MIDI'};
-  document.getElementById('save-heading').textContent=heads[type]||'Save capture';
+  const heads={audio:'Save recording',text:'Save note',idea:'New capture',dream:'Save dream',photo:'Save photo',video:'Save video',midi:'Save MIDI'};
+  document.getElementById('save-heading').textContent=isNew?'New capture':(heads[type]||'Save capture');
+  // transcript
   document.getElementById('transcript-fg').style.display='none';
   document.getElementById('transcript-status').innerHTML='';
   document.getElementById('s-transcript').value='';
   document.getElementById('s-transcript').style.display='none';
+  // media row: show only for new captures
+  document.getElementById('modal-media-row').style.display=isNew?'':'none';
+  document.getElementById('modal-rec-bar').style.display='none';
+  // media preview
+  const previewEl=document.getElementById('modal-media-preview');
+  if(pendingDataUrl){
+    showModalMediaPreview(type,pendingDataUrl,null);
+  } else {
+    previewEl.style.display='none';
+  }
+  // transcribe toggle — show if audio present
+  const hasAudio=(type==='audio'&&pendingBlob)||false;
+  document.getElementById('transcribe-row').style.display=hasAudio?'':'none';
+  updateTranscribePill();
   document.getElementById('save-overlay').classList.add('show');
   setTimeout(()=>document.getElementById('s-note').focus(),80);
 }
 
-function closeSave(){ document.getElementById('save-overlay').classList.remove('show'); pendingBlob=null; pendingDataUrl=null; pendingTranscript=null; editingId=null; }
+// Legacy — kept for compatibility (old rec-overlay not used in new flow)
+function startRecording(){ openNewCapture(); }
+function stopRecording(){ stopModalAudio(); }
+function cancelRecording(){
+  cancelModalAudio();
+  document.getElementById('rec-overlay').classList.remove('show');
+}
 
-function adjBpm(d){ const el=document.getElementById('s-bpm'); const v=parseInt(el.value)||120; el.value=Math.max(20,Math.min(300,v+d)); }
+function closeSave(){
+  if(modalRecording) cancelModalAudio();
+  document.getElementById('save-overlay').classList.remove('show');
+  pendingBlob=null; pendingDataUrl=null; pendingTranscript=null; editingId=null;
+  cameraReturnMode=null;
+}
+
+function adjBpm(d){ const el=document.getElementById('s-bpm'); const v=parseInt(el.value)||120; el.value=Math.max(20,Math.min(300,v+d)); el.dispatchEvent(new Event('input')); }
 
 function autoTags(){
   const STOP=new Set(['this','that','with','have','from','they','been','were','what','when','where','will','your','just','about','into','more','also','some','than','then','there','these','those','would','could','should','which','their','over','other','after','before','every','never','through','during','itself','anyone','because','between','without','already','something','nothing','everything']);
@@ -1901,7 +2082,7 @@ async function confirmSave(){
     id:uid(), ts:Date.now(), type,
     name:name||null, project:proj||null, note,
     tags:[...currentTags], bpm, key, mood, genre, status,
-    duration:recSec||null, transcript
+    duration:modalRecSec||null, transcript
   };
   const blobForWaveform=(type==='audio'&&pendingBlob)?pendingBlob:null;
   if(pendingBlob&&type==='audio'){ entry.data=await blobToDataUrl(pendingBlob); entry.mimeType=pendingBlob.type; }
@@ -1909,7 +2090,7 @@ async function confirmSave(){
   const savedId=entry.id;
   entries.unshift(entry);
   persist(); closeSave(); render(); renderProjects(); renderHeatmap();
-  recSec=0; pendingBlob=null; pendingDataUrl=null;
+  modalRecSec=0; pendingBlob=null; pendingDataUrl=null;
   toast('Saved');
   if(blobForWaveform){
     computeWaveform(blobForWaveform).then(waveform=>{
@@ -2010,9 +2191,14 @@ async function openCamera(){
 async function startCamStream(){
   if(camStream) camStream.getTracks().forEach(t=>t.stop());
   try{
-    camStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:camFacing},audio:false});
-    document.getElementById('cam-video').srcObject=camStream;
-  }catch(e){ toast('Camera access denied'); closeCamera(); }
+    // Request video+audio together — iOS Safari requires single getUserMedia call for MediaRecorder
+    camStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:camFacing},audio:true});
+  }catch(e){
+    // Fall back to video-only if mic denied
+    try{ camStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:camFacing},audio:false}); }
+    catch(e2){ toast('Camera access denied'); closeCamera(); return; }
+  }
+  document.getElementById('cam-video').srcObject=camStream;
 }
 function closeCamera(){
   if(camStream) camStream.getTracks().forEach(t=>t.stop());
@@ -2035,7 +2221,15 @@ function shootPhoto(){
   const dataUrl=canvas.toDataURL('image/jpeg',0.9);
   pendingDataUrl=dataUrl;
   closeCamera();
-  openSaveModal('photo');
+  if(document.getElementById('save-overlay').classList.contains('show')){
+    // modal already open (opened from +) — populate it
+    document.getElementById('s-type').value='photo';
+    document.getElementById('save-heading').textContent='Save photo';
+    showModalMediaPreview('photo',dataUrl,null);
+  } else {
+    openSaveModal('photo');
+  }
+  cameraReturnMode=null;
 }
 function toggleCamVideo(){
   if(camMR&&camMR.state==='recording'){ stopCamVideo(); return; }
@@ -2043,26 +2237,41 @@ function toggleCamVideo(){
 }
 async function startCamVideo(){
   if(!camStream) return;
-  // get audio too
-  let fullStream=camStream;
-  try{
-    const audio=await navigator.mediaDevices.getUserMedia({audio:true});
-    fullStream=new MediaStream([...camStream.getTracks(),...audio.getTracks()]);
-  }catch(_){}
   camChunks=[]; camSec=0;
-  camMR=new MediaRecorder(fullStream);
-  camMR.ondataavailable=e=>camChunks.push(e.data);
+  // Try preferred MIME types in order of iOS/Chrome compatibility
+  const mimeTypes=['video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm',''];
+  let mr=null;
+  for(const mt of mimeTypes){
+    try{ mr=new MediaRecorder(camStream,mt?{mimeType:mt}:{}); break; }catch(_){}
+  }
+  if(!mr){ toast('Video recording not supported on this device'); return; }
+  camMR=mr;
+  camMR.ondataavailable=e=>{ if(e.data&&e.data.size>0) camChunks.push(e.data); };
+  camMR.onerror=e=>{ toast('Recording error: '+(e.error?.message||e)); stopCamVideo(); };
   camMR.onstop=()=>{
-    const blob=new Blob(camChunks,{type:camMR.mimeType||'video/webm'});
+    const mime=camMR.mimeType||'video/mp4';
+    const blob=new Blob(camChunks,{type:mime});
     pendingDataUrl=null;
-    // store as data url
-    const fr=new FileReader(); fr.onload=ev=>{ pendingDataUrl=ev.target.result; openSaveModal('video'); }; fr.readAsDataURL(blob);
-    closeCamera();
+    const fr=new FileReader();
+    fr.onload=ev=>{
+      pendingDataUrl=ev.target.result;
+      closeCamera();
+      if(document.getElementById('save-overlay').classList.contains('show')){
+        // return to already-open modal
+        document.getElementById('s-type').value='video';
+        document.getElementById('save-heading').textContent='Save video';
+        showModalMediaPreview('video',ev.target.result,null);
+      } else {
+        openSaveModal('video');
+      }
+      cameraReturnMode=null;
+    };
+    fr.readAsDataURL(blob);
   };
-  camMR.start();
-  const btn=document.getElementById('cam-vid-btn');
-  btn.classList.add('recording');
-  document.getElementById('cam-shutter')?document.querySelector('.cam-shutter').classList.add('recording'):null;
+  camMR.start(500); // collect data every 500ms
+  document.getElementById('cam-vid-btn').classList.add('recording');
+  const shutter=document.querySelector('.cam-shutter');
+  if(shutter) shutter.classList.add('recording');
   const timer=document.getElementById('cam-rec-timer');
   timer.classList.add('show');
   camTimer=setInterval(()=>{ camSec++; timer.textContent='● '+fmtDur(camSec); },1000);
@@ -2070,9 +2279,12 @@ async function startCamVideo(){
 function stopCamVideo(){
   if(camMR&&camMR.state==='recording') camMR.stop();
   clearInterval(camTimer);
-  document.getElementById('cam-vid-btn').classList.remove('recording');
-  document.querySelector('.cam-shutter').classList.remove('recording');
-  document.getElementById('cam-rec-timer').classList.remove('show');
+  const btn=document.getElementById('cam-vid-btn');
+  if(btn) btn.classList.remove('recording');
+  const shutter=document.querySelector('.cam-shutter');
+  if(shutter) shutter.classList.remove('recording');
+  const timer=document.getElementById('cam-rec-timer');
+  if(timer) timer.classList.remove('show');
 }
 
 function editEntry(id){
@@ -2102,6 +2314,11 @@ function editEntry(id){
     document.getElementById('s-transcript').value='';
   }
   document.getElementById('save-heading').textContent='Edit capture';
+  // hide media row and preview in edit mode
+  document.getElementById('modal-media-row').style.display='none';
+  document.getElementById('modal-media-preview').style.display='none';
+  document.getElementById('modal-rec-bar').style.display='none';
+  document.getElementById('transcribe-row').style.display='none';
   document.getElementById('save-overlay').classList.add('show');
   setTimeout(()=>document.getElementById('s-note').focus(),80);
 }
