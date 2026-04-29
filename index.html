@@ -1322,6 +1322,14 @@ audio { display: none; }
   <div class="settings-card">
     <h3>Settings</h3>
     <div class="fg">
+      <label class="flabel">Recording format</label>
+      <select class="fselect" id="rec-format">
+        <option value="webm">WebM (default · smaller file)</option>
+        <option value="wav">WAV (lossless · larger file)</option>
+      </select>
+      <div class="settings-hint">WAV is converted after recording stops — may take a moment for long recordings.</div>
+    </div>
+    <div class="fg">
       <label class="flabel">OpenAI API Key</label>
       <input class="finput" id="openai-key" type="password" placeholder="sk-…" autocomplete="off">
       <div class="settings-hint">For Whisper audio transcription. Stored locally only.</div>
@@ -1632,14 +1640,23 @@ async function startRecording(){
     mr.onstop=async ()=>{
       stream.getTracks().forEach(t=>t.stop());
       const mimeType=mr.mimeType||'audio/webm';
-      const blob=new Blob(recChunks,{type:mimeType});
-      pendingBlob=blob; pendingTranscript=null;
+      let blob=new Blob(recChunks,{type:mimeType});
       document.getElementById('rec-overlay').classList.remove('show');
       document.getElementById('capture-btn').classList.remove('recording');
       document.getElementById('cap-mic').style.display='block';
       document.getElementById('cap-stop').style.display='none';
       const fab=document.getElementById('mob-fab'); if(fab) fab.classList.remove('recording');
-      openSaveModal('audio');
+      if(settings.recFormat==='wav'){
+        openSaveModal('audio');
+        updateTranscriptUI('loading'); // reuse loading UI for conversion
+        document.getElementById('transcript-status').innerHTML='<div class="transcript-loading"><div class="transcript-dot"></div>Converting to WAV…</div>';
+        document.getElementById('transcript-fg').style.display='';
+        try{ blob=await convertToWav(blob); }catch(_){}
+        document.getElementById('transcript-fg').style.display='none';
+        document.getElementById('transcript-status').innerHTML='';
+      }
+      pendingBlob=blob; pendingTranscript=null;
+      if(!document.getElementById('save-overlay').classList.contains('show')) openSaveModal('audio');
       if(settings.openaiKey&&blob.size>1000){
         pendingTranscript='';
         updateTranscriptUI('loading');
@@ -1893,7 +1910,7 @@ function expJson(){
   if(!curEntry) return; const e={...curEntry}; if(e.data&&e.data.length>80000) e.data='[binary — export audio separately]';
   dl(new Blob([JSON.stringify(e,null,2)],{type:'application/json'}),(e.name||autoTitle(e))+'.json');
 }
-function expAudio(){ if(!curEntry||!curEntry.data){toast('No audio data');return;} const a=document.createElement('a'); a.href=curEntry.data; a.download=(curEntry.name||autoTitle(curEntry))+'.webm'; a.click(); }
+function expAudio(){ if(!curEntry||!curEntry.data){toast('No audio data');return;} const ext=(curEntry.mimeType||'').includes('wav')?'wav':(curEntry.mimeType||'').includes('ogg')?'ogg':'webm'; const a=document.createElement('a'); a.href=curEntry.data; a.download=(curEntry.name||autoTitle(curEntry))+'.'+ext; a.click(); }
 function dl(blob,name){ const u=URL.createObjectURL(blob),a=document.createElement('a'); a.href=u; a.download=name; a.click(); URL.revokeObjectURL(u); }
 
 function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2200); }
@@ -1954,15 +1971,48 @@ function seed(){
 // ── SETTINGS ──
 function openSettings(){
   document.getElementById('openai-key').value=settings.openaiKey||'';
+  document.getElementById('rec-format').value=settings.recFormat||'webm';
   document.getElementById('settings-overlay').classList.add('show');
-  setTimeout(()=>document.getElementById('openai-key').focus(),80);
+  setTimeout(()=>document.getElementById('rec-format').focus(),80);
 }
 function closeSettings(){ document.getElementById('settings-overlay').classList.remove('show'); }
 function saveSettings(){
   settings.openaiKey=document.getElementById('openai-key').value.trim();
+  settings.recFormat=document.getElementById('rec-format').value;
   localStorage.setItem(ST,JSON.stringify(settings));
   closeSettings();
-  toast(settings.openaiKey?'Whisper enabled':'Settings saved');
+  toast('Settings saved');
+}
+
+// ── WAV ENCODER ──
+function audioBufferToWav(buf){
+  const nCh=buf.numberOfChannels, sr=buf.sampleRate, len=buf.length;
+  const pcm=new Int16Array(len*nCh);
+  for(let ch=0;ch<nCh;ch++){
+    const src=buf.getChannelData(ch);
+    for(let i=0;i<len;i++){
+      const s=Math.max(-1,Math.min(1,src[i]));
+      pcm[i*nCh+ch]=s<0?s*0x8000:s*0x7FFF;
+    }
+  }
+  const wavBuf=new ArrayBuffer(44+pcm.byteLength);
+  const v=new DataView(wavBuf);
+  const str=(o,s)=>{for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i));};
+  str(0,'RIFF'); v.setUint32(4,36+pcm.byteLength,true);
+  str(8,'WAVE'); str(12,'fmt '); v.setUint32(16,16,true);
+  v.setUint16(20,1,true); v.setUint16(22,nCh,true);
+  v.setUint32(24,sr,true); v.setUint32(28,sr*nCh*2,true);
+  v.setUint16(32,nCh*2,true); v.setUint16(34,16,true);
+  str(36,'data'); v.setUint32(40,pcm.byteLength,true);
+  new Int16Array(wavBuf,44).set(pcm);
+  return new Blob([wavBuf],{type:'audio/wav'});
+}
+async function convertToWav(webmBlob){
+  const ab=await webmBlob.arrayBuffer();
+  const ctx=new AudioContext();
+  const audioBuf=await ctx.decodeAudioData(ab);
+  await ctx.close();
+  return audioBufferToWav(audioBuf);
 }
 
 // ── WHISPER ──
