@@ -1325,6 +1325,10 @@ audio { display: none; }
   <div class="settings-card">
     <h3>Settings</h3>
     <div class="fg">
+      <label class="flabel">Your name <span style="color:var(--ink3);font-weight:300;text-transform:none;letter-spacing:0;font-size:10px">(optional — used in auto-title)</span></label>
+      <input class="finput" id="username" type="text" placeholder="e.g. dafa" autocomplete="name">
+    </div>
+    <div class="fg">
       <label class="flabel">Recording format</label>
       <select class="fselect" id="rec-format">
         <option value="webm">WebM (default · smaller file)</option>
@@ -1354,6 +1358,7 @@ audio { display: none; }
 <div id="toast"></div>
 <div id="hm-tooltip" class="hm-tooltip"></div>
 <input type="file" id="file-in" style="display:none" onchange="handleFile(this)">
+<input type="file" id="attach-in" accept="image/*,video/*" style="display:none" onchange="handleAttach(this)">
 
 <script>
 const DB='hum_entries', PJ='hum_projects', LV='hum_layout', ST='hum_settings';
@@ -1865,6 +1870,7 @@ function openDetail(id){
   if(e.tags&&e.tags.length) h+=`<div class="dsec"><span class="dsec-label">Tags</span><div class="dtags">${e.tags.map(t=>`<span class="card-tag">#${escHtml(t)}</span>`).join('')}</div></div>`;
   h+=`<div style="margin-top:24px;display:flex;gap:8px">
     <button onclick="editEntry('${e.id}')" style="flex:1;padding:10px;background:var(--warm-soft);border:1px solid var(--paper4);border-radius:10px;font-family:var(--sans);font-size:12px;font-weight:500;color:var(--ink2);cursor:pointer">Edit</button>
+    <button onclick="attachToEntry('${e.id}')" style="flex:1;padding:10px;background:var(--paper2);border:1px solid var(--paper4);border-radius:10px;font-family:var(--sans);font-size:12px;font-weight:400;color:var(--ink2);cursor:pointer">Attach</button>
     <button onclick="delEntry('${e.id}')" style="flex:1;padding:10px;background:var(--rose-soft);border:1px solid var(--paper4);border-radius:10px;font-family:var(--sans);font-size:12px;font-weight:400;color:var(--rose);cursor:pointer">Delete</button>
   </div>`;
   body.innerHTML=h; panel.classList.add('open');
@@ -1879,6 +1885,29 @@ function togglePlay(){ const a=document.getElementById('da'),b=document.getEleme
 function seekA(ev){ const a=document.getElementById('da'); if(!a||!a.duration) return; const r=ev.currentTarget.getBoundingClientRect(); a.currentTime=((ev.clientX-r.left)/r.width)*a.duration; }
 function closeDetail(){ const a=document.getElementById('da'); if(a) a.pause(); document.getElementById('detail').classList.remove('open'); curEntry=null; }
 function delEntry(id){ if(!confirm('Delete this capture?')) return; entries=entries.filter(e=>e.id!==id); persist(); closeDetail(); render(); renderHeatmap(); toast('Deleted'); }
+
+let attachTargetId=null;
+function attachToEntry(id){
+  attachTargetId=id;
+  document.getElementById('attach-in').click();
+}
+function handleAttach(input){
+  const file=input.files[0]; if(!file||!attachTargetId) return;
+  const type=file.type.startsWith('image')?'photo':'video';
+  const r=new FileReader();
+  r.onload=ev=>{
+    const idx=entries.findIndex(x=>x.id===attachTargetId);
+    if(idx>=0){
+      entries[idx].data=ev.target.result;
+      entries[idx].mimeType=file.type;
+      if(entries[idx].type!=='audio') entries[idx].type=type;
+      persist(); render(); openDetail(attachTargetId); toast('Media attached');
+    }
+    attachTargetId=null;
+  };
+  r.readAsDataURL(file);
+  input.value='';
+}
 
 function editEntry(id){
   const e=entries.find(x=>x.id===id); if(!e) return;
@@ -2001,13 +2030,15 @@ function seed(){
 
 // ── SETTINGS ──
 function openSettings(){
+  document.getElementById('username').value=settings.username||'';
   document.getElementById('openai-key').value=settings.openaiKey||'';
   document.getElementById('rec-format').value=settings.recFormat||'webm';
   document.getElementById('settings-overlay').classList.add('show');
-  setTimeout(()=>document.getElementById('rec-format').focus(),80);
+  setTimeout(()=>document.getElementById('username').focus(),80);
 }
 function closeSettings(){ document.getElementById('settings-overlay').classList.remove('show'); }
 function saveSettings(){
+  settings.username=document.getElementById('username').value.trim();
   settings.openaiKey=document.getElementById('openai-key').value.trim();
   settings.recFormat=document.getElementById('rec-format').value;
   localStorage.setItem(ST,JSON.stringify(settings));
