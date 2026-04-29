@@ -650,6 +650,25 @@ body {
 .tinput::placeholder { color: var(--ink3); }
 
 .save-actions { display: flex; gap: 9px; margin-top: 16px; position: sticky; bottom: 0; background: white; padding: 10px 0 4px; border-top: 1px solid var(--paper4); z-index: 2; }
+
+/* Collapsible "More fields" — hidden by default to keep capture simple */
+.more-fields { margin-top: 4px; border-top: 1px solid var(--paper4); padding-top: 12px; }
+.more-fields > summary {
+  list-style: none; cursor: pointer;
+  font-family: var(--sans); font-size: 11px; font-weight: 500;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--ink3); padding: 4px 0;
+  display: flex; align-items: center; gap: 6px;
+  user-select: none; -webkit-user-select: none;
+}
+.more-fields > summary::-webkit-details-marker { display: none; }
+.more-fields > summary::before {
+  content: "›"; display: inline-block;
+  font-size: 16px; transition: transform 0.15s ease;
+  color: var(--ink3);
+}
+.more-fields[open] > summary::before { transform: rotate(90deg); }
+.more-fields > summary:hover { color: var(--ink2); }
 .btn-save {
   flex: 1; padding: 11px;
   background: var(--ink); border: none;
@@ -1305,11 +1324,42 @@ audio { display: none; }
       <div id="transcript-status-wav"></div>
       <textarea id="s-transcript" style="display:none"></textarea>
     </div>
+    <!-- Tags (moved up — primary metadata) -->
     <div class="fg">
-      <label class="flabel">Title <span style="color:var(--ink3);font-weight:300;text-transform:none;letter-spacing:0;font-size:10px">(optional — auto-generated if blank)</span></label>
-      <input class="finput" id="s-name" type="text" placeholder="Leave blank for auto title">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <label class="flabel" style="margin-bottom:0">Tags</label>
+        <button type="button" onclick="autoTags()" style="font-size:10px;font-family:var(--sans);font-weight:500;color:var(--ink2);background:var(--paper2);border:1px solid var(--paper4);border-radius:6px;padding:2px 8px;cursor:pointer;transition:all 0.15s" onmouseover="this.style.borderColor='var(--warm)';this.style.color='var(--warm2)'" onmouseout="this.style.borderColor='var(--paper4)';this.style.color='var(--ink2)'">Auto</button>
+      </div>
+      <div class="tags-wrap" id="tags-wrap" onclick="document.getElementById('tag-in').focus()">
+        <input class="tinput" id="tag-in" placeholder="#tag, mood, key, genre…" onkeydown="handleTag(event)">
+      </div>
     </div>
-    <div class="frow2">
+    <!-- Project (full-width, with inline + New) -->
+    <div class="fg">
+      <label class="flabel">Project</label>
+      <select class="fselect" id="s-proj" onchange="onProjSelectChange(this)"><option value="">— Inbox</option></select>
+      <div id="s-proj-new" style="display:none;margin-top:8px;padding:10px;background:var(--paper2);border:1px solid var(--paper4);border-radius:10px">
+        <input class="finput" id="s-proj-new-name" type="text" placeholder="Project name…" style="margin-bottom:8px" onkeydown="if(event.key==='Enter'){event.preventDefault();createInlineProject()}">
+        <div class="color-row" id="s-proj-new-colors" style="margin-bottom:8px">
+          <div class="cswatch sel" data-c="#e8a87c" style="background:#e8a87c" onclick="pickInlineColor(this)"></div>
+          <div class="cswatch" data-c="#88a896" style="background:#88a896" onclick="pickInlineColor(this)"></div>
+          <div class="cswatch" data-c="#7fa0c0" style="background:#7fa0c0" onclick="pickInlineColor(this)"></div>
+          <div class="cswatch" data-c="#9580a8" style="background:#9580a8" onclick="pickInlineColor(this)"></div>
+          <div class="cswatch" data-c="#c47878" style="background:#c47878" onclick="pickInlineColor(this)"></div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn-cancel" type="button" style="flex:1;padding:7px" onclick="cancelInlineProject()">Cancel</button>
+          <button class="btn-save" type="button" style="flex:1;padding:7px" onclick="createInlineProject()">Create</button>
+        </div>
+      </div>
+    </div>
+    <!-- More fields — collapsed by default for simple capture -->
+    <details class="more-fields" id="more-fields">
+      <summary>More fields</summary>
+      <div class="fg" style="margin-top:12px">
+        <label class="flabel">Title <span style="color:var(--ink3);font-weight:300;text-transform:none;letter-spacing:0;font-size:10px">(optional — auto-generated if blank)</span></label>
+        <input class="finput" id="s-name" type="text" placeholder="Leave blank for auto title">
+      </div>
       <div class="fg">
         <label class="flabel">Type</label>
         <select class="fselect" id="s-type">
@@ -1322,23 +1372,18 @@ audio { display: none; }
           <option value="midi">MIDI</option>
         </select>
       </div>
-      <div class="fg">
-        <label class="flabel">Project</label>
-        <select class="fselect" id="s-proj"><option value="">— Inbox</option></select>
-      </div>
-    </div>
-    <div class="frow2">
-      <div class="fg">
-        <label class="flabel">BPM</label>
-        <div class="bpm-row">
-          <button class="bpm-adj" type="button" onclick="adjBpm(-5)">−</button>
-          <input class="finput bpm-in" id="s-bpm" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="120">
-          <button class="bpm-adj" type="button" onclick="adjBpm(5)">+</button>
+      <div class="frow2">
+        <div class="fg">
+          <label class="flabel">BPM</label>
+          <div class="bpm-row">
+            <button class="bpm-adj" type="button" onclick="adjBpm(-5)">−</button>
+            <input class="finput bpm-in" id="s-bpm" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="120">
+            <button class="bpm-adj" type="button" onclick="adjBpm(5)">+</button>
+          </div>
         </div>
-      </div>
-      <div class="fg">
-        <label class="flabel">Key</label>
-        <select class="fselect" id="s-key">
+        <div class="fg">
+          <label class="flabel">Key</label>
+          <select class="fselect" id="s-key">
           <option value="">— none</option>
           <option value="C maj">C major</option>
           <option value="C# maj">C♯ major</option>
@@ -1369,15 +1414,6 @@ audio { display: none; }
           <option value="Bb min">B♭ minor</option>
           <option value="B min">B minor</option>
         </select>
-      </div>
-    </div>
-    <div class="fg">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-        <label class="flabel" style="margin-bottom:0">Tags</label>
-        <button type="button" onclick="autoTags()" style="font-size:10px;font-family:var(--sans);font-weight:500;color:var(--ink2);background:var(--paper2);border:1px solid var(--paper4);border-radius:6px;padding:2px 8px;cursor:pointer;transition:all 0.15s" onmouseover="this.style.borderColor='var(--warm)';this.style.color='var(--warm2)'" onmouseout="this.style.borderColor='var(--paper4)';this.style.color='var(--ink2)'">Auto</button>
-      </div>
-      <div class="tags-wrap" id="tags-wrap" onclick="document.getElementById('tag-in').focus()">
-        <input class="tinput" id="tag-in" placeholder="#tag…" onkeydown="handleTag(event)">
       </div>
     </div>
     <div class="frow3">
@@ -1448,6 +1484,7 @@ audio { display: none; }
         </select>
       </div>
     </div>
+    </details>
     <div class="save-actions">
       <button class="btn-cancel" onclick="closeSave()">Cancel</button>
       <button class="btn-save" onclick="confirmSave()">Save →</button>
@@ -2014,10 +2051,12 @@ function openSaveModal(type, isNew){
   ['s-note','s-key','s-mood','s-genre'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('s-status').value='raw';
   document.getElementById('s-type').value=type||'idea';
-  const sel=document.getElementById('s-proj');
   const viewProj=projects.find(p=>p.id===view)?view:null;
-  sel.innerHTML='<option value="">— Inbox</option>'+projects.map(p=>`<option value="${p.id}">${escHtml(p.name)}</option>`).join('');
-  if(viewProj) sel.value=viewProj;
+  refreshProjSelect(viewProj||'');
+  // collapse "More fields" for new captures (simple stupid by default)
+  const more=document.getElementById('more-fields'); if(more) more.open=false;
+  // hide inline new-project form if it was open
+  const np=document.getElementById('s-proj-new'); if(np) np.style.display='none';
   const tmpE={ts:Date.now(), type:type||'idea', project:viewProj};
   document.getElementById('s-name').value=autoTitle(tmpE);
   document.getElementById('s-bpm').value=type==='audio'?'120':'';
@@ -2062,6 +2101,45 @@ function closeSave(){
 }
 
 function adjBpm(d){ const el=document.getElementById('s-bpm'); const v=parseInt(el.value)||120; el.value=Math.max(20,Math.min(300,v+d)); el.dispatchEvent(new Event('input')); }
+
+// Inline "+ New project" inside save modal
+let inlineProjColor='#e8a87c';
+function onProjSelectChange(sel){
+  if(sel.value==='__new__'){
+    sel.value=''; // reset selection
+    document.getElementById('s-proj-new').style.display='';
+    document.getElementById('s-proj-new-name').focus();
+  } else {
+    document.getElementById('s-proj-new').style.display='none';
+  }
+}
+function pickInlineColor(el){
+  document.querySelectorAll('#s-proj-new-colors .cswatch').forEach(s=>s.classList.remove('sel'));
+  el.classList.add('sel'); inlineProjColor=el.dataset.c;
+}
+function cancelInlineProject(){
+  document.getElementById('s-proj-new').style.display='none';
+  document.getElementById('s-proj-new-name').value='';
+}
+function createInlineProject(){
+  const name=document.getElementById('s-proj-new-name').value.trim();
+  if(!name){ toast('Project name required'); return; }
+  const p={id:uid(), name, desc:'', color:inlineProjColor, template:'free', ts:Date.now()};
+  projects.push(p); persist();
+  refreshProjSelect(p.id);
+  renderProjects();
+  document.getElementById('s-proj-new').style.display='none';
+  document.getElementById('s-proj-new-name').value='';
+  toast('Project created');
+}
+function refreshProjSelect(selectId){
+  const sel=document.getElementById('s-proj');
+  const cur=selectId||sel.value;
+  sel.innerHTML='<option value="">— Inbox</option>'+
+    projects.map(p=>`<option value="${p.id}">${escHtml(p.name)}</option>`).join('')+
+    '<option value="__new__" style="color:var(--warm2);font-weight:500">+ New project…</option>';
+  sel.value=cur||'';
+}
 
 function autoTags(){
   const STOP=new Set(['this','that','with','have','from','they','been','were','what','when','where','will','your','just','about','into','more','also','some','than','then','there','these','those','would','could','should','which','their','over','other','after','before','every','never','through','during','itself','anyone','because','between','without','already','something','nothing','everything']);
@@ -2349,9 +2427,11 @@ function editEntry(id){
   document.getElementById('s-genre').value=e.genre||'';
   document.getElementById('s-status').value=e.status||'raw';
   document.getElementById('s-type').value=e.type;
-  const sel=document.getElementById('s-proj');
-  sel.innerHTML='<option value="">— Inbox</option>'+projects.map(p=>`<option value="${p.id}">${escHtml(p.name)}</option>`).join('');
-  sel.value=e.project||'';
+  refreshProjSelect(e.project||'');
+  // For edits, expand "More fields" so user can see/edit metadata
+  const more=document.getElementById('more-fields');
+  if(more) more.open=!!(e.bpm||e.key||e.mood||e.genre||(e.status&&e.status!=='raw')||e.name);
+  const np=document.getElementById('s-proj-new'); if(np) np.style.display='none';
   if(e.transcript){
     document.getElementById('transcript-fg').style.display='';
     document.getElementById('s-transcript').style.display='';
