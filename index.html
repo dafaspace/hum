@@ -2584,7 +2584,7 @@ document.addEventListener('keydown',e=>{ if(e.key==='Escape'){closeDetail();clos
 // ── PWA SERVICE WORKER (inline via blob) ──
 if ('serviceWorker' in navigator) {
   const swCode = `
-const CACHE = 'hum-v1';
+const CACHE = 'hum-v3';
 const FONTS = [
   'https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&family=Geist:wght@300;400;500&display=swap'
 ];
@@ -2595,6 +2595,7 @@ self.addEventListener('install', e => {
   self.skipWaiting();
 });
 self.addEventListener('activate', e => {
+  // Delete ALL old caches (including hum-v1, hum-v2 which may have cached HTML)
   e.waitUntil(caches.keys().then(keys =>
     Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
   ));
@@ -2602,13 +2603,21 @@ self.addEventListener('activate', e => {
 });
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
+  const url = e.request.url;
+  // Network-first for HTML — always get fresh app
+  if (url.endsWith('.html') || url.endsWith('/') || !url.includes('.')) {
+    e.respondWith(
+      fetch(e.request).catch(() => caches.match(e.request))
+    );
+    return;
+  }
+  // Cache-first for fonts only
   e.respondWith(
     caches.match(e.request).then(cached => {
       if (cached) return cached;
       return fetch(e.request).then(res => {
-        if (res && res.status === 200 && e.request.url.includes('fonts.g')) {
-          const clone = res.clone();
-          caches.open(CACHE).then(c => c.put(e.request, clone));
+        if (res && res.status === 200 && url.includes('fonts.g')) {
+          caches.open(CACHE).then(c => c.put(e.request, res.clone()));
         }
         return res;
       }).catch(() => cached);
