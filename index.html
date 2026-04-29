@@ -651,6 +651,18 @@ body {
 
 .save-actions { display: flex; gap: 9px; margin-top: 16px; position: sticky; bottom: 0; background: white; padding: 10px 0 4px; border-top: 1px solid var(--paper4); z-index: 2; }
 
+/* Pill selectors for Mood / Genre */
+.fpill-wrap { display: flex; flex-wrap: wrap; gap: 5px; }
+.fpill {
+  font-size: 12px; font-family: var(--sans); font-weight: 400;
+  padding: 4px 11px; border-radius: 20px;
+  border: 1px solid var(--paper4); background: var(--paper2);
+  color: var(--ink2); cursor: pointer;
+  transition: all 0.12s ease; line-height: 1.4;
+}
+.fpill:hover { border-color: var(--ink3); color: var(--ink); }
+.fpill.sel { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+
 /* Collapsible "More fields" — hidden by default to keep capture simple */
 .more-fields { margin-top: 4px; border-top: 1px solid var(--paper4); padding-top: 12px; }
 .more-fields > summary {
@@ -1337,7 +1349,7 @@ audio { display: none; }
     <!-- Project (full-width, with inline + New) -->
     <div class="fg">
       <label class="flabel">Project</label>
-      <select class="fselect" id="s-proj" onchange="onProjSelectChange(this)"><option value="">— Inbox</option></select>
+      <select class="fselect" id="s-proj" onchange="onProjSelectChange(this)"><option value="">— None</option></select>
       <div id="s-proj-new" style="display:none;margin-top:8px;padding:10px;background:var(--paper2);border:1px solid var(--paper4);border-radius:10px">
         <input class="finput" id="s-proj-new-name" type="text" placeholder="Project name…" style="margin-bottom:8px" onkeydown="if(event.key==='Enter'){event.preventDefault();createInlineProject()}">
         <div class="color-row" id="s-proj-new-colors" style="margin-bottom:8px">
@@ -1416,73 +1428,58 @@ audio { display: none; }
         </select>
       </div>
     </div>
-    <div class="frow3">
-      <div class="fg">
-        <label class="flabel">Mood</label>
-        <input class="finput" id="s-mood" type="text" list="mood-list" placeholder="dark">
-        <datalist id="mood-list">
-          <option value="dark">
-          <option value="bright">
-          <option value="melancholic">
-          <option value="dreamy">
-          <option value="tense">
-          <option value="warm">
-          <option value="cold">
-          <option value="playful">
-          <option value="ethereal">
-          <option value="raw">
-          <option value="cinematic">
-          <option value="intimate">
-          <option value="energetic">
-          <option value="peaceful">
-        </datalist>
+    <!-- hidden inputs for backward compat — values managed by pill pickers below -->
+    <input type="hidden" id="s-mood" value="">
+    <input type="hidden" id="s-genre" value="">
+    <div class="fg">
+      <label class="flabel">Mood</label>
+      <div class="fpill-wrap" id="mood-pills">
+        <button class="fpill" type="button" data-val="dark" onclick="pickPill('mood',this)">dark</button>
+        <button class="fpill" type="button" data-val="bright" onclick="pickPill('mood',this)">bright</button>
+        <button class="fpill" type="button" data-val="melancholic" onclick="pickPill('mood',this)">melancholic</button>
+        <button class="fpill" type="button" data-val="dreamy" onclick="pickPill('mood',this)">dreamy</button>
+        <button class="fpill" type="button" data-val="tense" onclick="pickPill('mood',this)">tense</button>
+        <button class="fpill" type="button" data-val="warm" onclick="pickPill('mood',this)">warm</button>
+        <button class="fpill" type="button" data-val="cold" onclick="pickPill('mood',this)">cold</button>
+        <button class="fpill" type="button" data-val="playful" onclick="pickPill('mood',this)">playful</button>
+        <button class="fpill" type="button" data-val="ethereal" onclick="pickPill('mood',this)">ethereal</button>
+        <button class="fpill" type="button" data-val="cinematic" onclick="pickPill('mood',this)">cinematic</button>
+        <button class="fpill" type="button" data-val="intimate" onclick="pickPill('mood',this)">intimate</button>
+        <button class="fpill" type="button" data-val="energetic" onclick="pickPill('mood',this)">energetic</button>
+        <button class="fpill" type="button" data-val="peaceful" onclick="pickPill('mood',this)">peaceful</button>
+        <button class="fpill" type="button" data-val="raw" onclick="pickPill('mood',this)">raw</button>
       </div>
-      <div class="fg"><label class="flabel">Genre</label>
-        <input class="finput" id="s-genre" type="text" list="genre-list" placeholder="ambient" autocomplete="off">
-        <datalist id="genre-list">
-          <option value="ambient">
-          <option value="classical">
-          <option value="neo-classical">
-          <option value="orchestral">
-          <option value="chamber">
-          <option value="cinematic">
-          <option value="soundtrack">
-          <option value="electronic">
-          <option value="experimental">
-          <option value="minimalist">
-          <option value="drone">
-          <option value="noise">
-          <option value="post-rock">
-          <option value="jazz">
-          <option value="blues">
-          <option value="soul">
-          <option value="r&b">
-          <option value="hip-hop">
-          <option value="lo-fi">
-          <option value="trip-hop">
-          <option value="downtempo">
-          <option value="pop">
-          <option value="indie">
-          <option value="folk">
-          <option value="country">
-          <option value="rock">
-          <option value="metal">
-          <option value="psychedelic">
-          <option value="shoegaze">
-          <option value="reggae">
-          <option value="latin">
-          <option value="world">
-          <option value="gospel">
-        </datalist>
+    </div>
+    <div class="fg">
+      <label class="flabel">Genre</label>
+      <div class="fpill-wrap" id="genre-pills">
+        <button class="fpill" type="button" data-val="ambient" onclick="pickPill('genre',this)">ambient</button>
+        <button class="fpill" type="button" data-val="classical" onclick="pickPill('genre',this)">classical</button>
+        <button class="fpill" type="button" data-val="neo-classical" onclick="pickPill('genre',this)">neo-classical</button>
+        <button class="fpill" type="button" data-val="orchestral" onclick="pickPill('genre',this)">orchestral</button>
+        <button class="fpill" type="button" data-val="cinematic" onclick="pickPill('genre',this)">cinematic</button>
+        <button class="fpill" type="button" data-val="electronic" onclick="pickPill('genre',this)">electronic</button>
+        <button class="fpill" type="button" data-val="experimental" onclick="pickPill('genre',this)">experimental</button>
+        <button class="fpill" type="button" data-val="minimalist" onclick="pickPill('genre',this)">minimalist</button>
+        <button class="fpill" type="button" data-val="drone" onclick="pickPill('genre',this)">drone</button>
+        <button class="fpill" type="button" data-val="lo-fi" onclick="pickPill('genre',this)">lo-fi</button>
+        <button class="fpill" type="button" data-val="jazz" onclick="pickPill('genre',this)">jazz</button>
+        <button class="fpill" type="button" data-val="folk" onclick="pickPill('genre',this)">folk</button>
+        <button class="fpill" type="button" data-val="post-rock" onclick="pickPill('genre',this)">post-rock</button>
+        <button class="fpill" type="button" data-val="shoegaze" onclick="pickPill('genre',this)">shoegaze</button>
+        <button class="fpill" type="button" data-val="trip-hop" onclick="pickPill('genre',this)">trip-hop</button>
+        <button class="fpill" type="button" data-val="noise" onclick="pickPill('genre',this)">noise</button>
+        <button class="fpill" type="button" data-val="world" onclick="pickPill('genre',this)">world</button>
       </div>
-      <div class="fg"><label class="flabel">Status</label>
-        <select class="fselect" id="s-status">
-          <option value="raw">Raw sketch</option>
-          <option value="dev">In progress</option>
-          <option value="done">Done</option>
-          <option value="archived">Archived</option>
-        </select>
-      </div>
+    </div>
+    <div class="fg">
+      <label class="flabel">Status</label>
+      <select class="fselect" id="s-status">
+        <option value="raw">Sketch</option>
+        <option value="dev">In progress</option>
+        <option value="done">Done</option>
+        <option value="archived">Archived</option>
+      </select>
     </div>
     </details>
     <div class="save-actions">
@@ -1623,7 +1620,18 @@ let mr=null, recChunks=[], recSec=0, recInterval=null;
 let dateFilter=null; // YYYY-MM-DD or null
 let editingId=null;
 
-function persist(){ localStorage.setItem(DB,JSON.stringify(entries)); localStorage.setItem(PJ,JSON.stringify(projects)); localStorage.setItem(LV,layout); }
+function persist(){
+  try{
+    localStorage.setItem(DB,JSON.stringify(entries));
+    localStorage.setItem(PJ,JSON.stringify(projects));
+    localStorage.setItem(LV,layout);
+  }catch(e){
+    if(e.name==='QuotaExceededError'||e.code===22||e.code===1014){
+      toast('Storage full — delete some entries with audio to free space');
+    }
+    throw e;
+  }
+}
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,5); }
 function fmtDate(ts){ const d=new Date(ts); return d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})+' · '+d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}); }
 function fmtDur(s){ return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
@@ -1965,6 +1973,66 @@ function cancelModalAudio(){
   if(btn){ btn.classList.remove('recording'); document.getElementById('mbtn-audio-label').textContent='Audio'; }
 }
 
+// ── UNIFIED AUDIO PLAYER ──
+// Returns a .detail-player element that plays blobOrUrl.
+// estimatedDuration: seconds shown before metadata loads.
+function createAudioPlayer(blobOrUrl, estimatedDuration){
+  const url=(blobOrUrl instanceof Blob)?URL.createObjectURL(blobOrUrl):blobOrUrl;
+  const audio=new Audio(url);
+  const wrap=document.createElement('div');
+  wrap.className='detail-player';
+
+  // Decorative waveform (random sine-ish pattern)
+  const wave=document.createElement('div'); wave.className='player-wave';
+  const N=44;
+  for(let i=0;i<N;i++){
+    const b=document.createElement('div'); b.className='pwbar';
+    const h=15+Math.abs(Math.sin(i/N*Math.PI*3+Math.random()))*75;
+    b.style.cssText=`height:${h}%;flex:1;max-width:7px`;
+    wave.appendChild(b);
+  }
+
+  const row=document.createElement('div'); row.className='player-row';
+  const PLAY=`<svg viewBox="0 0 12 12"><polygon points="2,1 11,6 2,11"/></svg>`;
+  const PAUSE=`<svg viewBox="0 0 12 12"><rect x="2" y="1" width="3" height="10"/><rect x="7" y="1" width="3" height="10"/></svg>`;
+  const playBtn=document.createElement('button'); playBtn.className='play-btn2'; playBtn.innerHTML=PLAY;
+
+  const prog=document.createElement('div'); prog.className='player-prog';
+  const fill=document.createElement('div'); fill.className='player-fill'; prog.appendChild(fill);
+
+  const time=document.createElement('span'); time.className='player-t';
+  time.textContent=estimatedDuration?fmtDur(estimatedDuration):'—';
+
+  // Speed toggle
+  const speeds=[1,1.5,2,0.75]; let si=0;
+  const spd=document.createElement('button');
+  spd.style.cssText='font-size:10px;font-family:var(--sans);font-weight:600;color:var(--ink2);background:none;border:1px solid var(--paper4);border-radius:4px;padding:1px 5px;cursor:pointer;min-width:32px;white-space:nowrap';
+  spd.textContent='1×';
+  spd.onclick=()=>{ si=(si+1)%speeds.length; audio.playbackRate=speeds[si]; spd.textContent=speeds[si]+'×'; };
+
+  row.append(playBtn, prog, time, spd);
+  wrap.append(wave, row);
+
+  playBtn.onclick=()=>{ audio.paused?audio.play():audio.pause(); };
+  audio.onplay=()=>{ playBtn.innerHTML=PAUSE; };
+  audio.onpause=audio.onended=()=>{ playBtn.innerHTML=PLAY; };
+  audio.ontimeupdate=()=>{
+    if(audio.duration&&isFinite(audio.duration)){
+      fill.style.width=(audio.currentTime/audio.duration*100)+'%';
+      time.textContent=fmtDur(Math.floor(audio.currentTime));
+    }
+  };
+  audio.onloadedmetadata=()=>{
+    if(isFinite(audio.duration)) time.textContent=fmtDur(Math.round(audio.duration));
+  };
+  prog.onclick=(e)=>{
+    if(!audio.duration||!isFinite(audio.duration)) return;
+    const r=prog.getBoundingClientRect();
+    audio.currentTime=((e.clientX-r.left)/r.width)*audio.duration;
+  };
+  return wrap;
+}
+
 // ── MODAL MEDIA PREVIEW ──
 function showModalMediaPreview(type, dataUrl, blob){
   const el=document.getElementById('modal-media-preview');
@@ -1977,12 +2045,9 @@ function showModalMediaPreview(type, dataUrl, blob){
   } else if(type==='video'){
     const v=document.createElement('video'); v.src=dataUrl; v.controls=true; v.playsInline=true; el.appendChild(v);
   } else if(type==='audio'&&blob){
-    const url=URL.createObjectURL(blob);
-    const wrap=document.createElement('div'); wrap.className='modal-audio-preview';
-    const audio=document.createElement('audio'); audio.src=url; audio.controls=true;
-    audio.style.cssText='width:100%;min-width:0;display:block;height:44px';
-    wrap.style.cssText='display:block;padding:14px 16px;background:var(--paper2)';
-    wrap.appendChild(audio); el.appendChild(wrap);
+    const player=createAudioPlayer(blob, modalRecSec||null);
+    player.style.cssText='border-radius:0;margin:0';
+    el.appendChild(player);
   }
 }
 function createClearBtn(){
@@ -2048,7 +2113,8 @@ function openSaveModal(type, isNew){
   // stop any active inline recording
   if(modalRecording) cancelModalAudio();
   currentTags=[]; renderTags();
-  ['s-note','s-key','s-mood','s-genre'].forEach(id=>document.getElementById(id).value='');
+  ['s-note','s-key'].forEach(id=>document.getElementById(id).value='');
+  resetPills();
   document.getElementById('s-status').value='raw';
   document.getElementById('s-type').value=type||'idea';
   const viewProj=projects.find(p=>p.id===view)?view:null;
@@ -2102,6 +2168,35 @@ function closeSave(){
 
 function adjBpm(d){ const el=document.getElementById('s-bpm'); const v=parseInt(el.value)||120; el.value=Math.max(20,Math.min(300,v+d)); el.dispatchEvent(new Event('input')); }
 
+// Pill pickers for Mood / Genre
+function pickPill(field, el){
+  const wrapId=field+'-pills';
+  const inputId='s-'+field;
+  const cur=document.getElementById(inputId).value;
+  const val=el.dataset.val;
+  if(cur===val){
+    // deselect
+    document.getElementById(inputId).value='';
+    el.classList.remove('sel');
+  } else {
+    document.querySelectorAll('#'+wrapId+' .fpill').forEach(b=>b.classList.remove('sel'));
+    el.classList.add('sel');
+    document.getElementById(inputId).value=val;
+  }
+}
+function syncPills(field, val){
+  const wrapId=field+'-pills';
+  document.querySelectorAll('#'+wrapId+' .fpill').forEach(b=>{
+    b.classList.toggle('sel', b.dataset.val===val);
+  });
+}
+function resetPills(){
+  ['mood','genre'].forEach(f=>{
+    document.getElementById('s-'+f).value='';
+    document.querySelectorAll('#'+f+'-pills .fpill').forEach(b=>b.classList.remove('sel'));
+  });
+}
+
 // Inline "+ New project" inside save modal
 let inlineProjColor='#e8a87c';
 function onProjSelectChange(sel){
@@ -2135,7 +2230,7 @@ function createInlineProject(){
 function refreshProjSelect(selectId){
   const sel=document.getElementById('s-proj');
   const cur=selectId||sel.value;
-  sel.innerHTML='<option value="">— Inbox</option>'+
+  sel.innerHTML='<option value="">— None</option>'+
     projects.map(p=>`<option value="${p.id}">${escHtml(p.name)}</option>`).join('')+
     '<option value="__new__" style="color:var(--warm2);font-weight:500">+ New project…</option>';
   sel.value=cur||'';
@@ -2191,7 +2286,8 @@ async function confirmSave(){
         note, tags:[...currentTags], bpm, key, mood, genre, status, transcript};
     }
     const eid=editingId;
-    persist(); closeSave(); render(); renderProjects(); renderHeatmap();
+    try{ persist(); }catch(_){ toast('Save failed — storage full'); closeSave(); return; }
+    closeSave(); render(); renderProjects(); renderHeatmap();
     openDetail(eid);
     toast('Updated');
     return;
@@ -2214,14 +2310,21 @@ async function confirmSave(){
   }
   const savedId=entry.id;
   entries.unshift(entry);
-  persist(); closeSave(); render(); renderProjects(); renderHeatmap();
+  try{ persist(); }catch(storErr){
+    // Quota full: try saving without media data
+    entries[0].data=null; entries[0].mimeType=null;
+    try{ persist(); toast('Saved (audio not stored — storage full)'); }
+    catch(_){ entries.shift(); toast('Could not save — please delete entries with audio'); closeSave(); return; }
+  }
+  closeSave(); render(); renderProjects(); renderHeatmap();
   modalRecSec=0; pendingBlob=null; pendingDataUrl=null; pendingVideoBlob=null;
-  toast('Saved');
+  if(!entries[0].data) { toast('Saved — audio not stored (storage full)'); }
+  else toast('Saved');
   if(blobForWaveform){
     computeWaveform(blobForWaveform).then(waveform=>{
       if(!waveform) return;
       const idx=entries.findIndex(x=>x.id===savedId);
-      if(idx>=0){ entries[idx].waveform=waveform; persist(); render(); }
+      if(idx>=0){ entries[idx].waveform=waveform; try{persist();}catch(_){} render(); }
     });
   }
 }
@@ -2247,6 +2350,7 @@ function openDetail(id){
           <button class="play-btn2" id="play-btn" onclick="togglePlay()"><svg viewBox="0 0 12 12"><polygon points="2,1 11,6 2,11"/></svg></button>
           <div class="player-prog" onclick="seekA(event)"><div class="player-fill" id="pfill"></div></div>
           <span class="player-t" id="ptim">${e.duration?fmtDur(e.duration):'—'}</span>
+          <button id="spd-btn" onclick="cycleSpeed()" style="font-size:10px;font-family:var(--sans);font-weight:600;color:var(--ink2);background:none;border:1px solid var(--paper4);border-radius:4px;padding:1px 5px;cursor:pointer;min-width:32px;white-space:nowrap">1×</button>
         </div>
       </div></div>`;
   }
@@ -2258,7 +2362,7 @@ function openDetail(id){
   if(e.key) metas.push(['Key',e.key]);
   if(e.mood) metas.push(['Mood',e.mood]);
   if(e.genre) metas.push(['Genre',e.genre]);
-  if(e.status) metas.push(['Status',{raw:'Raw sketch',dev:'In progress',done:'Done',archived:'Archived'}[e.status]||e.status]);
+  if(e.status) metas.push(['Status',{raw:'Sketch',dev:'In progress',done:'Done',archived:'Archived'}[e.status]||e.status]);
   if(e.duration) metas.push(['Duration',fmtDur(e.duration)]);
   const proj=projects.find(p=>p.id===e.project);
   if(proj) metas.push(['Project',proj.name]);
@@ -2269,7 +2373,7 @@ function openDetail(id){
     <button onclick="attachToEntry('${e.id}')" style="flex:1;padding:10px;background:var(--paper2);border:1px solid var(--paper4);border-radius:10px;font-family:var(--sans);font-size:12px;font-weight:400;color:var(--ink2);cursor:pointer">Attach</button>
     <button onclick="delEntry('${e.id}')" style="flex:1;padding:10px;background:var(--rose-soft);border:1px solid var(--paper4);border-radius:10px;font-family:var(--sans);font-size:12px;font-weight:400;color:var(--rose);cursor:pointer">Delete</button>
   </div>`;
-  body.innerHTML=h; panel.classList.add('open');
+  body.innerHTML=h; panel.classList.add('open'); _detailSpeedIdx=0;
   const da=document.getElementById('da');
   if(da){
     da.ontimeupdate=()=>{ const pct=da.duration?(da.currentTime/da.duration*100):0; const f=document.getElementById('pfill'); if(f) f.style.width=pct.toFixed(1)+'%'; const t2=document.getElementById('ptim'); if(t2) t2.textContent=fmtDur(Math.floor(da.currentTime)); };
@@ -2279,6 +2383,8 @@ function openDetail(id){
 
 function togglePlay(){ const a=document.getElementById('da'),b=document.getElementById('play-btn'); if(!a) return; if(a.paused){ a.play(); b.innerHTML='<svg viewBox="0 0 12 12" fill="white"><rect x="2" y="1" width="3" height="10"/><rect x="7" y="1" width="3" height="10"/></svg>'; } else { a.pause(); b.innerHTML='<svg viewBox="0 0 12 12"><polygon points="2,1 11,6 2,11"/></svg>'; } }
 function seekA(ev){ const a=document.getElementById('da'); if(!a||!a.duration) return; const r=ev.currentTarget.getBoundingClientRect(); a.currentTime=((ev.clientX-r.left)/r.width)*a.duration; }
+let _detailSpeedIdx=0;
+function cycleSpeed(){ const a=document.getElementById('da'),b=document.getElementById('spd-btn'); if(!a||!b) return; const spds=[1,1.5,2,0.75]; _detailSpeedIdx=(_detailSpeedIdx+1)%spds.length; a.playbackRate=spds[_detailSpeedIdx]; b.textContent=spds[_detailSpeedIdx]+'×'; }
 function closeDetail(){ const a=document.getElementById('da'); if(a) a.pause(); document.getElementById('detail').classList.remove('open'); curEntry=null; }
 function delEntry(id){ if(!confirm('Delete this capture?')) return; entries=entries.filter(e=>e.id!==id); persist(); closeDetail(); render(); renderHeatmap(); toast('Deleted'); }
 
@@ -2423,8 +2529,8 @@ function editEntry(id){
   document.getElementById('s-note').value=e.note||e.text||'';
   document.getElementById('s-bpm').value=e.bpm||'';
   document.getElementById('s-key').value=e.key||'';
-  document.getElementById('s-mood').value=e.mood||'';
-  document.getElementById('s-genre').value=e.genre||'';
+  document.getElementById('s-mood').value=e.mood||''; syncPills('mood',e.mood||'');
+  document.getElementById('s-genre').value=e.genre||''; syncPills('genre',e.genre||'');
   document.getElementById('s-status').value=e.status||'raw';
   document.getElementById('s-type').value=e.type;
   refreshProjSelect(e.project||'');
