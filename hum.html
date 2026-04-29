@@ -651,7 +651,7 @@ body {
 
 .save-actions { display: flex; gap: 9px; margin-top: 16px; position: sticky; bottom: 0; background: white; padding: 10px 0 4px; border-top: 1px solid var(--paper4); z-index: 2; }
 
-/* Pill selectors for Mood / Genre */
+/* Pill selectors for tag suggestions (Mood / Genre) */
 .fpill-wrap { display: flex; flex-wrap: wrap; gap: 5px; }
 .fpill {
   font-size: 12px; font-family: var(--sans); font-weight: 400;
@@ -662,6 +662,20 @@ body {
 }
 .fpill:hover { border-color: var(--ink3); color: var(--ink); }
 .fpill.sel { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.fpill.sel::before { content: "#"; opacity: 0.6; margin-right: 1px; }
+.sugg-label {
+  font-size: 10px; font-family: var(--sans); font-weight: 500;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--ink3); margin: 0 0 6px;
+}
+.mini-action {
+  font-size: 10px; font-family: var(--sans); font-weight: 500;
+  color: var(--ink2); background: var(--paper2);
+  border: 1px solid var(--paper4); border-radius: 6px;
+  padding: 2px 8px; cursor: pointer; transition: all 0.15s;
+}
+.mini-action:hover { border-color: var(--warm); color: var(--warm2); }
+.mini-action.on { background: var(--ink); color: var(--paper); border-color: var(--ink); }
 
 /* Collapsible "More fields" — hidden by default to keep capture simple */
 .more-fields { margin-top: 4px; border-top: 1px solid var(--paper4); padding-top: 12px; }
@@ -1336,14 +1350,54 @@ audio { display: none; }
       <div id="transcript-status-wav"></div>
       <textarea id="s-transcript" style="display:none"></textarea>
     </div>
-    <!-- Tags (moved up — primary metadata) -->
+    <!-- BPM / Key — compact row, primary musical metadata -->
+    <div class="frow2">
+      <div class="fg">
+        <label class="flabel">BPM</label>
+        <div class="bpm-row">
+          <button class="bpm-adj" type="button" onclick="adjBpm(-5)">−</button>
+          <input class="finput bpm-in" id="s-bpm" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="120">
+          <button class="bpm-adj" type="button" onclick="adjBpm(5)">+</button>
+        </div>
+      </div>
+      <div class="fg">
+        <label class="flabel">Key</label>
+        <select class="fselect" id="s-key">
+          <option value="">— none</option>
+          <option value="C maj">C major</option><option value="C# maj">C♯ major</option>
+          <option value="Db maj">D♭ major</option><option value="D maj">D major</option>
+          <option value="Eb maj">E♭ major</option><option value="E maj">E major</option>
+          <option value="F maj">F major</option><option value="F# maj">F♯ major</option>
+          <option value="Gb maj">G♭ major</option><option value="G maj">G major</option>
+          <option value="Ab maj">A♭ major</option><option value="A maj">A major</option>
+          <option value="Bb maj">B♭ major</option><option value="B maj">B major</option>
+          <option value="C min">C minor</option><option value="C# min">C♯ minor</option>
+          <option value="D min">D minor</option><option value="D# min">D♯ minor</option>
+          <option value="Eb min">E♭ minor</option><option value="E min">E minor</option>
+          <option value="F min">F minor</option><option value="F# min">F♯ minor</option>
+          <option value="G min">G minor</option><option value="G# min">G♯ minor</option>
+          <option value="Ab min">A♭ minor</option><option value="A min">A minor</option>
+          <option value="Bb min">B♭ minor</option><option value="B min">B minor</option>
+        </select>
+      </div>
+    </div>
+    <!-- Tags + suggestion pills (mood / genre fold into tags) -->
     <div class="fg">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
         <label class="flabel" style="margin-bottom:0">Tags</label>
-        <button type="button" onclick="autoTags()" style="font-size:10px;font-family:var(--sans);font-weight:500;color:var(--ink2);background:var(--paper2);border:1px solid var(--paper4);border-radius:6px;padding:2px 8px;cursor:pointer;transition:all 0.15s" onmouseover="this.style.borderColor='var(--warm)';this.style.color='var(--warm2)'" onmouseout="this.style.borderColor='var(--paper4)';this.style.color='var(--ink2)'">Auto</button>
+        <div style="display:flex;gap:5px">
+          <button type="button" id="sugg-toggle" onclick="toggleSuggestions()" class="mini-action">Suggest</button>
+          <button type="button" onclick="autoTags()" class="mini-action">Auto</button>
+        </div>
       </div>
       <div class="tags-wrap" id="tags-wrap" onclick="document.getElementById('tag-in').focus()">
-        <input class="tinput" id="tag-in" placeholder="#tag, mood, key, genre…" onkeydown="handleTag(event)">
+        <input class="tinput" id="tag-in" placeholder="#tag — space or comma to add" onkeydown="handleTag(event)" oninput="onTagInput(event)">
+      </div>
+      <div id="tag-suggestions" style="display:none;margin-top:10px">
+        <div class="sugg-label">Mood</div>
+        <div class="fpill-wrap" id="mood-pills"></div>
+        <div class="sugg-label" style="margin-top:12px">Genre</div>
+        <div class="fpill-wrap" id="genre-pills"></div>
       </div>
     </div>
     <!-- Project (full-width, with inline + New) -->
@@ -1384,103 +1438,15 @@ audio { display: none; }
           <option value="midi">MIDI</option>
         </select>
       </div>
-      <div class="frow2">
-        <div class="fg">
-          <label class="flabel">BPM</label>
-          <div class="bpm-row">
-            <button class="bpm-adj" type="button" onclick="adjBpm(-5)">−</button>
-            <input class="finput bpm-in" id="s-bpm" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="120">
-            <button class="bpm-adj" type="button" onclick="adjBpm(5)">+</button>
-          </div>
-        </div>
-        <div class="fg">
-          <label class="flabel">Key</label>
-          <select class="fselect" id="s-key">
-          <option value="">— none</option>
-          <option value="C maj">C major</option>
-          <option value="C# maj">C♯ major</option>
-          <option value="Db maj">D♭ major</option>
-          <option value="D maj">D major</option>
-          <option value="Eb maj">E♭ major</option>
-          <option value="E maj">E major</option>
-          <option value="F maj">F major</option>
-          <option value="F# maj">F♯ major</option>
-          <option value="Gb maj">G♭ major</option>
-          <option value="G maj">G major</option>
-          <option value="Ab maj">A♭ major</option>
-          <option value="A maj">A major</option>
-          <option value="Bb maj">B♭ major</option>
-          <option value="B maj">B major</option>
-          <option value="C min">C minor</option>
-          <option value="C# min">C♯ minor</option>
-          <option value="D min">D minor</option>
-          <option value="D# min">D♯ minor</option>
-          <option value="Eb min">E♭ minor</option>
-          <option value="E min">E minor</option>
-          <option value="F min">F minor</option>
-          <option value="F# min">F♯ minor</option>
-          <option value="G min">G minor</option>
-          <option value="G# min">G♯ minor</option>
-          <option value="Ab min">A♭ minor</option>
-          <option value="A min">A minor</option>
-          <option value="Bb min">B♭ minor</option>
-          <option value="B min">B minor</option>
+      <div class="fg">
+        <label class="flabel">Status</label>
+        <select class="fselect" id="s-status">
+          <option value="raw">Sketch</option>
+          <option value="dev">In progress</option>
+          <option value="done">Done</option>
+          <option value="archived">Archived</option>
         </select>
       </div>
-    </div>
-    <!-- hidden inputs for backward compat — values managed by pill pickers below -->
-    <input type="hidden" id="s-mood" value="">
-    <input type="hidden" id="s-genre" value="">
-    <div class="fg">
-      <label class="flabel">Mood</label>
-      <div class="fpill-wrap" id="mood-pills">
-        <button class="fpill" type="button" data-val="dark" onclick="pickPill('mood',this)">dark</button>
-        <button class="fpill" type="button" data-val="bright" onclick="pickPill('mood',this)">bright</button>
-        <button class="fpill" type="button" data-val="melancholic" onclick="pickPill('mood',this)">melancholic</button>
-        <button class="fpill" type="button" data-val="dreamy" onclick="pickPill('mood',this)">dreamy</button>
-        <button class="fpill" type="button" data-val="tense" onclick="pickPill('mood',this)">tense</button>
-        <button class="fpill" type="button" data-val="warm" onclick="pickPill('mood',this)">warm</button>
-        <button class="fpill" type="button" data-val="cold" onclick="pickPill('mood',this)">cold</button>
-        <button class="fpill" type="button" data-val="playful" onclick="pickPill('mood',this)">playful</button>
-        <button class="fpill" type="button" data-val="ethereal" onclick="pickPill('mood',this)">ethereal</button>
-        <button class="fpill" type="button" data-val="cinematic" onclick="pickPill('mood',this)">cinematic</button>
-        <button class="fpill" type="button" data-val="intimate" onclick="pickPill('mood',this)">intimate</button>
-        <button class="fpill" type="button" data-val="energetic" onclick="pickPill('mood',this)">energetic</button>
-        <button class="fpill" type="button" data-val="peaceful" onclick="pickPill('mood',this)">peaceful</button>
-        <button class="fpill" type="button" data-val="raw" onclick="pickPill('mood',this)">raw</button>
-      </div>
-    </div>
-    <div class="fg">
-      <label class="flabel">Genre</label>
-      <div class="fpill-wrap" id="genre-pills">
-        <button class="fpill" type="button" data-val="ambient" onclick="pickPill('genre',this)">ambient</button>
-        <button class="fpill" type="button" data-val="classical" onclick="pickPill('genre',this)">classical</button>
-        <button class="fpill" type="button" data-val="neo-classical" onclick="pickPill('genre',this)">neo-classical</button>
-        <button class="fpill" type="button" data-val="orchestral" onclick="pickPill('genre',this)">orchestral</button>
-        <button class="fpill" type="button" data-val="cinematic" onclick="pickPill('genre',this)">cinematic</button>
-        <button class="fpill" type="button" data-val="electronic" onclick="pickPill('genre',this)">electronic</button>
-        <button class="fpill" type="button" data-val="experimental" onclick="pickPill('genre',this)">experimental</button>
-        <button class="fpill" type="button" data-val="minimalist" onclick="pickPill('genre',this)">minimalist</button>
-        <button class="fpill" type="button" data-val="drone" onclick="pickPill('genre',this)">drone</button>
-        <button class="fpill" type="button" data-val="lo-fi" onclick="pickPill('genre',this)">lo-fi</button>
-        <button class="fpill" type="button" data-val="jazz" onclick="pickPill('genre',this)">jazz</button>
-        <button class="fpill" type="button" data-val="folk" onclick="pickPill('genre',this)">folk</button>
-        <button class="fpill" type="button" data-val="post-rock" onclick="pickPill('genre',this)">post-rock</button>
-        <button class="fpill" type="button" data-val="shoegaze" onclick="pickPill('genre',this)">shoegaze</button>
-        <button class="fpill" type="button" data-val="trip-hop" onclick="pickPill('genre',this)">trip-hop</button>
-        <button class="fpill" type="button" data-val="noise" onclick="pickPill('genre',this)">noise</button>
-        <button class="fpill" type="button" data-val="world" onclick="pickPill('genre',this)">world</button>
-      </div>
-    </div>
-    <div class="fg">
-      <label class="flabel">Status</label>
-      <select class="fselect" id="s-status">
-        <option value="raw">Sketch</option>
-        <option value="dev">In progress</option>
-        <option value="done">Done</option>
-        <option value="archived">Archived</option>
-      </select>
-    </div>
     </details>
     <div class="save-actions">
       <button class="btn-cancel" onclick="closeSave()">Cancel</button>
@@ -2212,7 +2178,10 @@ function openSaveModal(type, isNew){
   if(modalRecording) cancelModalAudio();
   currentTags=[]; renderTags();
   ['s-note','s-key'].forEach(id=>document.getElementById(id).value='');
-  resetPills();
+  // hide suggestions; render fresh pill state
+  const sg=document.getElementById('tag-suggestions'); if(sg) sg.style.display='none';
+  const sgBtn=document.getElementById('sugg-toggle'); if(sgBtn) sgBtn.classList.remove('on');
+  renderSuggestionPills();
   document.getElementById('s-status').value='raw';
   document.getElementById('s-type').value=type||'idea';
   const viewProj=projects.find(p=>p.id===view)?view:null;
@@ -2266,33 +2235,50 @@ function closeSave(){
 
 function adjBpm(d){ const el=document.getElementById('s-bpm'); const v=parseInt(el.value)||120; el.value=Math.max(20,Math.min(300,v+d)); el.dispatchEvent(new Event('input')); }
 
-// Pill pickers for Mood / Genre
-function pickPill(field, el){
-  const wrapId=field+'-pills';
-  const inputId='s-'+field;
-  const cur=document.getElementById(inputId).value;
-  const val=el.dataset.val;
-  if(cur===val){
-    // deselect
-    document.getElementById(inputId).value='';
-    el.classList.remove('sel');
-  } else {
-    document.querySelectorAll('#'+wrapId+' .fpill').forEach(b=>b.classList.remove('sel'));
-    el.classList.add('sel');
-    document.getElementById(inputId).value=val;
+// ── TAG SUGGESTIONS (mood + genre as multi-select tag chips) ──
+// Sources: Universal Production Music + Audio Network + APM Music taxonomies
+const MOOD_TAGS=['action','aggressive','bright','calm','cinematic','comedic','dark','dramatic','dreamy','driving','eerie','energetic','epic','ethereal','funky','happy','hopeful','inspirational','intense','laid-back','melancholic','mysterious','nostalgic','ominous','peaceful','playful','quirky','romantic','sad','sensual','serene','sentimental','smooth','suspenseful','tense','triumphant','uplifting','whimsical'];
+const GENRE_TAGS=['ambient','cinematic','classical','neo-classical','orchestral','chamber','score','soundtrack','sound design','drone','field recording','electronic','IDM','experimental','minimalist','downtempo','lo-fi','trip-hop','jazz','blues','soul','funk','folk','world','post-rock','noise'];
+
+function renderSuggestionPills(){
+  ['mood','genre'].forEach(group=>{
+    const list=group==='mood'?MOOD_TAGS:GENRE_TAGS;
+    const wrap=document.getElementById(group+'-pills');
+    if(!wrap) return;
+    wrap.innerHTML=list.map(t=>{
+      const sel=currentTags.includes(t)?' sel':'';
+      const safe=escHtml(t);
+      return `<button class="fpill${sel}" type="button" data-val="${safe}" onclick="togglePillTag('${safe.replace(/'/g,"\\'")}', this)">${safe}</button>`;
+    }).join('');
+  });
+}
+function togglePillTag(tag, el){
+  const i=currentTags.indexOf(tag);
+  if(i>=0){ currentTags.splice(i,1); el.classList.remove('sel'); }
+  else { currentTags.push(tag); el.classList.add('sel'); }
+  renderTags();
+}
+function refreshPillSelection(){
+  document.querySelectorAll('#mood-pills .fpill, #genre-pills .fpill').forEach(b=>{
+    b.classList.toggle('sel', currentTags.includes(b.dataset.val));
+  });
+}
+function toggleSuggestions(){
+  const el=document.getElementById('tag-suggestions');
+  const btn=document.getElementById('sugg-toggle');
+  const open=el.style.display!=='none';
+  el.style.display=open?'none':'';
+  if(btn) btn.classList.toggle('on', !open);
+  if(!open) renderSuggestionPills();
+}
+// Auto-chip when typing space (Enter/comma already handled in handleTag)
+function onTagInput(e){
+  const v=e.target.value;
+  if(v.endsWith(' ')||v.endsWith(',')){
+    const t=v.replace(/[#,\s]/g,'').trim();
+    if(t&&!currentTags.includes(t)) currentTags.push(t);
+    e.target.value=''; renderTags();
   }
-}
-function syncPills(field, val){
-  const wrapId=field+'-pills';
-  document.querySelectorAll('#'+wrapId+' .fpill').forEach(b=>{
-    b.classList.toggle('sel', b.dataset.val===val);
-  });
-}
-function resetPills(){
-  ['mood','genre'].forEach(f=>{
-    document.getElementById('s-'+f).value='';
-    document.querySelectorAll('#'+f+'-pills .fpill').forEach(b=>b.classList.remove('sel'));
-  });
 }
 
 // Inline "+ New project" inside save modal
@@ -2361,6 +2347,7 @@ function renderTags(){
   const w=document.getElementById('tags-wrap'), inp=document.getElementById('tag-in');
   w.innerHTML=currentTags.map((t,i)=>`<span class="tchip">#${escHtml(t)}<span class="tchip-x" onclick="rmTag(${i})">×</span></span>`).join('');
   w.appendChild(inp);
+  refreshPillSelection();
 }
 function rmTag(i){ currentTags.splice(i,1); renderTags(); }
 
@@ -2373,8 +2360,9 @@ async function confirmSave(){
   const transcript=(ta.style.display!=='none'?ta.value.trim():'')||null;
   const bpm=document.getElementById('s-bpm').value?parseInt(document.getElementById('s-bpm').value):null;
   const key=document.getElementById('s-key').value.trim()||null;
-  const mood=document.getElementById('s-mood').value.trim()||null;
-  const genre=document.getElementById('s-genre').value.trim()||null;
+  // mood/genre now live as tags — derive from currentTags for back-compat search
+  const mood=currentTags.find(t=>MOOD_TAGS.includes(t))||null;
+  const genre=currentTags.find(t=>GENRE_TAGS.includes(t))||null;
   const status=document.getElementById('s-status').value;
 
   if(editingId){
@@ -2461,14 +2449,12 @@ function openDetail(id){
   if(e.transcript) h+=`<div class="dsec"><span class="dsec-label">Transcript</span><div class="detail-text">${escHtml(e.transcript)}</div></div>`;
   if(e.note||e.text) h+=`<div class="dsec"><span class="dsec-label">Note</span><div class="detail-text">${escHtml(e.note||e.text)}</div></div>`;
   const metas=[];
-  if(e.bpm) metas.push(['BPM',e.bpm]);
-  if(e.key) metas.push(['Key',e.key]);
-  if(e.mood) metas.push(['Mood',e.mood]);
-  if(e.genre) metas.push(['Genre',e.genre]);
-  if(e.status) metas.push(['Status',{raw:'Sketch',dev:'In progress',done:'Done',archived:'Archived'}[e.status]||e.status]);
-  if(e.duration) metas.push(['Duration',fmtDur(e.duration)]);
   const proj=projects.find(p=>p.id===e.project);
   if(proj) metas.push(['Project',proj.name]);
+  if(e.bpm) metas.push(['BPM',e.bpm]);
+  if(e.key) metas.push(['Key',e.key]);
+  if(e.status) metas.push(['Status',{raw:'Sketch',dev:'In progress',done:'Done',archived:'Archived'}[e.status]||e.status]);
+  if(e.duration) metas.push(['Duration',fmtDur(e.duration)]);
   if(metas.length) h+=`<div class="dsec"><span class="dsec-label">Details</span><div class="meta-grid">${metas.map(([k,v])=>`<div class="meta-cell"><div class="meta-k">${k}</div><div class="meta-v">${escHtml(String(v))}</div></div>`).join('')}</div></div>`;
   if(e.tags&&e.tags.length) h+=`<div class="dsec"><span class="dsec-label">Tags</span><div class="dtags">${e.tags.map(t=>`<span class="card-tag">#${escHtml(t)}</span>`).join('')}</div></div>`;
   h+=`<div style="margin-top:24px;display:flex;gap:8px">
@@ -2655,8 +2641,13 @@ function editEntry(id){
   document.getElementById('s-note').value=e.note||e.text||'';
   document.getElementById('s-bpm').value=e.bpm||'';
   document.getElementById('s-key').value=e.key||'';
-  document.getElementById('s-mood').value=e.mood||''; syncPills('mood',e.mood||'');
-  document.getElementById('s-genre').value=e.genre||''; syncPills('genre',e.genre||'');
+  // legacy mood/genre — fold into tags if not already there
+  if(e.mood && !currentTags.includes(e.mood)) currentTags.push(e.mood);
+  if(e.genre && !currentTags.includes(e.genre)) currentTags.push(e.genre);
+  renderTags();
+  const sg=document.getElementById('tag-suggestions'); if(sg) sg.style.display='none';
+  const sgBtn=document.getElementById('sugg-toggle'); if(sgBtn) sgBtn.classList.remove('on');
+  renderSuggestionPills();
   document.getElementById('s-status').value=e.status||'raw';
   document.getElementById('s-type').value=e.type;
   refreshProjSelect(e.project||'');
