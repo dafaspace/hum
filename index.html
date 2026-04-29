@@ -1627,10 +1627,92 @@ function persist(){
     localStorage.setItem(LV,layout);
   }catch(e){
     if(e.name==='QuotaExceededError'||e.code===22||e.code===1014){
-      toast('Storage full — delete some entries with audio to free space');
+      toast('Metadata storage full — delete some entries');
     }
     throw e;
   }
+}
+
+// ── INDEXEDDB MEDIA STORE ──
+// Stores audio/photo/video blobs by entry.id. Frees us from the 5MB
+// localStorage limit and avoids base64 bloat.
+const IDB_DB='hum-media', IDB_VER=1, IDB_STORE='media';
+let _idbConn=null;
+function idbOpen(){
+  if(_idbConn) return Promise.resolve(_idbConn);
+  return new Promise((resolve,reject)=>{
+    if(!('indexedDB' in window)){ reject(new Error('No IndexedDB')); return; }
+    const r=indexedDB.open(IDB_DB,IDB_VER);
+    r.onupgradeneeded=e=>{
+      const db=e.target.result;
+      if(!db.objectStoreNames.contains(IDB_STORE)) db.createObjectStore(IDB_STORE);
+    };
+    r.onsuccess=e=>{ _idbConn=e.target.result; resolve(_idbConn); };
+    r.onerror=e=>reject(e.target.error||new Error('IDB open failed'));
+  });
+}
+function idbPut(id, blob, mimeType){
+  return idbOpen().then(db=>new Promise((res,rej)=>{
+    const tx=db.transaction(IDB_STORE,'readwrite');
+    tx.objectStore(IDB_STORE).put({blob, mimeType:mimeType||(blob&&blob.type)||'', ts:Date.now()}, id);
+    tx.oncomplete=()=>res();
+    tx.onerror=e=>rej(e.target.error);
+    tx.onabort=e=>rej(e.target.error);
+  }));
+}
+function idbGet(id){
+  return idbOpen().then(db=>new Promise((res,rej)=>{
+    const tx=db.transaction(IDB_STORE,'readonly');
+    const r=tx.objectStore(IDB_STORE).get(id);
+    r.onsuccess=()=>res(r.result||null);
+    r.onerror=e=>rej(e.target.error);
+  })).catch(()=>null);
+}
+function idbDelete(id){
+  return idbOpen().then(db=>new Promise((res)=>{
+    const tx=db.transaction(IDB_STORE,'readwrite');
+    tx.objectStore(IDB_STORE).delete(id);
+    tx.oncomplete=()=>res();
+    tx.onerror=()=>res();
+  })).catch(()=>{});
+}
+
+// ObjectURL cache — avoid creating new URLs for every render
+const _mediaUrls=new Map();
+async function getMediaUrl(entryId){
+  if(_mediaUrls.has(entryId)) return _mediaUrls.get(entryId);
+  const rec=await idbGet(entryId);
+  if(!rec||!rec.blob) return null;
+  const url=URL.createObjectURL(rec.blob);
+  _mediaUrls.set(entryId,url);
+  return url;
+}
+function releaseMediaUrl(entryId){
+  const url=_mediaUrls.get(entryId);
+  if(url){ try{URL.revokeObjectURL(url);}catch(_){} _mediaUrls.delete(entryId); }
+}
+
+// Migrate legacy base64 entries: convert data URLs to blobs in IDB,
+// then strip e.data to free localStorage. Runs once on app load.
+async function migrateLegacyMedia(){
+  const legacy=entries.filter(e=>typeof e.data==='string' && e.data.startsWith('data:'));
+  if(!legacy.length) return;
+  let ok=0, fail=0;
+  for(const e of legacy){
+    try{
+      const resp=await fetch(e.data);
+      const blob=await resp.blob();
+      await idbPut(e.id, blob, e.mimeType||blob.type||'');
+      e.data=null;
+      e.hasMedia=true;
+      if(!e.mimeType) e.mimeType=blob.type||'';
+      ok++;
+    }catch(err){ fail++; }
+  }
+  if(ok>0){
+    try{ persist(); toast(`Freed storage: migrated ${ok} file${ok===1?'':'s'} to local DB`); }catch(_){}
+  }
+  if(fail>0) console.warn('Media migration failed for',fail,'entries');
 }
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,5); }
 function fmtDate(ts){ const d=new Date(ts); return d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})+' · '+d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}); }
@@ -1796,6 +1878,18 @@ function render(){
 
   if(layout==='stream'){ c.innerHTML=streamHtml(f); }
   else { c.innerHTML=`<div class="cards-grid">${f.map(cardHtml).join('')}</div>`; }
+  populateLazyMedia();
+}
+
+// Set src on photo/video cards that need IDB-stored media
+async function populateLazyMedia(){
+  const els=document.querySelectorAll('.lazy-media[data-entry-id]:not([data-loaded])');
+  for(const el of els){
+    const id=el.dataset.entryId;
+    if(el.getAttribute('src')) { el.dataset.loaded='1'; continue; }
+    const url=await getMediaUrl(id);
+    if(url){ el.src=url; el.dataset.loaded='1'; }
+  }
 }
 
 function cardHtml(e){
@@ -1805,11 +1899,13 @@ function cardHtml(e){
   const ticon=typeIconSvg(e.type);
   const tpill=`<span class="type-pill tp-${e.type}">${ticon}${tlabel}</span>`;
   let body='';
-  if(e.type==='audio'&&e.data){
+  const hm=!!(e.hasMedia||e.data);
+  if(e.type==='audio'&&hm){
     body=`<div class="card-wave">${waveformBars(e,28,20,'wbar')}</div>`;
     if(e.note) body+=`<div class="card-preview">${escHtml(e.note)}</div>`;
-  } else if(e.type==='photo'&&e.data){
-    body=`<img class="card-photo" src="${e.data}" loading="lazy">`;
+  } else if(e.type==='photo'&&hm){
+    const src=(typeof e.data==='string'&&e.data.startsWith('data:'))?e.data:'';
+    body=`<img class="card-photo lazy-media" data-entry-id="${e.id}" src="${src}" loading="lazy">`;
     if(e.note) body+=`<div class="card-preview">${escHtml(e.note)}</div>`;
   } else {
     const t=e.note||e.text||'';
@@ -1850,10 +1946,12 @@ function streamItemHtml(e){
   const proj=projects.find(p=>p.id===e.project);
   const acc=proj?`<div class="card-accent" style="background:${proj.color}"></div>`:'';
   let body='';
-  if(e.type==='audio'&&e.data){
+  const hm=!!(e.hasMedia||e.data);
+  if(e.type==='audio'&&hm){
     body=`<div class="card-wave">${waveformBars(e,36,20,'wbar')}</div>`;
-  } else if(e.type==='photo'&&e.data){
-    body=`<img class="card-photo" src="${e.data}" loading="lazy">`;
+  } else if(e.type==='photo'&&hm){
+    const src=(typeof e.data==='string'&&e.data.startsWith('data:'))?e.data:'';
+    body=`<img class="card-photo lazy-media" data-entry-id="${e.id}" src="${src}" loading="lazy">`;
   }
   const txt=e.note||e.text||'';
   const foot=[
@@ -2300,26 +2398,29 @@ async function confirmSave(){
     duration:modalRecSec||null, transcript
   };
   const blobForWaveform=(type==='audio'&&pendingBlob)?pendingBlob:null;
-  if(pendingBlob&&type==='audio'){ entry.data=await blobToDataUrl(pendingBlob); entry.mimeType=pendingBlob.type; }
-  if(pendingDataUrl&&type==='photo') entry.data=pendingDataUrl;
-  if(pendingVideoBlob&&type==='video'){
-    entry.data=await blobToDataUrl(pendingVideoBlob);
-    entry.mimeType=pendingVideoBlob.type;
-  } else if(pendingDataUrl&&type==='video'){
-    entry.data=pendingDataUrl;
+  // Persist media blobs in IndexedDB (entry.data stays null in localStorage)
+  let mediaBlob=null, mediaMime=null;
+  if(pendingBlob&&type==='audio'){ mediaBlob=pendingBlob; mediaMime=pendingBlob.type; }
+  else if(pendingVideoBlob&&type==='video'){ mediaBlob=pendingVideoBlob; mediaMime=pendingVideoBlob.type; }
+  else if(pendingDataUrl&&(type==='photo'||type==='video')){
+    try{ const r=await fetch(pendingDataUrl); mediaBlob=await r.blob(); mediaMime=mediaBlob.type; }catch(_){}
+  }
+  if(mediaBlob){
+    try{
+      await idbPut(entry.id, mediaBlob, mediaMime);
+      entry.hasMedia=true; entry.mimeType=mediaMime;
+    }catch(err){ toast('Could not store media: '+(err.message||'IDB error')); }
   }
   const savedId=entry.id;
   entries.unshift(entry);
-  try{ persist(); }catch(storErr){
-    // Quota full: try saving without media data
-    entries[0].data=null; entries[0].mimeType=null;
-    try{ persist(); toast('Saved (audio not stored — storage full)'); }
-    catch(_){ entries.shift(); toast('Could not save — please delete entries with audio'); closeSave(); return; }
+  try{ persist(); }catch(_){
+    entries.shift();
+    toast('Could not save — try removing some entries');
+    closeSave(); return;
   }
   closeSave(); render(); renderProjects(); renderHeatmap();
   modalRecSec=0; pendingBlob=null; pendingDataUrl=null; pendingVideoBlob=null;
-  if(!entries[0].data) { toast('Saved — audio not stored (storage full)'); }
-  else toast('Saved');
+  toast('Saved');
   if(blobForWaveform){
     computeWaveform(blobForWaveform).then(waveform=>{
       if(!waveform) return;
@@ -2340,11 +2441,12 @@ function openDetail(id){
   pill.innerHTML=typeIconSvg(e.type)+(e.type);
   pill.className=`type-pill tp-${e.type}`;
   let h=`<div class="detail-title">${escHtml(e.name||autoTitle(e))}</div><div class="detail-date">${fmtDate(e.ts)}</div>`;
-  if(e.type==='audio'&&e.data){
+  const hasMedia=!!(e.hasMedia||e.data);
+  if(e.type==='audio'&&hasMedia){
     const bars=waveformBars(e,44,36,'pwbar',';flex:1;max-width:7px');
     h+=`<div class="dsec"><span class="dsec-label">Recording</span>
       <div class="detail-player">
-        <audio id="da" src="${e.data}"></audio>
+        <audio id="da" data-entry-id="${e.id}"></audio>
         <div class="player-wave">${bars}</div>
         <div class="player-row">
           <button class="play-btn2" id="play-btn" onclick="togglePlay()"><svg viewBox="0 0 12 12"><polygon points="2,1 11,6 2,11"/></svg></button>
@@ -2354,7 +2456,8 @@ function openDetail(id){
         </div>
       </div></div>`;
   }
-  if(e.type==='photo'&&e.data) h+=`<div class="dsec"><img src="${e.data}" style="width:100%;border-radius:14px"></div>`;
+  if(e.type==='photo'&&hasMedia) h+=`<div class="dsec"><img id="d-photo" data-entry-id="${e.id}" style="width:100%;border-radius:14px"></div>`;
+  if(e.type==='video'&&hasMedia) h+=`<div class="dsec"><video id="d-video" data-entry-id="${e.id}" controls playsinline style="width:100%;border-radius:14px;background:#111"></video></div>`;
   if(e.transcript) h+=`<div class="dsec"><span class="dsec-label">Transcript</span><div class="detail-text">${escHtml(e.transcript)}</div></div>`;
   if(e.note||e.text) h+=`<div class="dsec"><span class="dsec-label">Note</span><div class="detail-text">${escHtml(e.note||e.text)}</div></div>`;
   const metas=[];
@@ -2374,6 +2477,21 @@ function openDetail(id){
     <button onclick="delEntry('${e.id}')" style="flex:1;padding:10px;background:var(--rose-soft);border:1px solid var(--paper4);border-radius:10px;font-family:var(--sans);font-size:12px;font-weight:400;color:var(--rose);cursor:pointer">Delete</button>
   </div>`;
   body.innerHTML=h; panel.classList.add('open'); _detailSpeedIdx=0;
+  // Populate media src from IDB (or legacy base64)
+  (async()=>{
+    if(typeof e.data==='string' && e.data.startsWith('data:')){
+      // legacy base64 — use directly
+      const da=document.getElementById('da'); if(da) da.src=e.data;
+      const dp=document.getElementById('d-photo'); if(dp) dp.src=e.data;
+      const dv=document.getElementById('d-video'); if(dv) dv.src=e.data;
+    } else if(e.hasMedia){
+      const url=await getMediaUrl(e.id);
+      if(!url) return;
+      const da=document.getElementById('da'); if(da) da.src=url;
+      const dp=document.getElementById('d-photo'); if(dp) dp.src=url;
+      const dv=document.getElementById('d-video'); if(dv) dv.src=url;
+    }
+  })();
   const da=document.getElementById('da');
   if(da){
     da.ontimeupdate=()=>{ const pct=da.duration?(da.currentTime/da.duration*100):0; const f=document.getElementById('pfill'); if(f) f.style.width=pct.toFixed(1)+'%'; const t2=document.getElementById('ptim'); if(t2) t2.textContent=fmtDur(Math.floor(da.currentTime)); };
@@ -2386,28 +2504,36 @@ function seekA(ev){ const a=document.getElementById('da'); if(!a||!a.duration) r
 let _detailSpeedIdx=0;
 function cycleSpeed(){ const a=document.getElementById('da'),b=document.getElementById('spd-btn'); if(!a||!b) return; const spds=[1,1.5,2,0.75]; _detailSpeedIdx=(_detailSpeedIdx+1)%spds.length; a.playbackRate=spds[_detailSpeedIdx]; b.textContent=spds[_detailSpeedIdx]+'×'; }
 function closeDetail(){ const a=document.getElementById('da'); if(a) a.pause(); document.getElementById('detail').classList.remove('open'); curEntry=null; }
-function delEntry(id){ if(!confirm('Delete this capture?')) return; entries=entries.filter(e=>e.id!==id); persist(); closeDetail(); render(); renderHeatmap(); toast('Deleted'); }
+function delEntry(id){
+  if(!confirm('Delete this capture?')) return;
+  entries=entries.filter(e=>e.id!==id);
+  releaseMediaUrl(id);
+  idbDelete(id); // fire-and-forget
+  try{ persist(); }catch(_){}
+  closeDetail(); render(); renderHeatmap(); toast('Deleted');
+}
 
 let attachTargetId=null;
 function attachToEntry(id){
   attachTargetId=id;
   document.getElementById('attach-in').click();
 }
-function handleAttach(input){
+async function handleAttach(input){
   const file=input.files[0]; if(!file||!attachTargetId) return;
   const type=file.type.startsWith('image')?'photo':'video';
-  const r=new FileReader();
-  r.onload=ev=>{
-    const idx=entries.findIndex(x=>x.id===attachTargetId);
-    if(idx>=0){
-      entries[idx].data=ev.target.result;
-      entries[idx].mimeType=file.type;
-      if(entries[idx].type!=='audio') entries[idx].type=type;
-      persist(); render(); openDetail(attachTargetId); toast('Media attached');
-    }
-    attachTargetId=null;
-  };
-  r.readAsDataURL(file);
+  const idx=entries.findIndex(x=>x.id===attachTargetId);
+  if(idx<0){ attachTargetId=null; input.value=''; return; }
+  try{
+    await idbPut(attachTargetId, file, file.type);
+    entries[idx].hasMedia=true;
+    entries[idx].mimeType=file.type;
+    entries[idx].data=null;
+    if(entries[idx].type!=='audio') entries[idx].type=type;
+    releaseMediaUrl(attachTargetId);
+    try{ persist(); }catch(_){}
+    render(); openDetail(attachTargetId); toast('Media attached');
+  }catch(err){ toast('Attach failed: '+(err.message||'storage error')); }
+  attachTargetId=null;
   input.value='';
 }
 
@@ -2586,10 +2712,27 @@ function expMd(){
   dl(new Blob([s],{type:'text/markdown'}),(e.name||autoTitle(e))+'.md');
 }
 function expJson(){
-  if(!curEntry) return; const e={...curEntry}; if(e.data&&e.data.length>80000) e.data='[binary — export audio separately]';
+  if(!curEntry) return; const e={...curEntry};
+  // strip embedded media — files are exported separately
+  if(e.data) e.data='[binary — export media file separately]';
+  if(e.hasMedia) e.data='[stored in IDB — use Audio/Video export]';
   dl(new Blob([JSON.stringify(e,null,2)],{type:'application/json'}),(e.name||autoTitle(e))+'.json');
 }
-function expAudio(){ if(!curEntry||!curEntry.data){toast('No audio data');return;} const ext=(curEntry.mimeType||'').includes('wav')?'wav':(curEntry.mimeType||'').includes('ogg')?'ogg':'webm'; const a=document.createElement('a'); a.href=curEntry.data; a.download=(curEntry.name||autoTitle(curEntry))+'.'+ext; a.click(); }
+async function expAudio(){
+  if(!curEntry){ toast('No entry'); return; }
+  let blob=null, mime=curEntry.mimeType||'';
+  if(curEntry.hasMedia){
+    const rec=await idbGet(curEntry.id);
+    if(rec&&rec.blob){ blob=rec.blob; mime=rec.mimeType||mime; }
+  } else if(typeof curEntry.data==='string' && curEntry.data.startsWith('data:')){
+    const r=await fetch(curEntry.data); blob=await r.blob(); mime=blob.type;
+  }
+  if(!blob){ toast('No media stored'); return; }
+  const ext=mime.includes('wav')?'wav':mime.includes('ogg')?'ogg':mime.includes('mp4')?'mp4':mime.includes('image')?(mime.includes('png')?'png':'jpg'):'webm';
+  const u=URL.createObjectURL(blob), a=document.createElement('a');
+  a.href=u; a.download=(curEntry.name||autoTitle(curEntry))+'.'+ext; a.click();
+  setTimeout(()=>URL.revokeObjectURL(u),1000);
+}
 function dl(blob,name){ const u=URL.createObjectURL(blob),a=document.createElement('a'); a.href=u; a.download=name; a.click(); URL.revokeObjectURL(u); }
 
 function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2200); }
@@ -2780,6 +2923,8 @@ if(window.innerWidth <= 680 && layout === 'grid') layout = 'stream';
 setLayout(layout);
 renderProjects();
 renderHeatmap();
+// Migrate old base64 media to IndexedDB on app load (frees localStorage)
+migrateLegacyMedia().then(()=>render()).catch(err=>console.warn('Media migration failed:',err));
 document.addEventListener('keydown',e=>{ if(e.key==='Escape'){closeDetail();closeSave();closeProjModal();closeSettings();cancelRecording();} });
 
 // ── PWA SERVICE WORKER (inline via blob) ──
