@@ -1328,7 +1328,7 @@ audio { display: none; }
         <label class="flabel">BPM</label>
         <div class="bpm-row">
           <button class="bpm-adj" type="button" onclick="adjBpm(-5)">−</button>
-          <input class="finput bpm-in" id="s-bpm" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="—">
+          <input class="finput bpm-in" id="s-bpm" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="120">
           <button class="bpm-adj" type="button" onclick="adjBpm(5)">+</button>
         </div>
       </div>
@@ -1397,7 +1397,44 @@ audio { display: none; }
           <option value="peaceful">
         </datalist>
       </div>
-      <div class="fg"><label class="flabel">Genre</label><input class="finput" id="s-genre" type="text" placeholder="ambient"></div>
+      <div class="fg"><label class="flabel">Genre</label>
+        <input class="finput" id="s-genre" type="text" list="genre-list" placeholder="ambient" autocomplete="off">
+        <datalist id="genre-list">
+          <option value="ambient">
+          <option value="classical">
+          <option value="neo-classical">
+          <option value="orchestral">
+          <option value="chamber">
+          <option value="cinematic">
+          <option value="soundtrack">
+          <option value="electronic">
+          <option value="experimental">
+          <option value="minimalist">
+          <option value="drone">
+          <option value="noise">
+          <option value="post-rock">
+          <option value="jazz">
+          <option value="blues">
+          <option value="soul">
+          <option value="r&b">
+          <option value="hip-hop">
+          <option value="lo-fi">
+          <option value="trip-hop">
+          <option value="downtempo">
+          <option value="pop">
+          <option value="indie">
+          <option value="folk">
+          <option value="country">
+          <option value="rock">
+          <option value="metal">
+          <option value="psychedelic">
+          <option value="shoegaze">
+          <option value="reggae">
+          <option value="latin">
+          <option value="world">
+          <option value="gospel">
+        </datalist>
+      </div>
       <div class="fg"><label class="flabel">Status</label>
         <select class="fselect" id="s-status">
           <option value="raw">Raw sketch</option>
@@ -1940,13 +1977,11 @@ function toggleAutoTranscribe(){
 }
 
 // ── CAMERA FROM MODAL ──
+let camPendingVideoMode=false;
 function openCameraForModal(mode){
   cameraReturnMode=mode;
+  camPendingVideoMode=(mode==='video');
   openCamera();
-  if(mode==='video'){
-    // auto-switch to video mode once camera opens (small delay for stream)
-    setTimeout(()=>{ if(camStream) toggleCamVideo(); },600);
-  }
 }
 
 function openFile(accept){ const f=document.getElementById('file-in'); f.accept=accept; f.click(); }
@@ -2198,9 +2233,15 @@ async function startCamStream(){
     try{ camStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:camFacing},audio:false}); }
     catch(e2){ toast('Camera access denied'); closeCamera(); return; }
   }
-  document.getElementById('cam-video').srcObject=camStream;
+  const vid=document.getElementById('cam-video');
+  vid.srcObject=camStream;
+  if(camPendingVideoMode){
+    camPendingVideoMode=false;
+    vid.onloadedmetadata=()=>{ vid.onloadedmetadata=null; toggleCamVideo(); };
+  }
 }
 function closeCamera(){
+  camPendingVideoMode=false;
   if(camStream) camStream.getTracks().forEach(t=>t.stop());
   camStream=null;
   if(camMR&&camMR.state==='recording'){ camMR.stop(); clearInterval(camTimer); }
