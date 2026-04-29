@@ -650,7 +650,7 @@ body {
   font-size: 11px; color: var(--ink2);
   display: flex; align-items: center; gap: 2px;
 }
-.tchip-x { cursor: pointer; color: var(--ink3); width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
+.tchip-x { cursor: pointer; color: var(--ink3); width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-size: 14px; flex-shrink: 0; }
 .tchip-x:hover { color: var(--rose); background: var(--rose-soft); }
 .tinput { background: none; border: none; outline: none; font-family: var(--sans); font-size: 12.5px; font-weight: 400; color: var(--ink); min-width: 80px; flex: 1; }
 .tinput::placeholder { color: var(--ink3); }
@@ -1026,7 +1026,7 @@ audio { display: none; }
       </div>
       <div class="brand-heatmap" id="brand-heatmap" title="Your activity"></div>
     </div>
-    <div class="brand-sub">capture before it fades <span class="brand-ver">v0.2</span></div>
+    <div class="brand-sub">capture before it fades <span class="brand-ver">v0.3</span></div>
     <button class="sidebar-close-btn" onclick="closeSidebar()" aria-label="Close">
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg>
     </button>
@@ -1180,9 +1180,9 @@ audio { display: none; }
       <div class="fg">
         <label class="flabel">BPM</label>
         <div class="bpm-row">
-          <button class="bpm-adj" type="button" onclick="adjBpm(-5)">−</button>
+          <button class="bpm-adj" type="button" onclick="adjBpm(-5)">−5</button>
           <input class="finput bpm-in" id="s-bpm" type="number" placeholder="—" min="20" max="300">
-          <button class="bpm-adj" type="button" onclick="adjBpm(5)">+</button>
+          <button class="bpm-adj" type="button" onclick="adjBpm(5)">+5</button>
         </div>
       </div>
       <div class="fg">
@@ -1241,7 +1241,10 @@ audio { display: none; }
       </div>
     </div>
     <div class="fg">
-      <label class="flabel">Tags</label>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <label class="flabel" style="margin-bottom:0">Tags</label>
+        <button type="button" onclick="autoTags()" style="font-size:10px;font-family:var(--sans);font-weight:500;color:var(--ink2);background:var(--paper2);border:1px solid var(--paper4);border-radius:6px;padding:2px 8px;cursor:pointer;transition:all 0.15s" onmouseover="this.style.borderColor='var(--warm)';this.style.color='var(--warm2)'" onmouseout="this.style.borderColor='var(--paper4)';this.style.color='var(--ink2)'">Auto</button>
+      </div>
       <div class="tags-wrap" id="tags-wrap" onclick="document.getElementById('tag-in').focus()">
         <input class="tinput" id="tag-in" placeholder="#tag…" onkeydown="handleTag(event)">
       </div>
@@ -1716,11 +1719,19 @@ function handleFile(input){
 
 function openSaveModal(type){
   currentTags=[]; renderTags();
-  ['s-name','s-note','s-bpm','s-key','s-mood','s-genre'].forEach(id=>document.getElementById(id).value='');
+  ['s-note','s-key','s-mood','s-genre'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('s-status').value='raw';
   document.getElementById('s-type').value=type;
   const sel=document.getElementById('s-proj');
+  // pre-select current project view if applicable
+  const viewProj=projects.find(p=>p.id===view)?view:null;
   sel.innerHTML='<option value="">— Inbox</option>'+projects.map(p=>`<option value="${p.id}">${escHtml(p.name)}</option>`).join('');
+  if(viewProj) sel.value=viewProj;
+  // pre-fill title with auto-generated name
+  const tmpE={ts:Date.now(), type, project:viewProj};
+  document.getElementById('s-name').value=autoTitle(tmpE);
+  // default BPM for audio
+  document.getElementById('s-bpm').value=type==='audio'?120:'';
   const heads={audio:'Save recording',text:'Save note',idea:'Save idea',dream:'Save dream',photo:'Save photo',video:'Save video',midi:'Save MIDI'};
   document.getElementById('save-heading').textContent=heads[type]||'Save capture';
   document.getElementById('transcript-fg').style.display='none';
@@ -1728,12 +1739,25 @@ function openSaveModal(type){
   document.getElementById('s-transcript').value='';
   document.getElementById('s-transcript').style.display='none';
   document.getElementById('save-overlay').classList.add('show');
-  setTimeout(()=>document.getElementById('s-name').focus(),80);
+  setTimeout(()=>document.getElementById('s-note').focus(),80);
 }
 
 function closeSave(){ document.getElementById('save-overlay').classList.remove('show'); pendingBlob=null; pendingDataUrl=null; pendingTranscript=null; editingId=null; }
 
 function adjBpm(d){ const el=document.getElementById('s-bpm'); const v=parseInt(el.value)||120; el.value=Math.max(20,Math.min(300,v+d)); }
+
+function autoTags(){
+  const STOP=new Set(['this','that','with','have','from','they','been','were','what','when','where','will','your','just','about','into','more','also','some','than','then','there','these','those','would','could','should','which','their','over','other','after','before','every','never','through','during','itself','anyone','because','between','without','already','something','nothing','everything']);
+  const note=document.getElementById('s-note').value;
+  const tr=document.getElementById('s-transcript').value;
+  const words=(note+' '+tr).toLowerCase().match(/\b[a-zа-яё]{4,}\b/g)||[];
+  const freq={};
+  words.forEach(w=>{ if(!STOP.has(w)) freq[w]=(freq[w]||0)+1; });
+  const top=Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([w])=>w);
+  const added=top.filter(t=>!currentTags.includes(t));
+  if(!added.length){ toast('No new tags found'); return; }
+  currentTags=[...currentTags,...added]; renderTags();
+}
 
 function handleTag(e){
   if(['Enter',' ',','].includes(e.key)){
@@ -1860,7 +1884,7 @@ function editEntry(id){
   const e=entries.find(x=>x.id===id); if(!e) return;
   editingId=id;
   currentTags=[...(e.tags||[])]; renderTags();
-  document.getElementById('s-name').value=e.name||'';
+  document.getElementById('s-name').value=e.name||autoTitle(e);
   document.getElementById('s-note').value=e.note||e.text||'';
   document.getElementById('s-bpm').value=e.bpm||'';
   document.getElementById('s-key').value=e.key||'';
