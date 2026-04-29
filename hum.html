@@ -1365,10 +1365,10 @@ function escHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&l
 function autoTitle(e){
   const d=new Date(e.ts);
   const proj=projects.find(p=>p.id===e.project);
-  const dateStr=d.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+  const dateStr=d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
   const timeStr=d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
-  const pfx=proj?proj.name+' · ':'';
-  return pfx+dateStr+' · '+timeStr;
+  const pfx=proj?proj.name:(settings.username||'Hum');
+  return pfx+' · '+dateStr+' · '+timeStr;
 }
 function isToday(ts){ const d=new Date(ts), n=new Date(); return d.toDateString()===n.toDateString(); }
 function dayKey(ts){ return new Date(ts).toDateString(); }
