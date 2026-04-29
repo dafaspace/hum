@@ -1576,7 +1576,7 @@ let settings=JSON.parse(localStorage.getItem(ST)||'{}');
 let pendingTranscript=null;
 let projects=JSON.parse(localStorage.getItem(PJ)||'[]');
 let layout=localStorage.getItem(LV)||'grid';
-let view='all', curEntry=null, pendingBlob=null, pendingDataUrl=null;
+let view='all', curEntry=null, pendingBlob=null, pendingDataUrl=null, pendingVideoBlob=null;
 let currentTags=[], selColor='#e8a87c';
 let mr=null, recChunks=[], recSec=0, recInterval=null;
 let dateFilter=null; // YYYY-MM-DD or null
@@ -1947,7 +1947,7 @@ function createClearBtn(){
   b.title='Remove media'; b.onclick=clearModalMedia; return b;
 }
 function clearModalMedia(){
-  pendingBlob=null; pendingDataUrl=null;
+  pendingBlob=null; pendingDataUrl=null; pendingVideoBlob=null;
   document.getElementById('modal-media-preview').style.display='none';
   document.getElementById('transcribe-row').style.display='none';
   document.getElementById('transcript-fg').style.display='none';
@@ -2051,7 +2051,7 @@ function cancelRecording(){
 function closeSave(){
   if(modalRecording) cancelModalAudio();
   document.getElementById('save-overlay').classList.remove('show');
-  pendingBlob=null; pendingDataUrl=null; pendingTranscript=null; editingId=null;
+  pendingBlob=null; pendingDataUrl=null; pendingVideoBlob=null; pendingTranscript=null; editingId=null;
   cameraReturnMode=null;
 }
 
@@ -2121,11 +2121,17 @@ async function confirmSave(){
   };
   const blobForWaveform=(type==='audio'&&pendingBlob)?pendingBlob:null;
   if(pendingBlob&&type==='audio'){ entry.data=await blobToDataUrl(pendingBlob); entry.mimeType=pendingBlob.type; }
-  if(pendingDataUrl&&(type==='photo'||type==='video')) entry.data=pendingDataUrl;
+  if(pendingDataUrl&&type==='photo') entry.data=pendingDataUrl;
+  if(pendingVideoBlob&&type==='video'){
+    entry.data=await blobToDataUrl(pendingVideoBlob);
+    entry.mimeType=pendingVideoBlob.type;
+  } else if(pendingDataUrl&&type==='video'){
+    entry.data=pendingDataUrl;
+  }
   const savedId=entry.id;
   entries.unshift(entry);
   persist(); closeSave(); render(); renderProjects(); renderHeatmap();
-  modalRecSec=0; pendingBlob=null; pendingDataUrl=null;
+  modalRecSec=0; pendingBlob=null; pendingDataUrl=null; pendingVideoBlob=null;
   toast('Saved');
   if(blobForWaveform){
     computeWaveform(blobForWaveform).then(waveform=>{
@@ -2292,27 +2298,24 @@ async function startCamVideo(){
   camMR.onstop=()=>{
     const mime=camMR.mimeType||'video/mp4';
     const blob=new Blob(camChunks,{type:mime});
+    pendingVideoBlob=blob; // keep blob for saving
     pendingDataUrl=null;
-    const fr=new FileReader();
-    fr.onload=ev=>{
-      pendingDataUrl=ev.target.result;
-      closeCamera();
-      if(document.getElementById('save-overlay').classList.contains('show')){
-        // return to already-open modal
-        document.getElementById('s-type').value='video';
-        document.getElementById('save-heading').textContent='Save video';
-        showModalMediaPreview('video',ev.target.result,null);
-      } else {
-        openSaveModal('video');
-      }
-      cameraReturnMode=null;
-    };
-    fr.readAsDataURL(blob);
+    const previewUrl=URL.createObjectURL(blob); // use object URL for playable preview
+    closeCamera();
+    if(document.getElementById('save-overlay').classList.contains('show')){
+      document.getElementById('s-type').value='video';
+      document.getElementById('save-heading').textContent='Save video';
+      showModalMediaPreview('video', previewUrl, blob);
+    } else {
+      openSaveModal('video');
+    }
+    cameraReturnMode=null;
   };
   camMR.start(500); // collect data every 500ms
   document.getElementById('cam-vid-btn').classList.add('recording');
+  // Hide shutter so user can't accidentally shoot a photo during video
   const shutter=document.querySelector('.cam-shutter');
-  if(shutter) shutter.classList.add('recording');
+  if(shutter) shutter.style.visibility='hidden';
   const timer=document.getElementById('cam-rec-timer');
   timer.classList.add('show');
   camTimer=setInterval(()=>{ camSec++; timer.textContent='● '+fmtDur(camSec); },1000);
@@ -2323,7 +2326,7 @@ function stopCamVideo(){
   const btn=document.getElementById('cam-vid-btn');
   if(btn) btn.classList.remove('recording');
   const shutter=document.querySelector('.cam-shutter');
-  if(shutter) shutter.classList.remove('recording');
+  if(shutter) shutter.style.visibility='';
   const timer=document.getElementById('cam-rec-timer');
   if(timer) timer.classList.remove('show');
 }
@@ -2625,11 +2628,17 @@ self.addEventListener('fetch', e => {
   );
 });
 `;
-  const swBlob = new Blob([swCode], {type: 'application/javascript'});
-  const swUrl  = URL.createObjectURL(swBlob);
-  navigator.serviceWorker.register(swUrl, {type: 'classic'})
-    .then(() => console.log('Hum SW registered'))
-    .catch(e => console.log('SW skipped (file://):', e.message));
+  const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+  if (isLocal) {
+    // On localhost: unregister any stale SWs so we always get fresh files
+    navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(r => r.unregister()));
+  } else {
+    const swBlob = new Blob([swCode], {type: 'application/javascript'});
+    const swUrl  = URL.createObjectURL(swBlob);
+    navigator.serviceWorker.register(swUrl, {type: 'classic'})
+      .then(() => {})
+      .catch(() => {});
+  }
 }
 </script>
 </body>
