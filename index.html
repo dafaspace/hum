@@ -40,29 +40,29 @@ document.head.appendChild(appleIcon);
 <link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&family=Geist:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
 :root {
-  --paper: #faf7f2;
-  --paper2: #f3eee5;
-  --paper3: #ebe5d9;
-  --paper4: #e0d9c9;
-  --ink: #2a2622;
-  --ink2: #6a635a;
-  --ink3: #a8a195;
-  --ink4: #d2ccbf;
-  --warm: #e8a87c;       /* peachy capture button */
-  --warm2: #d68f5e;
-  --warm-soft: #fae5d6;
-  --sage: #88a896;
-  --sage-soft: #e2ece6;
-  --rose: #c47878;
-  --rose-soft: #f5e0e0;
-  --plum: #9580a8;
-  --plum-soft: #ebe4f0;
-  --sky: #7fa0c0;
-  --sky-soft: #e0e9f2;
-  --sand: #c69968;
-  --sand-soft: #f3e7d4;
-  --moss: #94a878;
-  --moss-soft: #e8edd9;
+  --paper:  #F2F2F2;
+  --paper2: #EAE7E3;
+  --paper3: #E1DDD8;
+  --paper4: #D0C9C2;
+  --ink:  #432B29;
+  --ink2: #733F2C;
+  --ink3: #A8806E;
+  --ink4: #D5C4BB;
+  --warm:  #DEA97A;
+  --warm2: #C25E3D;
+  --warm-soft: rgba(222,169,122,0.16);
+  --rose:      #C25E3D;
+  --rose-soft: rgba(194,94,61,0.10);
+  --sage:      #733F2C;
+  --sage-soft: rgba(115,63,44,0.10);
+  --plum:      #DEA97A;
+  --plum-soft: rgba(222,169,122,0.12);
+  --sky:       #733F2C;
+  --sky-soft:  rgba(115,63,44,0.08);
+  --sand:      #DEA97A;
+  --sand-soft: rgba(222,169,122,0.14);
+  --moss:      #733F2C;
+  --moss-soft: rgba(115,63,44,0.10);
   --serif: 'Newsreader', Georgia, serif;
   --sans: 'Geist', system-ui, -apple-system, sans-serif;
   --r: 12px;
@@ -449,13 +449,13 @@ body {
   text-transform: lowercase;
 }
 .type-pill svg { width: 10px; height: 10px; }
-.tp-audio   { background: var(--rose-soft); color: #8a4a4a; }
-.tp-text    { background: var(--sage-soft); color: #4d6f5e; }
-.tp-idea    { background: var(--warm-soft); color: #966238; }
-.tp-dream   { background: var(--plum-soft); color: #6a5587; }
-.tp-photo   { background: var(--sky-soft); color: #4d6c8a; }
-.tp-video   { background: var(--moss-soft); color: #5e7548; }
-.tp-midi    { background: var(--sand-soft); color: #876538; }
+.tp-audio   { background: var(--rose-soft);  color: var(--rose); }
+.tp-text    { background: var(--sage-soft);  color: var(--sage); }
+.tp-idea    { background: var(--warm-soft);  color: var(--warm2); }
+.tp-dream   { background: var(--plum-soft);  color: var(--ink2); }
+.tp-photo   { background: var(--sky-soft);   color: var(--sky); }
+.tp-video   { background: var(--moss-soft);  color: var(--moss); }
+.tp-midi    { background: var(--sand-soft);  color: var(--ink2); }
 
 .card-preview {
   font-size: 13px; color: var(--ink2); line-height: 1.6;
@@ -775,6 +775,19 @@ body {
 .settings-card h3 { font-family: var(--serif); font-size: 20px; font-weight: 500; margin-bottom: 18px; letter-spacing: -0.01em; }
 .settings-hint { font-size: 11px; color: var(--ink3); margin-top: 6px; line-height: 1.6; }
 
+.bpm-row { display:flex; align-items:stretch; }
+.bpm-in { border-radius:0 !important; text-align:center; flex:1; min-width:0; }
+.bpm-adj {
+  width:34px; flex-shrink:0;
+  border:1px solid var(--paper4); background:var(--paper2);
+  color:var(--ink2); font-size:20px; font-weight:300; line-height:1;
+  cursor:pointer; transition:all 0.15s;
+  display:flex; align-items:center; justify-content:center;
+}
+.bpm-adj:first-child { border-radius:10px 0 0 10px; border-right:none; }
+.bpm-adj:last-child { border-radius:0 10px 10px 0; border-left:none; }
+.bpm-adj:hover { background:var(--paper3); color:var(--ink); }
+
 .transcript-loading {
   display: flex; align-items: center; gap: 8px;
   font-size: 12px; color: var(--ink3);
@@ -958,16 +971,16 @@ body {
     bottom: calc(28px + env(safe-area-inset-bottom));
     left: 50%; transform: translateX(-50%);
     width: 58px; height: 58px; border-radius: 50%;
-    background: var(--mob-ink);
+    background: var(--warm);
     border: none; cursor: pointer;
     align-items: center; justify-content: center;
-    color: #F2F2F2;
-    box-shadow: 0 4px 20px rgba(67,43,41,0.35);
+    color: white;
+    box-shadow: 0 4px 20px rgba(222,169,122,0.45);
     z-index: 60;
     transition: transform 0.18s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.18s;
   }
-  #mob-fab:hover { transform: translateX(-50%) scale(1.07); box-shadow: 0 6px 28px rgba(67,43,41,0.45); }
-  #mob-fab.recording { background: var(--mob-accent2); }
+  #mob-fab:hover { transform: translateX(-50%) scale(1.07); box-shadow: 0 6px 28px rgba(222,169,122,0.55); }
+  #mob-fab.recording { background: var(--warm2); box-shadow: 0 4px 20px rgba(194,94,61,0.45); }
 
   /* Padding at bottom so FAB doesn't cover last item */
   #content { padding-bottom: calc(100px + env(safe-area-inset-bottom)); }
@@ -1133,8 +1146,17 @@ audio { display: none; }
   <div class="save-card">
     <div class="save-heading" id="save-heading">Save capture</div>
     <div class="fg">
-      <label class="flabel">Title (optional)</label>
-      <input class="finput" id="s-name" type="text" placeholder="Auto-generated if blank">
+      <label class="flabel">Note</label>
+      <textarea class="ftextarea" id="s-note" placeholder="Describe the idea, the feeling, the context…" style="min-height:100px"></textarea>
+    </div>
+    <div class="fg" id="transcript-fg" style="display:none">
+      <label class="flabel">Transcript</label>
+      <div id="transcript-status"></div>
+      <textarea class="ftextarea" id="s-transcript" placeholder="Transcript will appear here…" style="display:none;margin-top:6px"></textarea>
+    </div>
+    <div class="fg">
+      <label class="flabel">Title <span style="color:var(--ink3);font-weight:300;text-transform:none;letter-spacing:0;font-size:10px">(optional — auto-generated if blank)</span></label>
+      <input class="finput" id="s-name" type="text" placeholder="Leave blank for auto title">
     </div>
     <div class="frow2">
       <div class="fg">
@@ -1155,24 +1177,74 @@ audio { display: none; }
       </div>
     </div>
     <div class="frow3">
-      <div class="fg"><label class="flabel">BPM</label><input class="finput" id="s-bpm" type="number" placeholder="120"></div>
-      <div class="fg"><label class="flabel">Key</label><input class="finput" id="s-key" type="text" placeholder="C min"></div>
-      <div class="fg"><label class="flabel">Mood</label><input class="finput" id="s-mood" type="text" placeholder="dark"></div>
+      <div class="fg">
+        <label class="flabel">BPM</label>
+        <div class="bpm-row">
+          <button class="bpm-adj" type="button" onclick="adjBpm(-5)">−</button>
+          <input class="finput bpm-in" id="s-bpm" type="number" placeholder="—" min="20" max="300">
+          <button class="bpm-adj" type="button" onclick="adjBpm(5)">+</button>
+        </div>
+      </div>
+      <div class="fg">
+        <label class="flabel">Key</label>
+        <select class="fselect" id="s-key">
+          <option value="">— none</option>
+          <option value="C maj">C major</option>
+          <option value="C# maj">C♯ major</option>
+          <option value="Db maj">D♭ major</option>
+          <option value="D maj">D major</option>
+          <option value="Eb maj">E♭ major</option>
+          <option value="E maj">E major</option>
+          <option value="F maj">F major</option>
+          <option value="F# maj">F♯ major</option>
+          <option value="Gb maj">G♭ major</option>
+          <option value="G maj">G major</option>
+          <option value="Ab maj">A♭ major</option>
+          <option value="A maj">A major</option>
+          <option value="Bb maj">B♭ major</option>
+          <option value="B maj">B major</option>
+          <option value="C min">C minor</option>
+          <option value="C# min">C♯ minor</option>
+          <option value="D min">D minor</option>
+          <option value="D# min">D♯ minor</option>
+          <option value="Eb min">E♭ minor</option>
+          <option value="E min">E minor</option>
+          <option value="F min">F minor</option>
+          <option value="F# min">F♯ minor</option>
+          <option value="G min">G minor</option>
+          <option value="G# min">G♯ minor</option>
+          <option value="Ab min">A♭ minor</option>
+          <option value="A min">A minor</option>
+          <option value="Bb min">B♭ minor</option>
+          <option value="B min">B minor</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label class="flabel">Mood</label>
+        <input class="finput" id="s-mood" type="text" list="mood-list" placeholder="dark">
+        <datalist id="mood-list">
+          <option value="dark">
+          <option value="bright">
+          <option value="melancholic">
+          <option value="dreamy">
+          <option value="tense">
+          <option value="warm">
+          <option value="cold">
+          <option value="playful">
+          <option value="ethereal">
+          <option value="raw">
+          <option value="cinematic">
+          <option value="intimate">
+          <option value="energetic">
+          <option value="peaceful">
+        </datalist>
+      </div>
     </div>
     <div class="fg">
       <label class="flabel">Tags</label>
       <div class="tags-wrap" id="tags-wrap" onclick="document.getElementById('tag-in').focus()">
         <input class="tinput" id="tag-in" placeholder="#tag…" onkeydown="handleTag(event)">
       </div>
-    </div>
-    <div class="fg">
-      <label class="flabel">Note</label>
-      <textarea class="ftextarea" id="s-note" placeholder="Describe the idea, the feeling, the context…"></textarea>
-    </div>
-    <div class="fg" id="transcript-fg" style="display:none">
-      <label class="flabel">Transcript</label>
-      <div id="transcript-status"></div>
-      <textarea class="ftextarea" id="s-transcript" placeholder="Transcript will appear here…" style="display:none;margin-top:6px"></textarea>
     </div>
     <div class="frow2">
       <div class="fg"><label class="flabel">Status</label>
@@ -1283,13 +1355,21 @@ let view='all', curEntry=null, pendingBlob=null, pendingDataUrl=null;
 let currentTags=[], selColor='#e8a87c';
 let mr=null, recChunks=[], recSec=0, recInterval=null;
 let dateFilter=null; // YYYY-MM-DD or null
+let editingId=null;
 
 function persist(){ localStorage.setItem(DB,JSON.stringify(entries)); localStorage.setItem(PJ,JSON.stringify(projects)); localStorage.setItem(LV,layout); }
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,5); }
 function fmtDate(ts){ const d=new Date(ts); return d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})+' · '+d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}); }
 function fmtDur(s){ return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
 function escHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-function autoTitle(e){ const d=new Date(e.ts); const pfx={audio:'Recording',text:'Note',idea:'Idea',dream:'Dream',photo:'Photo',video:'Video',midi:'MIDI'}[e.type]||'Capture'; return pfx+' · '+d.toLocaleDateString('en-GB',{day:'numeric',month:'short'}); }
+function autoTitle(e){
+  const d=new Date(e.ts);
+  const proj=projects.find(p=>p.id===e.project);
+  const dateStr=d.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+  const timeStr=d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  const pfx=proj?proj.name+' · ':'';
+  return pfx+dateStr+' · '+timeStr;
+}
 function isToday(ts){ const d=new Date(ts), n=new Date(); return d.toDateString()===n.toDateString(); }
 function dayKey(ts){ return new Date(ts).toDateString(); }
 function dateKey(ts){ const d=new Date(ts); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
@@ -1546,12 +1626,13 @@ async function startRecording(){
   }
   try{
     const stream=await navigator.mediaDevices.getUserMedia({audio:true});
-    recChunks=[]; recSec=0;
+    clearInterval(recInterval); recChunks=[]; recSec=0;
     mr=new MediaRecorder(stream);
     mr.ondataavailable=e=>recChunks.push(e.data);
     mr.onstop=async ()=>{
       stream.getTracks().forEach(t=>t.stop());
-      const blob=new Blob(recChunks,{type:'audio/webm'});
+      const mimeType=mr.mimeType||'audio/webm';
+      const blob=new Blob(recChunks,{type:mimeType});
       pendingBlob=blob; pendingTranscript=null;
       document.getElementById('rec-overlay').classList.remove('show');
       document.getElementById('capture-btn').classList.remove('recording');
@@ -1563,10 +1644,11 @@ async function startRecording(){
         pendingTranscript='';
         updateTranscriptUI('loading');
         try{ pendingTranscript=await whisperTranscribe(blob); updateTranscriptUI('done'); }
-        catch(e){ pendingTranscript=null; updateTranscriptUI('error'); }
+        catch(e){ pendingTranscript=null; updateTranscriptUI('error',e.message); }
       }
     };
     mr.start();
+    document.getElementById('rec-time').textContent='0:00';
     recInterval=setInterval(()=>{ recSec++; document.getElementById('rec-time').textContent=fmtDur(recSec); },1000);
     document.getElementById('rec-overlay').classList.add('show');
     document.getElementById('capture-btn').classList.add('recording');
@@ -1634,7 +1716,9 @@ function openSaveModal(type){
   setTimeout(()=>document.getElementById('s-name').focus(),80);
 }
 
-function closeSave(){ document.getElementById('save-overlay').classList.remove('show'); pendingBlob=null; pendingDataUrl=null; pendingTranscript=null; }
+function closeSave(){ document.getElementById('save-overlay').classList.remove('show'); pendingBlob=null; pendingDataUrl=null; pendingTranscript=null; editingId=null; }
+
+function adjBpm(d){ const el=document.getElementById('s-bpm'); const v=parseInt(el.value)||120; el.value=Math.max(20,Math.min(300,v+d)); }
 
 function handleTag(e){
   if(['Enter',' ',','].includes(e.key)){
@@ -1660,17 +1744,30 @@ async function confirmSave(){
   const note=document.getElementById('s-note').value.trim();
   const ta=document.getElementById('s-transcript');
   const transcript=(ta.style.display!=='none'?ta.value.trim():'')||null;
+  const bpm=document.getElementById('s-bpm').value?parseInt(document.getElementById('s-bpm').value):null;
+  const key=document.getElementById('s-key').value.trim()||null;
+  const mood=document.getElementById('s-mood').value.trim()||null;
+  const genre=document.getElementById('s-genre').value.trim()||null;
+  const status=document.getElementById('s-status').value;
+
+  if(editingId){
+    const idx=entries.findIndex(x=>x.id===editingId);
+    if(idx>=0){
+      entries[idx]={...entries[idx], type, name:name||null, project:proj||null,
+        note, tags:[...currentTags], bpm, key, mood, genre, status, transcript};
+    }
+    const eid=editingId;
+    persist(); closeSave(); render(); renderProjects(); renderHeatmap();
+    openDetail(eid);
+    toast('Updated');
+    return;
+  }
+
   const entry={
     id:uid(), ts:Date.now(), type,
     name:name||null, project:proj||null, note,
-    tags:[...currentTags],
-    bpm:document.getElementById('s-bpm').value?parseInt(document.getElementById('s-bpm').value):null,
-    key:document.getElementById('s-key').value.trim()||null,
-    mood:document.getElementById('s-mood').value.trim()||null,
-    genre:document.getElementById('s-genre').value.trim()||null,
-    status:document.getElementById('s-status').value,
-    duration:recSec||null,
-    transcript:transcript
+    tags:[...currentTags], bpm, key, mood, genre, status,
+    duration:recSec||null, transcript
   };
   if(pendingBlob&&type==='audio'){ entry.data=await blobToDataUrl(pendingBlob); entry.mimeType=pendingBlob.type; }
   if(pendingDataUrl&&(type==='photo'||type==='video')) entry.data=pendingDataUrl;
@@ -1718,7 +1815,10 @@ function openDetail(id){
   if(proj) metas.push(['Project',proj.name]);
   if(metas.length) h+=`<div class="dsec"><span class="dsec-label">Details</span><div class="meta-grid">${metas.map(([k,v])=>`<div class="meta-cell"><div class="meta-k">${k}</div><div class="meta-v">${escHtml(String(v))}</div></div>`).join('')}</div></div>`;
   if(e.tags&&e.tags.length) h+=`<div class="dsec"><span class="dsec-label">Tags</span><div class="dtags">${e.tags.map(t=>`<span class="card-tag">#${escHtml(t)}</span>`).join('')}</div></div>`;
-  h+=`<div style="margin-top:24px"><button onclick="delEntry('${e.id}')" style="width:100%;padding:10px;background:var(--rose-soft);border:1px solid #f0d0d0;border-radius:10px;font-family:var(--sans);font-size:12px;font-weight:400;color:var(--rose);cursor:pointer">Delete this capture</button></div>`;
+  h+=`<div style="margin-top:24px;display:flex;gap:8px">
+    <button onclick="editEntry('${e.id}')" style="flex:1;padding:10px;background:var(--warm-soft);border:1px solid var(--paper4);border-radius:10px;font-family:var(--sans);font-size:12px;font-weight:500;color:var(--ink2);cursor:pointer">Edit</button>
+    <button onclick="delEntry('${e.id}')" style="flex:1;padding:10px;background:var(--rose-soft);border:1px solid var(--paper4);border-radius:10px;font-family:var(--sans);font-size:12px;font-weight:400;color:var(--rose);cursor:pointer">Delete</button>
+  </div>`;
   body.innerHTML=h; panel.classList.add('open');
   const da=document.getElementById('da');
   if(da){
@@ -1731,6 +1831,37 @@ function togglePlay(){ const a=document.getElementById('da'),b=document.getEleme
 function seekA(ev){ const a=document.getElementById('da'); if(!a||!a.duration) return; const r=ev.currentTarget.getBoundingClientRect(); a.currentTime=((ev.clientX-r.left)/r.width)*a.duration; }
 function closeDetail(){ const a=document.getElementById('da'); if(a) a.pause(); document.getElementById('detail').classList.remove('open'); curEntry=null; }
 function delEntry(id){ if(!confirm('Delete this capture?')) return; entries=entries.filter(e=>e.id!==id); persist(); closeDetail(); render(); renderHeatmap(); toast('Deleted'); }
+
+function editEntry(id){
+  const e=entries.find(x=>x.id===id); if(!e) return;
+  editingId=id;
+  currentTags=[...(e.tags||[])]; renderTags();
+  document.getElementById('s-name').value=e.name||'';
+  document.getElementById('s-note').value=e.note||e.text||'';
+  document.getElementById('s-bpm').value=e.bpm||'';
+  document.getElementById('s-key').value=e.key||'';
+  document.getElementById('s-mood').value=e.mood||'';
+  document.getElementById('s-genre').value=e.genre||'';
+  document.getElementById('s-status').value=e.status||'raw';
+  document.getElementById('s-type').value=e.type;
+  const sel=document.getElementById('s-proj');
+  sel.innerHTML='<option value="">— Inbox</option>'+projects.map(p=>`<option value="${p.id}">${escHtml(p.name)}</option>`).join('');
+  sel.value=e.project||'';
+  if(e.transcript){
+    document.getElementById('transcript-fg').style.display='';
+    document.getElementById('s-transcript').style.display='';
+    document.getElementById('s-transcript').value=e.transcript||'';
+    document.getElementById('transcript-status').innerHTML='';
+  } else {
+    document.getElementById('transcript-fg').style.display='none';
+    document.getElementById('transcript-status').innerHTML='';
+    document.getElementById('s-transcript').style.display='none';
+    document.getElementById('s-transcript').value='';
+  }
+  document.getElementById('save-heading').textContent='Edit capture';
+  document.getElementById('save-overlay').classList.add('show');
+  setTimeout(()=>document.getElementById('s-note').focus(),80);
+}
 
 function renderProjects(){
   document.getElementById('proj-list').innerHTML=projects.map(p=>{
@@ -1837,18 +1968,25 @@ function saveSettings(){
 // ── WHISPER ──
 async function whisperTranscribe(blob){
   const fd=new FormData();
-  fd.append('file',blob,'recording.webm');
+  const mt=blob.type||'audio/webm';
+  const ext=mt.includes('ogg')?'ogg':mt.includes('mp4')||mt.includes('m4a')?'mp4':'webm';
+  fd.append('file',blob,`recording.${ext}`);
   fd.append('model','whisper-1');
   const resp=await fetch('https://api.openai.com/v1/audio/transcriptions',{
     method:'POST',
     headers:{'Authorization':'Bearer '+settings.openaiKey},
     body:fd
   });
-  if(!resp.ok) throw new Error(await resp.text());
+  if(!resp.ok){
+    const errText=await resp.text();
+    let errMsg='API error';
+    try{ errMsg=JSON.parse(errText).error?.message||errText; }catch(_){}
+    throw new Error(errMsg);
+  }
   return (await resp.json()).text||'';
 }
 
-function updateTranscriptUI(state){
+function updateTranscriptUI(state, errMsg){
   const fg=document.getElementById('transcript-fg');
   const status=document.getElementById('transcript-status');
   const ta=document.getElementById('s-transcript');
@@ -1856,13 +1994,13 @@ function updateTranscriptUI(state){
   if(state==='loading'){
     fg.style.display=''; status.innerHTML='<div class="transcript-loading"><div class="transcript-dot"></div>Transcribing…</div>'; ta.style.display='none';
   } else if(state==='error'){
-    fg.style.display=''; status.innerHTML='<div class="transcript-error">Transcription failed. You can type it manually.</div>'; ta.style.display='';
+    const msg=errMsg?`Transcription failed: ${errMsg}`:'Transcription failed. You can type it manually.';
+    fg.style.display=''; status.innerHTML=`<div class="transcript-error">${escHtml(msg)}<br><span style="opacity:0.7;font-size:11px">You can type the transcript manually below</span></div>`; ta.style.display='';
   } else if(state==='done'){
     fg.style.display=''; status.innerHTML=''; ta.style.display=''; ta.value=pendingTranscript||'';
   }
 }
 
-seed();
 if(window.innerWidth <= 680 && layout === 'grid') layout = 'stream';
 setLayout(layout);
 renderProjects();
