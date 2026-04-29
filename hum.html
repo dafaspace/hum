@@ -1592,7 +1592,7 @@ function streamItemHtml(e){
   ].filter(Boolean).join('');
   return `<div class="stream-entry" onclick="openDetail('${e.id}')">${acc}
     <div class="stream-time">${time}${proj?` · <span style="color:${proj.color}">●</span> ${escHtml(proj.name)}`:''} ${tpill}</div>
-    ${e.name?`<div class="stream-entry-title">${escHtml(e.name)}</div>`:''}
+    <div class="stream-entry-title">${escHtml(e.name||autoTitle(e))}</div>
     ${body}
     ${txt?`<div class="stream-entry-body">${escHtml(txt)}</div>`:''}
     ${foot?`<div class="stream-entry-foot">${foot}</div>`:''}
