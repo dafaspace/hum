@@ -808,6 +808,58 @@ body {
   border-radius: 10px;
 }
 
+/* ── CAMERA ── */
+#cam-overlay {
+  position: fixed; inset: 0; z-index: 120;
+  background: #000;
+  display: none; flex-direction: column;
+}
+#cam-overlay.show { display: flex; }
+.cam-card { display: flex; flex-direction: column; height: 100%; }
+.cam-top {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px; padding-top: calc(16px + env(safe-area-inset-top));
+  position: absolute; top: 0; left: 0; right: 0; z-index: 2;
+}
+.cam-label { font-family: var(--sans); font-size: 14px; font-weight: 500; color: white; }
+.cam-close {
+  width: 32px; height: 32px; border-radius: 50%;
+  background: rgba(255,255,255,0.15); border: none;
+  cursor: pointer; color: white;
+  display: flex; align-items: center; justify-content: center;
+}
+.cam-video-wrap { flex: 1; position: relative; overflow: hidden; }
+#cam-video { width: 100%; height: 100%; object-fit: cover; }
+.cam-controls {
+  display: flex; align-items: center; justify-content: space-around;
+  padding: 24px 40px; padding-bottom: calc(24px + env(safe-area-inset-bottom));
+  background: #000;
+}
+.cam-shutter {
+  width: 68px; height: 68px; border-radius: 50%;
+  border: 4px solid white; background: white;
+  cursor: pointer; transition: transform 0.12s;
+  box-shadow: 0 0 0 3px rgba(255,255,255,0.3);
+}
+.cam-shutter:active { transform: scale(0.92); }
+.cam-shutter.recording { background: var(--rose); border-color: var(--rose); animation: rec-pulse 1.4s ease-in-out infinite; }
+.cam-flip, .cam-video-btn {
+  width: 44px; height: 44px; border-radius: 50%;
+  background: rgba(255,255,255,0.15); border: none;
+  cursor: pointer; color: white;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s;
+}
+.cam-flip:hover, .cam-video-btn:hover { background: rgba(255,255,255,0.25); }
+.cam-video-btn.recording { background: var(--rose); }
+.cam-rec-timer {
+  position: absolute; top: 60px; left: 50%; transform: translateX(-50%);
+  background: rgba(0,0,0,0.5); color: white; padding: 4px 12px;
+  border-radius: 100px; font-size: 13px; font-variant-numeric: tabular-nums;
+  display: none;
+}
+.cam-rec-timer.show { display: block; }
+
 /* ── SIDEBAR CLOSE BTN (always in DOM, hidden on desktop) ── */
 .sidebar-close-btn {
   display: none;
@@ -1057,9 +1109,14 @@ audio { display: none; }
         <span class="brand">hum</span>
         <span class="brand-dot"></span>
       </div>
-      <button class="mob-settings-btn" onclick="openSettings()" title="Settings">
-        <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><line x1="3" y1="6" x2="17" y2="6"/><line x1="3" y1="10" x2="17" y2="10"/><line x1="3" y1="14" x2="17" y2="14"/><circle cx="7" cy="6" r="2" fill="var(--mob-bg)"/><circle cx="13" cy="10" r="2" fill="var(--mob-bg)"/><circle cx="8" cy="14" r="2" fill="var(--mob-bg)"/></svg>
-      </button>
+      <div style="display:flex;align-items:center;gap:4px">
+        <button class="mob-settings-btn" onclick="openCamera()" title="Camera">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        </button>
+        <button class="mob-settings-btn" onclick="openSettings()" title="Settings">
+          <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><line x1="3" y1="6" x2="17" y2="6"/><line x1="3" y1="10" x2="17" y2="10"/><line x1="3" y1="14" x2="17" y2="14"/><circle cx="7" cy="6" r="2" fill="var(--mob-bg)"/><circle cx="13" cy="10" r="2" fill="var(--mob-bg)"/><circle cx="8" cy="14" r="2" fill="var(--mob-bg)"/></svg>
+        </button>
+      </div>
     </div>
     <div class="layout-tabs">
       <button class="layout-tab active" id="vt-grid" onclick="setLayout('grid')" title="Grid">
@@ -1092,13 +1149,20 @@ audio { display: none; }
       </div>
       <textarea id="quick-input" placeholder="A thought, a lyric, a plan, a memory… press Enter to save" onkeydown="handleTextEnter(event)"></textarea>
       <div class="attach-row">
+        <button class="attach-btn" onclick="openCamera()">
+          <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round">
+            <rect x="1.5" y="2.5" width="11" height="9" rx="1.5"/>
+            <circle cx="7" cy="7" r="2"/>
+          </svg>
+          Camera
+        </button>
         <button class="attach-btn" onclick="openFile('image/*,video/*')">
           <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round">
             <rect x="1.5" y="2.5" width="11" height="9" rx="1.5"/>
             <circle cx="5" cy="6" r="1"/>
             <path d="M1.5 10l3-3 2 2 3-3 3 3"/>
           </svg>
-          Photo / Video
+          Library
         </button>
         <button class="attach-btn" onclick="openSaveModal('midi')">
           <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4">
@@ -1354,6 +1418,32 @@ audio { display: none; }
     <path d="M5 12a7 7 0 0014 0M12 19v3M8 22h8"/>
   </svg>
 </button>
+
+<!-- CAMERA -->
+<div id="cam-overlay">
+  <div class="cam-card">
+    <div class="cam-top">
+      <span class="cam-label">Camera</span>
+      <button class="cam-close" onclick="closeCamera()">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg>
+      </button>
+    </div>
+    <div class="cam-video-wrap">
+      <video id="cam-video" autoplay playsinline muted></video>
+      <canvas id="cam-canvas" style="display:none"></canvas>
+      <div class="cam-rec-timer" id="cam-rec-timer">● 0:00</div>
+    </div>
+    <div class="cam-controls">
+      <button class="cam-flip" onclick="flipCamera()" title="Flip camera">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M1 4v6h6M23 20v-6h-6"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10M23 14l-4.64 4.36A9 9 0 013.51 15"/></svg>
+      </button>
+      <button class="cam-shutter" onclick="shootPhoto()"></button>
+      <button class="cam-video-btn" id="cam-vid-btn" onclick="toggleCamVideo()" title="Record video">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="2" y="6" width="13" height="12" rx="2"/><path d="M22 8l-5 4 5 4V8"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
 
 <div id="toast"></div>
 <div id="hm-tooltip" class="hm-tooltip"></div>
@@ -1907,6 +1997,82 @@ function handleAttach(input){
   };
   r.readAsDataURL(file);
   input.value='';
+}
+
+// ── CAMERA ──
+let camStream=null, camFacing='environment', camMR=null, camChunks=[], camSec=0, camTimer=null;
+
+async function openCamera(){
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ toast('Camera not available'); return; }
+  document.getElementById('cam-overlay').classList.add('show');
+  await startCamStream();
+}
+async function startCamStream(){
+  if(camStream) camStream.getTracks().forEach(t=>t.stop());
+  try{
+    camStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:camFacing},audio:false});
+    document.getElementById('cam-video').srcObject=camStream;
+  }catch(e){ toast('Camera access denied'); closeCamera(); }
+}
+function closeCamera(){
+  if(camStream) camStream.getTracks().forEach(t=>t.stop());
+  camStream=null;
+  if(camMR&&camMR.state==='recording'){ camMR.stop(); clearInterval(camTimer); }
+  camMR=null; camChunks=[];
+  document.getElementById('cam-overlay').classList.remove('show');
+  document.getElementById('cam-rec-timer').classList.remove('show');
+  document.getElementById('cam-video').srcObject=null;
+}
+async function flipCamera(){
+  camFacing=camFacing==='environment'?'user':'environment';
+  await startCamStream();
+}
+function shootPhoto(){
+  const video=document.getElementById('cam-video');
+  const canvas=document.getElementById('cam-canvas');
+  canvas.width=video.videoWidth; canvas.height=video.videoHeight;
+  canvas.getContext('2d').drawImage(video,0,0);
+  const dataUrl=canvas.toDataURL('image/jpeg',0.9);
+  pendingDataUrl=dataUrl;
+  closeCamera();
+  openSaveModal('photo');
+}
+function toggleCamVideo(){
+  if(camMR&&camMR.state==='recording'){ stopCamVideo(); return; }
+  startCamVideo();
+}
+async function startCamVideo(){
+  if(!camStream) return;
+  // get audio too
+  let fullStream=camStream;
+  try{
+    const audio=await navigator.mediaDevices.getUserMedia({audio:true});
+    fullStream=new MediaStream([...camStream.getTracks(),...audio.getTracks()]);
+  }catch(_){}
+  camChunks=[]; camSec=0;
+  camMR=new MediaRecorder(fullStream);
+  camMR.ondataavailable=e=>camChunks.push(e.data);
+  camMR.onstop=()=>{
+    const blob=new Blob(camChunks,{type:camMR.mimeType||'video/webm'});
+    pendingDataUrl=null;
+    // store as data url
+    const fr=new FileReader(); fr.onload=ev=>{ pendingDataUrl=ev.target.result; openSaveModal('video'); }; fr.readAsDataURL(blob);
+    closeCamera();
+  };
+  camMR.start();
+  const btn=document.getElementById('cam-vid-btn');
+  btn.classList.add('recording');
+  document.getElementById('cam-shutter')?document.querySelector('.cam-shutter').classList.add('recording'):null;
+  const timer=document.getElementById('cam-rec-timer');
+  timer.classList.add('show');
+  camTimer=setInterval(()=>{ camSec++; timer.textContent='● '+fmtDur(camSec); },1000);
+}
+function stopCamVideo(){
+  if(camMR&&camMR.state==='recording') camMR.stop();
+  clearInterval(camTimer);
+  document.getElementById('cam-vid-btn').classList.remove('recording');
+  document.querySelector('.cam-shutter').classList.remove('recording');
+  document.getElementById('cam-rec-timer').classList.remove('show');
 }
 
 function editEntry(id){
