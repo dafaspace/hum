@@ -1181,6 +1181,8 @@ button, .nav-item, .card, .stream-entry, .hm-cell {
 }
 audio { display: none; }
 </style>
+<!-- lamejs: pure-JS MP3 encoder (~50KB, MIT) — used for MP3 320 / 128 export -->
+<script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js"></script>
 </head>
 <body>
 <div id="app">
@@ -1517,12 +1519,14 @@ audio { display: none; }
       <input class="finput" id="username" type="text" placeholder="e.g. dafa" autocomplete="name">
     </div>
     <div class="fg">
-      <label class="flabel">Recording format</label>
+      <label class="flabel">Audio format</label>
       <select class="fselect" id="rec-format">
-        <option value="webm">WebM (default · smaller file)</option>
-        <option value="wav">WAV (lossless · larger file)</option>
+        <option value="mp3-320">MP3 320 kbps · ~2.4 MB/min · default</option>
+        <option value="mp3-128">MP3 128 kbps · ~1 MB/min · voice memos</option>
+        <option value="wav">WAV 16/48 · lossless · ~5.5 MB/min</option>
+        <option value="native">Native (no encoding · fastest, .webm/.m4a)</option>
       </select>
-      <div class="settings-hint">WAV is converted after recording stops — may take a moment for long recordings.</div>
+      <div class="settings-hint">MP3 and WAV are encoded after recording stops — takes 1-3s per minute. All three open in any DAW.</div>
     </div>
     <div class="fg">
       <label class="flabel">OpenAI API Key</label>
@@ -1982,12 +1986,21 @@ async function toggleModalAudio(){
       if(!recChunks.length) return;
       const mimeType=mr.mimeType||'audio/webm';
       let blob=new Blob(recChunks,{type:mimeType});
-      if(settings.recFormat==='wav'){
-        document.getElementById('transcript-fg').style.display='';
-        document.getElementById('transcript-status').innerHTML='<div class="transcript-loading"><div class="transcript-dot"></div>Converting to WAV…</div>';
-        try{ blob=await convertToWav(blob); }catch(_){}
-        document.getElementById('transcript-fg').style.display='none';
-        document.getElementById('transcript-status').innerHTML='';
+      // Encode to chosen format. Default = MP3 320 (universal + DAW-friendly).
+      const fmt=settings.recFormat||'mp3-320';
+      if(fmt!=='native'){
+        const status=document.getElementById('transcript-status');
+        const labels={'mp3-320':'Encoding MP3 320…','mp3-128':'Encoding MP3 128…','wav':'Converting to WAV…'};
+        if(status) status.textContent=labels[fmt]||'Encoding…';
+        try{
+          if(fmt==='wav') blob=await convertToWav(blob);
+          else if(fmt==='mp3-320') blob=await encodeMp3(blob,320);
+          else if(fmt==='mp3-128') blob=await encodeMp3(blob,128);
+        }catch(err){
+          toast('Encoding failed — saving original');
+          console.warn('encode error',err);
+        }
+        if(status) status.textContent='';
       }
       pendingBlob=blob;
       document.getElementById('s-type').value='audio';
@@ -2587,10 +2600,20 @@ function toggleCamVideo(){
 async function startCamVideo(){
   if(!camStream) return;
   camChunks=[]; camSec=0;
-  // Try preferred MIME types in order of iOS/Chrome compatibility
-  const mimeTypes=['video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm',''];
+  // Prefer MP4 (universal: iOS Safari native, Chrome since 2022, opens in
+  // QuickTime / Premiere / Final Cut). Fall back to WebM only if MP4 unavailable.
+  const mimeTypes=[
+    'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
+    'video/mp4;codecs=h264,aac',
+    'video/mp4',
+    'video/webm;codecs=vp9,opus',
+    'video/webm;codecs=vp8,opus',
+    'video/webm',
+    ''
+  ];
   let mr=null;
   for(const mt of mimeTypes){
+    if(mt && typeof MediaRecorder.isTypeSupported==='function' && !MediaRecorder.isTypeSupported(mt)) continue;
     try{ mr=new MediaRecorder(camStream,mt?{mimeType:mt}:{}); break; }catch(_){}
   }
   if(!mr){ toast('Video recording not supported on this device'); return; }
@@ -2719,7 +2742,7 @@ async function expAudio(){
     const r=await fetch(curEntry.data); blob=await r.blob(); mime=blob.type;
   }
   if(!blob){ toast('No media stored'); return; }
-  const ext=mime.includes('wav')?'wav':mime.includes('ogg')?'ogg':mime.includes('mp4')?'mp4':mime.includes('image')?(mime.includes('png')?'png':'jpg'):'webm';
+  const ext=mime.includes('mpeg')||mime.includes('mp3')?'mp3':mime.includes('wav')?'wav':mime.includes('ogg')?'ogg':mime.includes('mp4')||mime.includes('m4a')?(mime.startsWith('audio')?'m4a':'mp4'):mime.includes('image')?(mime.includes('png')?'png':'jpg'):mime.includes('webm')&&mime.startsWith('audio')?'webm':mime.includes('webm')?'webm':'bin';
   const u=URL.createObjectURL(blob), a=document.createElement('a');
   a.href=u; a.download=(curEntry.name||autoTitle(curEntry))+'.'+ext; a.click();
   setTimeout(()=>URL.revokeObjectURL(u),1000);
@@ -2785,7 +2808,7 @@ function seed(){
 function openSettings(){
   document.getElementById('username').value=settings.username||'';
   document.getElementById('openai-key').value=settings.openaiKey||'';
-  document.getElementById('rec-format').value=settings.recFormat||'webm';
+  document.getElementById('rec-format').value=settings.recFormat||'mp3-320';
   document.getElementById('settings-overlay').classList.add('show');
   setTimeout(()=>document.getElementById('username').focus(),80);
 }
@@ -2868,11 +2891,48 @@ async function convertToWav(webmBlob){
   return audioBufferToWav(audioBuf);
 }
 
+// MP3 encoder via lamejs. bitrate: 320 (high) or 128 (compact). Mono encoded
+// (humming/voice doesn't benefit from stereo and halves file size).
+async function encodeMp3(blob, bitrate){
+  if(typeof lamejs==='undefined') throw new Error('MP3 encoder not loaded');
+  const ab=await blob.arrayBuffer();
+  const ctx=new AudioContext();
+  const audioBuf=await ctx.decodeAudioData(ab);
+  await ctx.close();
+  // Mix down to mono
+  const numCh=audioBuf.numberOfChannels;
+  const len=audioBuf.length;
+  const sr=audioBuf.sampleRate;
+  const mono=new Float32Array(len);
+  if(numCh===1){ mono.set(audioBuf.getChannelData(0)); }
+  else {
+    const L=audioBuf.getChannelData(0), R=audioBuf.getChannelData(1);
+    for(let i=0;i<len;i++) mono[i]=(L[i]+R[i])/2;
+  }
+  // Convert to 16-bit PCM
+  const pcm=new Int16Array(len);
+  for(let i=0;i<len;i++){
+    const s=Math.max(-1,Math.min(1,mono[i]));
+    pcm[i]=s<0?s*0x8000:s*0x7FFF;
+  }
+  const enc=new lamejs.Mp3Encoder(1, sr, bitrate||320);
+  const chunks=[];
+  const blockSize=1152;
+  for(let i=0;i<pcm.length;i+=blockSize){
+    const slice=pcm.subarray(i, Math.min(i+blockSize, pcm.length));
+    const buf=enc.encodeBuffer(slice);
+    if(buf.length>0) chunks.push(buf);
+  }
+  const tail=enc.flush();
+  if(tail.length>0) chunks.push(tail);
+  return new Blob(chunks, {type:'audio/mpeg'});
+}
+
 // ── WHISPER ──
 async function whisperTranscribe(blob){
   const fd=new FormData();
   const mt=blob.type||'audio/webm';
-  const ext=mt.includes('ogg')?'ogg':mt.includes('mp4')||mt.includes('m4a')?'mp4':'webm';
+  const ext=mt.includes('mpeg')||mt.includes('mp3')?'mp3':mt.includes('wav')?'wav':mt.includes('ogg')?'ogg':mt.includes('mp4')||mt.includes('m4a')?'mp4':'webm';
   fd.append('file',blob,`recording.${ext}`);
   fd.append('model','whisper-1');
   const resp=await fetch('https://api.openai.com/v1/audio/transcriptions',{
