@@ -1768,11 +1768,15 @@ function gdRequestToken(){
   });
 }
 async function gdAuth(){ if(gdTokenValid()) return _gdToken; return gdRequestToken(); }
-async function gdFetch(url,opts={}){
+async function gdFetch(url,opts={},timeoutMs=30000){
   const token=await gdAuth();
-  const r=await fetch(url,{...opts,headers:{Authorization:`Bearer ${token}`,...(opts.headers||{})}});
-  if(!r.ok){ const t=await r.text(); throw new Error(`Drive ${r.status}: ${t.slice(0,120)}`); }
-  return r;
+  const ctrl=new AbortController();
+  const timer=setTimeout(()=>ctrl.abort(),timeoutMs);
+  try{
+    const r=await fetch(url,{...opts,signal:ctrl.signal,headers:{Authorization:`Bearer ${token}`,...(opts.headers||{})}});
+    if(!r.ok){ const t=await r.text(); throw new Error(`Drive ${r.status}: ${t.slice(0,120)}`); }
+    return r;
+  }finally{ clearTimeout(timer); }
 }
 async function gdFindOrCreateFolder(name,parentId){
   const parentQ=parentId?` and '${parentId}' in parents`:'';
@@ -1831,26 +1835,37 @@ function fmtRelTime(ts){
   if(d<86400000) return Math.floor(d/3600000)+'h ago';
   return new Date(ts).toLocaleDateString();
 }
-async function gdPushCore(){
+async function gdPushCore(onProgress){
   await gdEnsureFolders();
+  // 1. Metadata (fast — two small JSON files)
   const idx=entries.map(e=>{ const c={...e}; c.data=null; return c; });
   await gdUpsertJson('_index.json',idx,_gdVaultId);
   await gdUpsertJson('projects.json',projects,_gdVaultId);
-  for(const e of entries){
-    if(!e.hasMedia) continue;
-    const rec=await idbGet(e.id); if(!rec?.blob) continue;
+  // 2. Media blobs (one per entry, potentially large)
+  const mediaEntries=entries.filter(e=>e.hasMedia);
+  let done=0;
+  for(const e of mediaEntries){
+    const rec=await idbGet(e.id); if(!rec?.blob) { done++; continue; }
     const ext=extFromMime(rec.mimeType||e.mimeType||'');
     await gdUpsertBlob(`${e.id}.${ext}`,rec.blob,rec.mimeType||e.mimeType||'application/octet-stream',_gdMediaId);
+    done++;
+    if(onProgress) onProgress(done,mediaEntries.length);
   }
   settings.gdLastSync=Date.now(); localStorage.setItem(ST,JSON.stringify(settings));
 }
 async function gdPush(){
   const btn=document.getElementById('gd-push-btn');
-  if(btn){ btn.disabled=true; btn.textContent='Pushing…'; }
+  const setLabel=t=>{ if(btn){ btn.disabled=true; btn.textContent=t; } };
+  setLabel('Pushing…');
   try{
-    await gdEnsureFolders(); await gdPushCore();
+    await gdEnsureFolders();
+    const total=entries.filter(e=>e.hasMedia).length;
+    await gdPushCore(total>0?(done,n)=>setLabel(`Uploading ${done}/${n}…`):null);
     updateGdStatus(); toast('Synced to Google Drive ✓');
-  }catch(e){ toast('Push failed: '+e.message); }
+  }catch(e){
+    const msg=e.name==='AbortError'?'Request timed out — check connection':e.message;
+    toast('Push failed: '+msg);
+  }
   finally{ if(btn){ btn.disabled=false; btn.textContent='Push to Drive'; } }
 }
 async function gdPull(){
@@ -1868,7 +1883,10 @@ async function gdPull(){
     persist(); render(); renderHeatmap();
     settings.gdLastSync=Date.now(); localStorage.setItem(ST,JSON.stringify(settings));
     updateGdStatus(); toast('Pulled from Google Drive ✓');
-  }catch(e){ toast('Pull failed: '+e.message); }
+  }catch(e){
+    const msg=e.name==='AbortError'?'Request timed out':e.message;
+    toast('Pull failed: '+msg);
+  }
   finally{ if(btn){ btn.disabled=false; btn.textContent='Pull from Drive'; } }
 }
 async function gdConnect(){
