@@ -1376,6 +1376,14 @@ audio { display: none; }
         <span id="transcribe-label">Transcribe</span>
       </button>
     </div>
+    <!-- Transcript result box (shown after Whisper returns) -->
+    <div id="transcript-box" style="display:none;margin-top:8px;background:var(--paper2);border-radius:10px;padding:10px 12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <span style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink3);font-weight:500">Transcript</span>
+        <button onclick="transcriptToNote()" style="font-size:11px;padding:3px 9px;border-radius:6px;border:1px solid var(--paper4);background:var(--paper3);color:var(--ink2);cursor:pointer;font-family:var(--sans)">→ Note</button>
+      </div>
+      <div id="transcript-text" style="font-size:13px;color:var(--ink2);line-height:1.7;white-space:pre-wrap"></div>
+    </div>
     <!-- transcript-fg kept for WAV conversion status only, always hidden -->
     <div id="transcript-fg" style="display:none">
       <div id="transcript-status-wav"></div>
@@ -2241,7 +2249,7 @@ async function toggleModalAudio(){
     toast('Audio requires HTTPS or local install'); return;
   }
   try{
-    const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    const stream=await navigator.mediaDevices.getUserMedia({audio:{noiseSuppression:false,echoCancellation:false,autoGainControl:false}});
     modalRecStream=stream;
     clearInterval(modalRecInterval); recChunks=[]; modalRecSec=0;
     mr=new MediaRecorder(stream);
@@ -2407,6 +2415,8 @@ function clearModalMedia(){
   document.getElementById('transcript-fg').style.display='none';
   document.getElementById('transcript-status').innerHTML='';
   document.getElementById('s-transcript').value=''; document.getElementById('s-transcript').style.display='none';
+  const _tb=document.getElementById('transcript-box'); if(_tb) _tb.style.display='none';
+  const _tt=document.getElementById('transcript-text'); if(_tt) _tt.textContent='';
   // reset type to idea
   document.getElementById('s-type').value='idea';
   document.getElementById('s-bpm').value='';
@@ -2744,7 +2754,7 @@ function openDetail(id){
     const secLabel=mediaItems.length>1?`Media (${mediaItems.length})`:(mediaItems[0].type==='audio'?'Recording':mediaItems[0].type==='photo'?'Photo':'Video');
     h+=`<div class="dsec"><span class="dsec-label">${secLabel}</span>${mh}</div>`;
   }
-  if(e.transcript) h+=`<div class="dsec"><span class="dsec-label">Transcript</span><div class="detail-text">${escHtml(e.transcript)}</div></div>`;
+  if(e.transcript) h+=`<div class="dsec"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><span class="dsec-label" style="margin-bottom:0">Transcript</span><button onclick="navigator.clipboard.writeText(${JSON.stringify(e.transcript)}).then(()=>toast('Copied'))" style="font-size:11px;padding:3px 9px;border-radius:6px;border:1px solid var(--paper4);background:var(--paper2);color:var(--ink2);cursor:pointer;font-family:var(--sans)">Copy</button></div><div class="detail-text">${escHtml(e.transcript)}</div></div>`;
   if(e.note||e.text) h+=`<div class="dsec"><span class="dsec-label">Note</span><div class="detail-text">${escHtml(e.note||e.text)}</div></div>`;
   const metas=[];
   const proj=projects.find(p=>p.id===e.project);
@@ -2915,6 +2925,10 @@ async function shootPhoto(){
     await _attachBlobToEntry(curEntry.id, blob, 'image/jpeg', 'photo');
     return;
   }
+  // If save modal already has media, warn and attach after saving
+  if(document.getElementById('save-overlay').classList.contains('show')&&(pendingBlob||pendingDataUrl||pendingVideoBlob)){
+    toast('Save this entry first — then use Add media for more files'); return;
+  }
   pendingDataUrl=dataUrl;
   if(document.getElementById('save-overlay').classList.contains('show')){
     document.getElementById('s-type').value='photo';
@@ -2960,6 +2974,9 @@ async function startCamVideo(){
     if(curEntry && !cameraReturnMode && !document.getElementById('save-overlay').classList.contains('show')){
       await _attachBlobToEntry(curEntry.id, blob, mime, 'video');
       return;
+    }
+    if(document.getElementById('save-overlay').classList.contains('show')&&(pendingBlob||pendingDataUrl||pendingVideoBlob)){
+      toast('Save this entry first — then use Add media for more files'); return;
     }
     pendingVideoBlob=blob;
     pendingDataUrl=null;
@@ -3293,23 +3310,28 @@ async function whisperTranscribe(blob){
 
 function updateTranscriptUI(state, errMsg){
   const status=document.getElementById('transcript-status');
+  const box=document.getElementById('transcript-box');
+  const txt=document.getElementById('transcript-text');
   if(state==='loading'){
     if(status) status.textContent='Transcribing…';
+    if(box) box.style.display='none';
   } else if(state==='error'){
     if(status) status.textContent='';
     toast(errMsg?'Transcription failed: '+errMsg:'Transcription failed');
   } else if(state==='done'){
     if(status) status.textContent='';
-    // Put transcript directly into note textarea
-    if(pendingTranscript){
-      const note=document.getElementById('s-note');
-      note.value=note.value.trim()
-        ? note.value.trim()+'\n\n'+pendingTranscript
-        : pendingTranscript;
-      // auto-grow the textarea to show content
-      note.style.minHeight=Math.max(120, note.scrollHeight)+'px';
+    if(pendingTranscript&&box&&txt){
+      txt.textContent=pendingTranscript;
+      box.style.display='';
     }
   }
+}
+function transcriptToNote(){
+  if(!pendingTranscript) return;
+  const note=document.getElementById('s-note'); if(!note) return;
+  note.value=note.value.trim()?note.value.trim()+'\n\n'+pendingTranscript:pendingTranscript;
+  note.style.minHeight=Math.max(120,note.scrollHeight)+'px';
+  toast('Transcript added to note');
 }
 
 if(window.innerWidth <= 680 && layout === 'grid') layout = 'stream';
