@@ -1770,7 +1770,9 @@ function migrateMediaArray(){
 
 // ── GOOGLE DRIVE SYNC ──
 const GD_SCOPE='https://www.googleapis.com/auth/drive.file';
-let _gdToken=null, _gdTokenExp=0, _gdVaultId=null, _gdMediaId=null;
+let _gdToken=null, _gdTokenExp=0, _gdVaultId=null;
+let _gdInboxId=null, _gdProjectsRootId=null;
+const _gdProjectFolderIds=new Map(); // projectId → Drive folder id
 
 function loadGsi(){
   if(document.getElementById('gsi-script')) return;
@@ -1839,8 +1841,53 @@ async function gdUpsertBlob(name,blob,mimeType,parentId){
   return gdUpload(name,blob,mimeType,parentId,existId);
 }
 async function gdEnsureFolders(){
-  if(!_gdVaultId) _gdVaultId=await gdFindOrCreateFolder('HumVault',null);
-  if(!_gdMediaId) _gdMediaId=await gdFindOrCreateFolder('media',_gdVaultId);
+  if(!_gdVaultId)       _gdVaultId=await gdFindOrCreateFolder('HumVault',null);
+  if(!_gdInboxId)       _gdInboxId=await gdFindOrCreateFolder('inbox',_gdVaultId);
+  if(!_gdProjectsRootId) _gdProjectsRootId=await gdFindOrCreateFolder('projects',_gdVaultId);
+}
+// Human-readable filename base: 2026-04-30_14-32_main-theme
+function gdEntryFileName(e){
+  const d=new Date(e.ts);
+  const date=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  const time=String(d.getHours()).padStart(2,'0')+'-'+String(d.getMinutes()).padStart(2,'0');
+  const name=slugify(e.name||autoTitle(e)).slice(0,40).replace(/-$/,'');
+  return `${date}_${time}_${name}`;
+}
+function slugify(s){
+  const cyr={'а':'a','б':'b','в':'v','г':'g','д':'d','е':'e','ё':'yo','ж':'zh','з':'z','и':'i','й':'y','к':'k','л':'l','м':'m','н':'n','о':'o','п':'p','р':'r','с':'s','т':'t','у':'u','ф':'f','х':'h','ц':'ts','ч':'ch','ш':'sh','щ':'sch','ы':'y','э':'e','ю':'yu','я':'ya'};
+  return String(s||'').toLowerCase()
+    .replace(/[а-яёА-ЯЁ]/g,c=>cyr[c.toLowerCase()]||'')
+    .replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+}
+async function gdGetEntryFolder(e){
+  if(!e.project) return _gdInboxId;
+  if(_gdProjectFolderIds.has(e.project)) return _gdProjectFolderIds.get(e.project);
+  const proj=projects.find(p=>p.id===e.project);
+  const folderName=proj?slugify(proj.name):e.project;
+  const fid=await gdFindOrCreateFolder(folderName,_gdProjectsRootId);
+  _gdProjectFolderIds.set(e.project,fid);
+  return fid;
+}
+async function gdUpsertEntry(e){
+  const folderId=await gdGetEntryFolder(e);
+  const base=gdEntryFileName(e);
+  // JSON sidecar (metadata, no blobs)
+  const meta={...e,data:null};
+  await gdUpsertJson(base+'.json',meta,folderId);
+  // Media files with readable suffixes
+  const items=e.media||(e.hasMedia?[{id:e.id,type:e.type==='photo'?'photo':e.type==='video'?'video':'audio',mimeType:e.mimeType||''}]:[]);
+  if(!items.length) return;
+  // Count by type to decide whether to add _1 _2 suffix
+  const typeCnt={};
+  items.forEach(m=>{ typeCnt[m.type]=(typeCnt[m.type]||0)+1; });
+  const typeIdx={};
+  for(const m of items){
+    const rec=await idbGet(m.id); if(!rec?.blob) continue;
+    const ext=extFromMime(rec.mimeType||m.mimeType||'');
+    typeIdx[m.type]=(typeIdx[m.type]||0)+1;
+    const suffix=items.length===1?'':(typeCnt[m.type]===1?`_${m.type}`:`_${m.type}_${typeIdx[m.type]}`);
+    await gdUpsertBlob(`${base}${suffix}.${ext}`,rec.blob,rec.mimeType||m.mimeType||'application/octet-stream',folderId);
+  }
 }
 function extFromMime(mime){
   if(!mime) return 'bin';
@@ -1863,22 +1910,20 @@ function fmtRelTime(ts){
 }
 async function gdPushCore(onProgress){
   await gdEnsureFolders();
-  // 1. Metadata (fast — two small JSON files)
+  // 1. Root index files (fast)
   const idx=entries.map(e=>{ const c={...e}; c.data=null; return c; });
   await gdUpsertJson('_index.json',idx,_gdVaultId);
   await gdUpsertJson('projects.json',projects,_gdVaultId);
-  // 2. Media blobs — iterate entry.media[] (new model) or fallback to entry.id
-  const allMedia=[];
-  for(const e of entries){
-    const items=e.media||(e.hasMedia?[{id:e.id,mimeType:e.mimeType||''}]:[]);
-    items.forEach(m=>allMedia.push(m));
+  // 2. Project folders + project.json sidecars
+  for(const p of projects){
+    const fid=await gdGetEntryFolder({project:p.id}); // reuse — creates folder
+    await gdUpsertJson('project.json',p,fid);
   }
+  // 3. Entries — each gets a JSON sidecar + media files in its project folder
   let done=0;
-  for(const m of allMedia){
-    const rec=await idbGet(m.id); if(!rec?.blob){ done++; if(onProgress) onProgress(done,allMedia.length); continue; }
-    const ext=extFromMime(rec.mimeType||m.mimeType||'');
-    await gdUpsertBlob(`${m.id}.${ext}`,rec.blob,rec.mimeType||m.mimeType||'application/octet-stream',_gdMediaId);
-    done++; if(onProgress) onProgress(done,allMedia.length);
+  for(const e of entries){
+    await gdUpsertEntry(e);
+    done++; if(onProgress) onProgress(done,entries.length);
   }
   settings.gdLastSync=Date.now(); localStorage.setItem(ST,JSON.stringify(settings));
 }
@@ -1887,8 +1932,7 @@ async function gdPush(){
   const setLabel=t=>{ if(btn){ btn.disabled=true; btn.textContent=t; } };
   setLabel('Pushing…');
   try{
-    await gdEnsureFolders();
-    const total=entries.filter(e=>e.hasMedia).length;
+    const total=entries.filter(e=>e.hasMedia||e.media?.length).length;
     await gdPushCore(total>0?(done,n)=>setLabel(`Uploading ${done}/${n}…`):null);
     updateGdStatus(); toast('Synced to Google Drive ✓');
   }catch(e){
@@ -1901,7 +1945,7 @@ async function gdPull(){
   const btn=document.getElementById('gd-pull-btn');
   if(btn){ btn.disabled=true; btn.textContent='Pulling…'; }
   try{
-    await gdEnsureFolders();
+    await gdEnsureFolders(); // need _gdVaultId for pull
     const fileId=await gdFindFile('_index.json',_gdVaultId);
     if(!fileId){ toast('No data on Drive yet'); return; }
     const r=await gdFetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`);
@@ -1939,6 +1983,7 @@ async function gdConnect(){
 }
 function gdDisconnect(){
   _gdToken=null; _gdTokenExp=0; _gdVaultId=null; _gdMediaId=null;
+  _gdInboxId=null; _gdProjectsRootId=null; _gdProjectFolderIds.clear();
   settings.gdConnected=false; localStorage.setItem(ST,JSON.stringify(settings));
   updateGdUi(); toast('Disconnected from Google Drive');
 }
