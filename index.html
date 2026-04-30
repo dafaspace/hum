@@ -826,9 +826,20 @@ body {
 
 #settings-overlay { position: fixed; inset: 0; z-index: 110; background: rgba(250,247,242,0.9); backdrop-filter: blur(14px); display: none; align-items: center; justify-content: center; padding: 20px; }
 #settings-overlay.show { display: flex; }
-.settings-card { background: white; border: 1px solid var(--paper4); border-radius: 22px; padding: 26px 28px; width: 100%; max-width: 360px; box-shadow: 0 12px 48px rgba(42,38,34,0.1); }
+.settings-card { background: white; border: 1px solid var(--paper4); border-radius: 22px; padding: 26px 28px; width: 100%; max-width: 380px; max-height: 88vh; overflow-y: auto; box-shadow: 0 12px 48px rgba(42,38,34,0.1); }
+.settings-card::-webkit-scrollbar { width: 0; }
 .settings-card h3 { font-family: var(--serif); font-size: 20px; font-weight: 500; margin-bottom: 18px; letter-spacing: -0.01em; }
 .settings-hint { font-size: 11px; color: var(--ink3); margin-top: 6px; line-height: 1.6; }
+.settings-sep { border: none; border-top: 1px solid var(--paper4); margin: 18px 0 14px; }
+.settings-section-title { font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink3); font-weight: 500; margin-bottom: 12px; }
+.gd-btn-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.gd-small-btn { padding: 7px 13px; border-radius: 9px; border: 1px solid var(--paper4); background: var(--paper2); font-family: var(--sans); font-size: 12px; font-weight: 400; color: var(--ink2); cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+.gd-small-btn:hover { border-color: var(--warm); color: var(--warm2); background: var(--warm-soft); }
+.gd-small-btn.primary { background: var(--warm); border-color: var(--warm); color: white; font-weight: 500; }
+.gd-small-btn.primary:hover { background: var(--warm2); border-color: var(--warm2); }
+.gd-small-btn.danger:hover { border-color: var(--rose); color: var(--rose); background: var(--rose-soft); }
+.gd-small-btn:disabled { opacity: 0.5; cursor: default; }
+#gd-status { font-size: 11px; color: var(--ink3); }
 
 .bpm-row { display:flex; align-items:stretch; }
 .bpm-in { border-radius:0 !important; text-align:center; flex:1; width:0; min-width:40px; font-size:14px; font-weight:500; color:var(--ink); }
@@ -1561,6 +1572,24 @@ audio { display: none; }
       <input class="finput" id="openai-key" type="password" placeholder="sk-…" autocomplete="off">
       <div class="settings-hint">For Whisper audio transcription. Stored locally only.</div>
     </div>
+    <hr class="settings-sep">
+    <div class="settings-section-title">Google Drive</div>
+    <div class="fg">
+      <label class="flabel">OAuth Client ID</label>
+      <input class="finput" id="gd-client-id" type="text" placeholder="xxxx.apps.googleusercontent.com" autocomplete="off" spellcheck="false" style="font-size:11px">
+      <div class="settings-hint">Create at <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener" style="color:var(--warm2)">Google Cloud Console</a> → APIs &amp; Services → Credentials → OAuth 2.0 Web Client. Enable Drive API. Add your site origin to Authorized JavaScript origins.</div>
+    </div>
+    <div id="gd-connect-row" class="gd-btn-row">
+      <button id="gd-connect-btn" class="gd-small-btn primary" onclick="gdConnect()">Connect</button>
+    </div>
+    <div id="gd-actions" style="display:none">
+      <div class="gd-btn-row">
+        <button id="gd-push-btn" class="gd-small-btn primary" onclick="gdPush()">Push to Drive</button>
+        <button id="gd-pull-btn" class="gd-small-btn" onclick="gdPull()">Pull from Drive</button>
+        <button class="gd-small-btn danger" onclick="gdDisconnect()">Disconnect</button>
+      </div>
+      <div id="gd-status" style="margin-top:6px"></div>
+    </div>
     <div class="save-actions">
       <button class="btn-cancel" onclick="closeSettings()">Cancel</button>
       <button class="btn-save" onclick="saveSettings()">Save →</button>
@@ -1712,6 +1741,183 @@ async function migrateLegacyMedia(){
   }
   if(fail>0) console.warn('Media migration failed for',fail,'entries');
 }
+
+// ── GOOGLE DRIVE SYNC ──
+const GD_SCOPE='https://www.googleapis.com/auth/drive.file';
+let _gdToken=null, _gdTokenExp=0, _gdVaultId=null, _gdMediaId=null;
+
+function loadGsi(){
+  if(document.getElementById('gsi-script')) return;
+  const s=document.createElement('script');
+  s.id='gsi-script'; s.src='https://accounts.google.com/gsi/client';
+  s.async=true; s.defer=true; document.head.appendChild(s);
+}
+function gdTokenValid(){ return !!(_gdToken && Date.now()<_gdTokenExp-60000); }
+function gdRequestToken(){
+  return new Promise((resolve,reject)=>{
+    if(!window.google?.accounts?.oauth2){ reject(new Error('Google Identity Services not loaded')); return; }
+    const client=google.accounts.oauth2.initTokenClient({
+      client_id: settings.gdClientId, scope: GD_SCOPE,
+      callback(resp){
+        if(resp.error){ reject(new Error(resp.error_description||resp.error)); return; }
+        _gdToken=resp.access_token; _gdTokenExp=Date.now()+resp.expires_in*1000;
+        resolve(_gdToken);
+      }
+    });
+    client.requestAccessToken();
+  });
+}
+async function gdAuth(){ if(gdTokenValid()) return _gdToken; return gdRequestToken(); }
+async function gdFetch(url,opts={}){
+  const token=await gdAuth();
+  const r=await fetch(url,{...opts,headers:{Authorization:`Bearer ${token}`,...(opts.headers||{})}});
+  if(!r.ok){ const t=await r.text(); throw new Error(`Drive ${r.status}: ${t.slice(0,120)}`); }
+  return r;
+}
+async function gdFindOrCreateFolder(name,parentId){
+  const parentQ=parentId?` and '${parentId}' in parents`:'';
+  const q=`name=${JSON.stringify(name)} and mimeType='application/vnd.google-apps.folder' and trashed=false${parentQ}`;
+  const r=await gdFetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id)&spaces=drive`);
+  const d=await r.json(); if(d.files?.length) return d.files[0].id;
+  const meta={name,mimeType:'application/vnd.google-apps.folder',...(parentId?{parents:[parentId]}:{})};
+  const cr=await gdFetch('https://www.googleapis.com/drive/v3/files',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(meta)});
+  return (await cr.json()).id;
+}
+async function gdFindFile(name,parentId){
+  const q=`name=${JSON.stringify(name)} and '${parentId}' in parents and trashed=false`;
+  const r=await gdFetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id)&spaces=drive`);
+  const d=await r.json(); return d.files?.[0]?.id||null;
+}
+async function gdUpload(name,blob,mimeType,parentId,existId){
+  const form=new FormData();
+  const meta=existId?{}:{name,parents:[parentId]};
+  form.append('metadata',new Blob([JSON.stringify(meta)],{type:'application/json'}));
+  form.append('file',blob);
+  const url=existId
+    ?`https://www.googleapis.com/upload/drive/v3/files/${existId}?uploadType=multipart`
+    :'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
+  const r=await gdFetch(url,{method:existId?'PATCH':'POST',body:form});
+  return (await r.json()).id;
+}
+async function gdUpsertJson(name,data,parentId){
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const existId=await gdFindFile(name,parentId);
+  return gdUpload(name,blob,'application/json',parentId,existId);
+}
+async function gdUpsertBlob(name,blob,mimeType,parentId){
+  const existId=await gdFindFile(name,parentId);
+  return gdUpload(name,blob,mimeType,parentId,existId);
+}
+async function gdEnsureFolders(){
+  if(!_gdVaultId) _gdVaultId=await gdFindOrCreateFolder('HumVault',null);
+  if(!_gdMediaId) _gdMediaId=await gdFindOrCreateFolder('media',_gdVaultId);
+}
+function extFromMime(mime){
+  if(!mime) return 'bin';
+  if(mime.includes('mpeg')||mime.includes('mp3')) return 'mp3';
+  if(mime.includes('wav')) return 'wav';
+  if(mime.includes('ogg')) return 'ogg';
+  if(mime.includes('mp4')&&mime.startsWith('audio')) return 'm4a';
+  if(mime.includes('mp4')) return 'mp4';
+  if(mime.includes('webm')) return 'webm';
+  if(mime.includes('jpeg')||mime.includes('jpg')) return 'jpg';
+  if(mime.includes('png')) return 'png';
+  return 'bin';
+}
+function fmtRelTime(ts){
+  const d=Date.now()-ts;
+  if(d<60000) return 'just now';
+  if(d<3600000) return Math.floor(d/60000)+'min ago';
+  if(d<86400000) return Math.floor(d/3600000)+'h ago';
+  return new Date(ts).toLocaleDateString();
+}
+async function gdPushCore(){
+  await gdEnsureFolders();
+  const idx=entries.map(e=>{ const c={...e}; c.data=null; return c; });
+  await gdUpsertJson('_index.json',idx,_gdVaultId);
+  await gdUpsertJson('projects.json',projects,_gdVaultId);
+  for(const e of entries){
+    if(!e.hasMedia) continue;
+    const rec=await idbGet(e.id); if(!rec?.blob) continue;
+    const ext=extFromMime(rec.mimeType||e.mimeType||'');
+    await gdUpsertBlob(`${e.id}.${ext}`,rec.blob,rec.mimeType||e.mimeType||'application/octet-stream',_gdMediaId);
+  }
+  settings.gdLastSync=Date.now(); localStorage.setItem(ST,JSON.stringify(settings));
+}
+async function gdPush(){
+  const btn=document.getElementById('gd-push-btn');
+  if(btn){ btn.disabled=true; btn.textContent='Pushing…'; }
+  try{
+    await gdEnsureFolders(); await gdPushCore();
+    updateGdStatus(); toast('Synced to Google Drive ✓');
+  }catch(e){ toast('Push failed: '+e.message); }
+  finally{ if(btn){ btn.disabled=false; btn.textContent='Push to Drive'; } }
+}
+async function gdPull(){
+  const btn=document.getElementById('gd-pull-btn');
+  if(btn){ btn.disabled=true; btn.textContent='Pulling…'; }
+  try{
+    await gdEnsureFolders();
+    const fileId=await gdFindFile('_index.json',_gdVaultId);
+    if(!fileId){ toast('No data on Drive yet'); return; }
+    const r=await gdFetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`);
+    const remote=await r.json();
+    const map=new Map(entries.map(e=>[e.id,e]));
+    for(const re of remote){ const le=map.get(re.id); if(!le||re.ts>le.ts) map.set(re.id,re); }
+    entries=[...map.values()].sort((a,b)=>b.ts-a.ts);
+    persist(); render(); renderHeatmap();
+    settings.gdLastSync=Date.now(); localStorage.setItem(ST,JSON.stringify(settings));
+    updateGdStatus(); toast('Pulled from Google Drive ✓');
+  }catch(e){ toast('Pull failed: '+e.message); }
+  finally{ if(btn){ btn.disabled=false; btn.textContent='Pull from Drive'; } }
+}
+async function gdConnect(){
+  if(!settings.gdClientId){ toast('Enter Client ID first'); return; }
+  loadGsi();
+  let tries=0;
+  while(!window.google?.accounts?.oauth2 && tries++<25) await new Promise(r=>setTimeout(r,300));
+  if(!window.google?.accounts?.oauth2){ toast('Google SDK failed to load'); return; }
+  const btn=document.getElementById('gd-connect-btn');
+  if(btn){ btn.disabled=true; btn.textContent='Connecting…'; }
+  try{
+    await gdAuth();
+    settings.gdConnected=true; localStorage.setItem(ST,JSON.stringify(settings));
+    // save client id from input if not yet saved
+    const cidEl=document.getElementById('gd-client-id');
+    if(cidEl) settings.gdClientId=cidEl.value.trim();
+    localStorage.setItem(ST,JSON.stringify(settings));
+    updateGdUi(); toast('Connected to Google Drive ✓');
+  }catch(e){ toast('Auth failed: '+e.message); }
+  finally{ if(btn){ btn.disabled=false; btn.textContent='Connect'; } }
+}
+function gdDisconnect(){
+  _gdToken=null; _gdTokenExp=0; _gdVaultId=null; _gdMediaId=null;
+  settings.gdConnected=false; localStorage.setItem(ST,JSON.stringify(settings));
+  updateGdUi(); toast('Disconnected from Google Drive');
+}
+function updateGdStatus(){
+  const el=document.getElementById('gd-status'); if(!el) return;
+  const ts=settings.gdLastSync;
+  el.textContent=ts?'Last sync: '+fmtRelTime(ts):'';
+}
+function updateGdUi(){
+  const connected=!!(settings.gdConnected&&settings.gdClientId);
+  const connectRow=document.getElementById('gd-connect-row');
+  const actions=document.getElementById('gd-actions');
+  const cidInput=document.getElementById('gd-client-id');
+  if(connectRow) connectRow.style.display=connected?'none':'';
+  if(actions) actions.style.display=connected?'block':'none';
+  if(cidInput) cidInput.disabled=connected;
+  updateGdStatus();
+}
+// Auto-push after save (only if token already valid — no popup)
+let _gdSyncTimer=null;
+function scheduleGdPush(){
+  if(!settings.gdClientId||!settings.gdConnected||!gdTokenValid()) return;
+  clearTimeout(_gdSyncTimer);
+  _gdSyncTimer=setTimeout(async()=>{ try{ await gdPushCore(); updateGdStatus(); }catch(_){} },5000);
+}
+
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,5); }
 function fmtDate(ts){ const d=new Date(ts); return d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})+' · '+d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}); }
 function fmtDur(s){ return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
@@ -2447,6 +2653,7 @@ async function confirmSave(){
     toast('Could not save — try removing some entries');
     closeSave(); return;
   }
+  scheduleGdPush();
   closeSave(); render(); renderProjects(); renderHeatmap();
   modalRecSec=0; pendingBlob=null; pendingDataUrl=null; pendingVideoBlob=null;
   toast('Saved');
@@ -2834,6 +3041,8 @@ function openSettings(){
   document.getElementById('username').value=settings.username||'';
   document.getElementById('openai-key').value=settings.openaiKey||'';
   document.getElementById('rec-format').value=settings.recFormat||'mp3-320';
+  document.getElementById('gd-client-id').value=settings.gdClientId||'';
+  updateGdUi();
   document.getElementById('settings-overlay').classList.add('show');
   setTimeout(()=>document.getElementById('username').focus(),80);
 }
@@ -2842,7 +3051,10 @@ function saveSettings(){
   settings.username=document.getElementById('username').value.trim();
   settings.openaiKey=document.getElementById('openai-key').value.trim();
   settings.recFormat=document.getElementById('rec-format').value;
+  const newCid=document.getElementById('gd-client-id').value.trim();
+  if(newCid!==settings.gdClientId){ settings.gdClientId=newCid; settings.gdConnected=false; _gdToken=null; _gdTokenExp=0; _gdVaultId=null; _gdMediaId=null; }
   localStorage.setItem(ST,JSON.stringify(settings));
+  if(settings.gdClientId) loadGsi();
   closeSettings();
   toast('Settings saved');
 }
@@ -3001,6 +3213,7 @@ renderProjects();
 renderHeatmap();
 // Migrate old base64 media to IndexedDB on app load (frees localStorage)
 migrateLegacyMedia().then(()=>render()).catch(err=>console.warn('Media migration failed:',err));
+if(settings.gdClientId) loadGsi();
 document.addEventListener('keydown',e=>{ if(e.key==='Escape'){closeDetail();closeSave();closeProjModal();closeSettings();cancelRecording();} });
 document.addEventListener('click',e=>{ const pop=document.getElementById('exp-pop'); if(pop&&pop.classList.contains('open')&&!pop.closest('.exp-pop-wrap').contains(e.target)) closeExpPop(); });
 
