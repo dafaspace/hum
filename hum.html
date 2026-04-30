@@ -1872,7 +1872,11 @@ async function gdPull(){
   finally{ if(btn){ btn.disabled=false; btn.textContent='Pull from Drive'; } }
 }
 async function gdConnect(){
+  // Read client ID directly from input (no need to Save first)
+  const cidEl=document.getElementById('gd-client-id');
+  if(cidEl&&cidEl.value.trim()) settings.gdClientId=cidEl.value.trim();
   if(!settings.gdClientId){ toast('Enter Client ID first'); return; }
+  localStorage.setItem(ST,JSON.stringify(settings));
   loadGsi();
   let tries=0;
   while(!window.google?.accounts?.oauth2 && tries++<25) await new Promise(r=>setTimeout(r,300));
@@ -1882,10 +1886,6 @@ async function gdConnect(){
   try{
     await gdAuth();
     settings.gdConnected=true; localStorage.setItem(ST,JSON.stringify(settings));
-    // save client id from input if not yet saved
-    const cidEl=document.getElementById('gd-client-id');
-    if(cidEl) settings.gdClientId=cidEl.value.trim();
-    localStorage.setItem(ST,JSON.stringify(settings));
     updateGdUi(); toast('Connected to Google Drive ✓');
   }catch(e){ toast('Auth failed: '+e.message); }
   finally{ if(btn){ btn.disabled=false; btn.textContent='Connect'; } }
