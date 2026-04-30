@@ -451,6 +451,36 @@ body {
 .tp-video   { background: var(--moss-soft);  color: var(--moss); }
 .tp-midi    { background: var(--sand-soft);  color: var(--ink2); }
 
+/* ── TYPE FILTER BAR ── */
+#type-filter-bar {
+  display: flex; gap: 5px;
+  padding: 0 16px 10px;
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+#type-filter-bar:empty { display: none; padding: 0; }
+#type-filter-bar::-webkit-scrollbar { display: none; }
+.tfilter-pill {
+  flex-shrink: 0; cursor: pointer; white-space: nowrap;
+  font-family: var(--sans); font-size: 11px; font-weight: 450; letter-spacing: 0.01em;
+  padding: 4px 9px 4px 7px; border-radius: 100px;
+  border: 1px solid var(--paper4); background: var(--paper2); color: var(--ink3);
+  display: inline-flex; align-items: center; gap: 4px;
+  transition: all 0.15s;
+}
+.tfilter-pill svg { width: 10px; height: 10px; opacity: 0.7; }
+.tfilter-pill:hover { background: var(--paper3); color: var(--ink2); border-color: var(--paper4); }
+.tfilter-pill.active { border-color: transparent; }
+.tfilter-pill.active svg { opacity: 1; }
+.tfilter-pill.active.tp-audio  { background: var(--rose-soft);  color: var(--rose); }
+.tfilter-pill.active.tp-text   { background: var(--sage-soft);  color: var(--sage); }
+.tfilter-pill.active.tp-idea   { background: var(--warm-soft);  color: var(--warm2); }
+.tfilter-pill.active.tp-dream  { background: var(--plum-soft);  color: var(--plum); }
+.tfilter-pill.active.tp-photo  { background: var(--sky-soft);   color: var(--sky); }
+.tfilter-pill.active.tp-video  { background: var(--moss-soft);  color: var(--moss); }
+.tfilter-pill.active.tp-midi   { background: var(--sand-soft);  color: var(--ink2); }
+.tfp-cnt { font-size: 10px; opacity: 0.65; margin-left: 1px; }
+
 .card-preview {
   font-size: 13px; color: var(--ink2); line-height: 1.6;
   display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
@@ -1288,6 +1318,8 @@ audio { display: none; }
     <span class="capture-hint"><strong>Tap</strong> to start a new capture</span>
   </div>
 
+  <div id="type-filter-bar"></div>
+
   <div id="content"></div>
 
   <div id="statusbar">
@@ -1652,7 +1684,7 @@ let settings=JSON.parse(localStorage.getItem(ST)||'{}');
 let pendingTranscript=null;
 let projects=JSON.parse(localStorage.getItem(PJ)||'[]');
 let layout=localStorage.getItem(LV)||'grid';
-let view='all', curEntry=null;
+let view='all', curEntry=null, typeFilter='';
 // Each item: {type:'audio'|'photo'|'video', blob:Blob, mimeType:string, duration:number|null, previewUrl:string|null}
 let pendingMediaList=[];
 // Legacy aliases (used internally, cleared on save/close)
@@ -2133,7 +2165,7 @@ function closeSidebar(){
 
 // ── VIEW ──
 function setView(v,el){
-  view=v;
+  view=v; typeFilter=''; // reset type filter on view change
   document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
   if(el) el.classList.add('active');
   const titles={all:'All captures',inbox:'Inbox',today:'Today',audio:'Audio',text:'Text & Lyrics',idea:'Ideas',dream:'Dreams'};
@@ -2143,6 +2175,33 @@ function setView(v,el){
   renderHeatmap();
   render();
   closeSidebar();
+}
+
+function setTypeFilter(t){
+  typeFilter= typeFilter===t ? '' : t; // toggle
+  render();
+}
+
+function renderTypeFilterBar(visibleEntries){
+  const bar=document.getElementById('type-filter-bar');
+  if(!bar) return;
+  // Don't show when view is already a single type
+  if(['audio','text','idea','dream','photo','video','midi'].includes(view)){
+    bar.innerHTML=''; return;
+  }
+  // Count entries per type from the pre-typeFilter set
+  const counts={};
+  visibleEntries.forEach(e=>{ counts[e.type]=(counts[e.type]||0)+1; });
+  const types=Object.keys(counts);
+  if(types.length<2){ bar.innerHTML=''; return; } // nothing to filter
+  // Order: audio, text, idea, dream, photo, video, midi
+  const ORDER=['audio','photo','video','text','idea','dream','midi'];
+  types.sort((a,b)=>ORDER.indexOf(a)-ORDER.indexOf(b));
+  const pills=types.map(t=>{
+    const active=typeFilter===t;
+    return `<button class="tfilter-pill tp-${t}${active?' active':''}" onclick="setTypeFilter('${t}')">${typeIconSvg(t)}<span>${t}</span><span class="tfp-cnt">${counts[t]}</span></button>`;
+  });
+  bar.innerHTML=pills.join('');
 }
 
 // ── RENDER ──
@@ -2155,11 +2214,15 @@ function render(){
   else if(view!=='all') f=f.filter(e=>e.type===view);
   if(dateFilter) f=f.filter(e=>dateKey(e.ts)===dateFilter);
   if(q) f=f.filter(e=>(e.name||'').toLowerCase().includes(q)||(e.note||'').toLowerCase().includes(q)||(e.transcript||'').toLowerCase().includes(q)||(e.tags||[]).some(t=>t.toLowerCase().includes(q)));
+  // render type filter bar BEFORE applying typeFilter (so counts reflect full set)
+  renderTypeFilterBar(f);
+  if(typeFilter) f=f.filter(e=>e.type===typeFilter);
   f.sort((a,b)=>b.ts-a.ts);
 
   document.getElementById('sb-count').textContent=f.length+' capture'+(f.length===1?'':'s');
   let filterText = '';
   if(q) filterText += `"${q}"`;
+  if(typeFilter){ if(filterText) filterText+=' · '; filterText+=typeFilter; }
   if(dateFilter){
     const d = new Date(dateFilter);
     if(filterText) filterText += ' · ';
