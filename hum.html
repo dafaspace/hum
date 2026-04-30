@@ -2965,18 +2965,45 @@ function updateFab(){
 }
 function toggleExpPop(ev){ ev.stopPropagation(); const p=document.getElementById('exp-pop'); p.classList.toggle('open'); }
 function closeExpPop(){ const p=document.getElementById('exp-pop'); if(p) p.classList.remove('open'); }
+let _undoTimer=null;
+let _undoEntry=null; // {entry, mediaIds}
+
 function delEntry(id){
   if(!confirm('Delete this capture?')) return;
   const e=entries.find(x=>x.id===id);
+  if(!e) return;
+  // Remove from list and UI immediately
   entries=entries.filter(x=>x.id!==id);
-  // Delete all media items from IDB
-  if(e){
-    const mediaIds=(e.media||[]).map(m=>m.id);
-    if(!mediaIds.includes(e.id)&&e.hasMedia) mediaIds.push(e.id); // legacy
-    mediaIds.forEach(mid=>{ releaseMediaUrl(mid); idbDelete(mid); });
-  }
   try{ persist(); }catch(_){}
-  closeDetail(); render(); renderHeatmap(); toast('Deleted');
+  closeDetail(); render(); renderHeatmap();
+  // Stash for undo (media stays in IDB for 6s)
+  const mediaIds=(e.media||[]).map(m=>m.id);
+  if(!mediaIds.includes(e.id)&&e.hasMedia) mediaIds.push(e.id);
+  if(_undoTimer){ clearTimeout(_undoTimer); _purgeUndo(); } // flush previous
+  _undoEntry={entry:e, mediaIds};
+  // Show toast with Undo button
+  const t=document.getElementById('toast');
+  t.innerHTML='Deleted <button onclick="undoDelete()" style="margin-left:10px;background:none;border:none;color:var(--warm);font:inherit;font-weight:600;cursor:pointer;padding:0;font-size:13px">Undo</button>';
+  t.classList.add('show');
+  _undoTimer=setTimeout(()=>{ t.classList.remove('show'); _purgeUndo(); },5000);
+}
+
+function undoDelete(){
+  if(!_undoEntry) return;
+  clearTimeout(_undoTimer); _undoTimer=null;
+  entries.push(_undoEntry.entry);
+  entries.sort((a,b)=>b.ts-a.ts);
+  _undoEntry=null;
+  try{ persist(); }catch(_){}
+  render(); renderHeatmap();
+  document.getElementById('toast').classList.remove('show');
+  toast('Restored');
+}
+
+function _purgeUndo(){
+  if(!_undoEntry) return;
+  _undoEntry.mediaIds.forEach(mid=>{ releaseMediaUrl(mid); idbDelete(mid); });
+  _undoEntry=null; _undoTimer=null;
 }
 
 // Shared helper: store a blob as a new media item on an existing entry
@@ -3243,7 +3270,7 @@ async function expAudio(){
 }
 function dl(blob,name){ const u=URL.createObjectURL(blob),a=document.createElement('a'); a.href=u; a.download=name; a.click(); URL.revokeObjectURL(u); }
 
-function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2200); }
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); if(_undoTimer) clearTimeout(_undoTimer); setTimeout(()=>t.classList.remove('show'),2200); }
 
 function loadDemo(){
   entries = []; projects = [];
