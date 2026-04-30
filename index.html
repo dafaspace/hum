@@ -2245,13 +2245,26 @@ function render(){
   populateLazyMedia();
 }
 
+// Returns the best cover media item for a card: first photo, then first video.
+// Works with both new entry.media[] and legacy hasMedia entries.
+function entryCoverMedia(e){
+  if(e.media&&e.media.length){
+    return e.media.find(m=>m.type==='photo')||e.media.find(m=>m.type==='video')||null;
+  }
+  // Legacy: blob stored under e.id
+  if(e.hasMedia&&(e.type==='photo'||e.type==='video')) return {id:e.id,type:e.type,_legacy:true};
+  return null;
+}
+
 // Set src on photo/video cards that need IDB-stored media
 async function populateLazyMedia(){
-  const els=document.querySelectorAll('.lazy-media[data-entry-id]:not([data-loaded])');
+  const els=document.querySelectorAll('.lazy-media[data-media-id]:not([data-loaded])');
   for(const el of els){
-    const id=el.dataset.entryId;
-    if(el.getAttribute('src')) { el.dataset.loaded='1'; continue; }
-    const url=await getMediaUrl(id);
+    if(el.dataset.loaded) continue;
+    const mid=el.dataset.mediaId;
+    // If already has a data-URL src (legacy base64), just mark loaded
+    if(el.src&&el.src.startsWith('data:')){ el.dataset.loaded='1'; continue; }
+    const url=await getMediaUrl(mid);
     if(url){ el.src=url; el.dataset.loaded='1'; }
   }
 }
@@ -2263,13 +2276,17 @@ function cardHtml(e){
   const ticon=typeIconSvg(e.type);
   const tpill=`<span class="type-pill tp-${e.type}">${ticon}${tlabel}</span>`;
   let body='';
-  const hm=!!(e.hasMedia||e.data);
-  if(e.type==='audio'&&hm){
-    body=`<div class="card-wave">${waveformBars(e,28,20,'wbar')}</div>`;
+  const cover=entryCoverMedia(e);
+  if(cover){
+    const legacySrc=(cover._legacy&&typeof e.data==='string'&&e.data.startsWith('data:'))?e.data:'';
+    if(cover.type==='video'){
+      body=`<video class="card-photo lazy-media" data-media-id="${cover.id}" src="${legacySrc}" muted playsinline preload="metadata" onloadedmetadata="this.currentTime=0.001" style="pointer-events:none"></video>`;
+    } else {
+      body=`<img class="card-photo lazy-media" data-media-id="${cover.id}" src="${legacySrc}" loading="lazy">`;
+    }
     if(e.note) body+=`<div class="card-preview">${escHtml(e.note)}</div>`;
-  } else if(e.type==='photo'&&hm){
-    const src=(typeof e.data==='string'&&e.data.startsWith('data:'))?e.data:'';
-    body=`<img class="card-photo lazy-media" data-entry-id="${e.id}" src="${src}" loading="lazy">`;
+  } else if((e.hasMedia||e.media?.length)&&e.media?.some(m=>m.type==='audio')||e.type==='audio'&&(e.hasMedia||e.data)){
+    body=`<div class="card-wave">${waveformBars(e,28,20,'wbar')}</div>`;
     if(e.note) body+=`<div class="card-preview">${escHtml(e.note)}</div>`;
   } else {
     const t=e.note||e.text||'';
@@ -2310,12 +2327,16 @@ function streamItemHtml(e){
   const proj=projects.find(p=>p.id===e.project);
   const acc=proj?`<div class="card-accent" style="background:${proj.color}"></div>`:'';
   let body='';
-  const hm=!!(e.hasMedia||e.data);
-  if(e.type==='audio'&&hm){
+  const cover=entryCoverMedia(e);
+  if(cover){
+    const legacySrc=(cover._legacy&&typeof e.data==='string'&&e.data.startsWith('data:'))?e.data:'';
+    if(cover.type==='video'){
+      body=`<video class="card-photo lazy-media" data-media-id="${cover.id}" src="${legacySrc}" muted playsinline preload="metadata" onloadedmetadata="this.currentTime=0.001" style="pointer-events:none"></video>`;
+    } else {
+      body=`<img class="card-photo lazy-media" data-media-id="${cover.id}" src="${legacySrc}" loading="lazy">`;
+    }
+  } else if(e.type==='audio'&&(e.hasMedia||e.data)){
     body=`<div class="card-wave">${waveformBars(e,36,20,'wbar')}</div>`;
-  } else if(e.type==='photo'&&hm){
-    const src=(typeof e.data==='string'&&e.data.startsWith('data:'))?e.data:'';
-    body=`<img class="card-photo lazy-media" data-entry-id="${e.id}" src="${src}" loading="lazy">`;
   }
   const txt=e.note||e.text||'';
   const foot=[
