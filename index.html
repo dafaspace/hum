@@ -1356,9 +1356,9 @@ audio { display: none; }
       </button>
     </div>
 
-    <!-- Media preview (photo / video / audio wave — before note field) -->
-    <div class="modal-media-preview" id="modal-media-preview" style="display:none">
-      <button class="modal-preview-clear" onclick="clearModalMedia()" title="Remove">✕</button>
+    <!-- Multi-media list (thumbnails of all pending items) -->
+    <div id="modal-media-preview" style="display:none;margin-bottom:14px">
+      <div id="modal-media-items" style="display:flex;flex-wrap:wrap;gap:8px"></div>
     </div>
 
     <div class="fg">
@@ -1651,7 +1651,11 @@ let settings=JSON.parse(localStorage.getItem(ST)||'{}');
 let pendingTranscript=null;
 let projects=JSON.parse(localStorage.getItem(PJ)||'[]');
 let layout=localStorage.getItem(LV)||'grid';
-let view='all', curEntry=null, pendingBlob=null, pendingDataUrl=null, pendingVideoBlob=null;
+let view='all', curEntry=null;
+// Each item: {type:'audio'|'photo'|'video', blob:Blob, mimeType:string, duration:number|null, previewUrl:string|null}
+let pendingMediaList=[];
+// Legacy aliases (used internally, cleared on save/close)
+let pendingBlob=null, pendingDataUrl=null, pendingVideoBlob=null;
 let currentTags=[], selColor='#e8a87c';
 let mr=null, recChunks=[], recSec=0, recInterval=null;
 let dateFilter=null; // YYYY-MM-DD or null
@@ -2235,7 +2239,7 @@ let cameraReturnMode=null; // 'photo'|'video'|null — camera was opened from mo
 let modalRecording=false, modalRecInterval=null, modalRecSec=0, modalRecStream=null;
 
 function openNewCapture(){
-  pendingBlob=null; pendingDataUrl=null; pendingTranscript=null;
+  pendingMediaList=[]; pendingBlob=null; pendingDataUrl=null; pendingVideoBlob=null; pendingTranscript=null;
   cameraReturnMode=null;
   openSaveModal('idea', true);
 }
@@ -2279,16 +2283,14 @@ async function toggleModalAudio(){
         }
         if(status) status.textContent='';
       }
-      pendingBlob=blob;
-      document.getElementById('s-type').value='audio';
-      document.getElementById('s-bpm').value='120';
-      showModalMediaPreview('audio', null, blob);
-      // update heading & title
-      const viewProj=projects.find(p=>p.id===view)?view:null;
-      document.getElementById('save-heading').textContent='Save recording';
-      document.getElementById('s-name').value=autoTitle({ts:Date.now(),type:'audio',project:viewProj});
-      // Whisper transcription
-      document.getElementById('transcribe-row').style.display='';
+      pendingBlob=blob; // legacy alias
+      addPendingMedia('audio', blob, blob.type, modalRecSec||null, null);
+      if(document.getElementById('s-bpm').value==='') document.getElementById('s-bpm').value='120';
+      // update title if first media
+      if(pendingMediaList.length===1){
+        const viewProj=projects.find(p=>p.id===view)?view:null;
+        document.getElementById('s-name').value=autoTitle({ts:Date.now(),type:'audio',project:viewProj});
+      }
       updateTranscribePill();
       if(settings.openaiKey&&blob.size>1000&&(settings.autoTranscribe!==false)){
         pendingTranscript='';
@@ -2409,7 +2411,8 @@ function createClearBtn(){
   b.title='Remove media'; b.onclick=clearModalMedia; return b;
 }
 function clearModalMedia(){
-  pendingBlob=null; pendingDataUrl=null; pendingVideoBlob=null;
+  pendingMediaList.forEach(m=>{ if(m.previewUrl) URL.revokeObjectURL(m.previewUrl); });
+  pendingMediaList=[]; pendingBlob=null; pendingDataUrl=null; pendingVideoBlob=null;
   document.getElementById('modal-media-preview').style.display='none';
   document.getElementById('transcribe-row').style.display='none';
   document.getElementById('transcript-fg').style.display='none';
@@ -2451,16 +2454,15 @@ function openCameraForModal(mode){
 function openFile(accept){ const f=document.getElementById('file-in'); f.accept=accept; f.click(); }
 function handleFile(input){
   const file=input.files[0]; if(!file) return;
-  const type=file.type.startsWith('image')?'photo':'video';
-  const r=new FileReader();
-  r.onload=e=>{
-    pendingDataUrl=e.target.result;
-    if(document.getElementById('save-overlay').classList.contains('show')){
-      document.getElementById('s-type').value=type;
-      showModalMediaPreview(type,e.target.result);
-    } else { openSaveModal(type); }
-  };
-  r.readAsDataURL(file);
+  const mime=file.type||'';
+  const type=mime.startsWith('image')?'photo':mime.startsWith('audio')?'audio':'video';
+  const previewUrl=URL.createObjectURL(file);
+  if(document.getElementById('save-overlay').classList.contains('show')){
+    addPendingMedia(type, file, mime, null, previewUrl);
+  } else {
+    openSaveModal(type);
+    addPendingMedia(type, file, mime, null, previewUrl);
+  }
   input.value='';
 }
 
@@ -2495,15 +2497,10 @@ function openSaveModal(type, isNew){
   // media row: show only for new captures
   document.getElementById('modal-media-row').style.display=isNew?'':'none';
   document.getElementById('modal-rec-bar').style.display='none';
-  // media preview
-  const previewEl=document.getElementById('modal-media-preview');
-  if(pendingDataUrl){
-    showModalMediaPreview(type,pendingDataUrl,null);
-  } else {
-    previewEl.style.display='none';
-  }
-  // transcribe toggle — show if audio present
-  const hasAudio=(type==='audio'&&pendingBlob)||false;
+  // render pending media list (may already have items if opened from camera)
+  renderModalMediaList();
+  // transcribe toggle — show if any audio in list
+  const hasAudio=pendingMediaList.some(m=>m.type==='audio');
   document.getElementById('transcribe-row').style.display=hasAudio?'':'none';
   updateTranscribePill();
   document.getElementById('save-overlay').classList.add('show');
@@ -2521,11 +2518,51 @@ function cancelRecording(){
 function closeSave(){
   if(modalRecording) cancelModalAudio();
   document.getElementById('save-overlay').classList.remove('show');
-  pendingBlob=null; pendingDataUrl=null; pendingVideoBlob=null; pendingTranscript=null; editingId=null;
+  pendingMediaList.forEach(m=>{ if(m.previewUrl&&m.type!=='photo') URL.revokeObjectURL(m.previewUrl); });
+  pendingMediaList=[]; pendingBlob=null; pendingDataUrl=null; pendingVideoBlob=null; pendingTranscript=null; editingId=null;
   cameraReturnMode=null;
 }
 
 function adjBpm(d){ const el=document.getElementById('s-bpm'); const v=parseInt(el.value)||120; el.value=Math.max(20,Math.min(300,v+d)); el.dispatchEvent(new Event('input')); }
+
+// ── MULTI-MEDIA IN MODAL ──
+function addPendingMedia(type, blob, mimeType, duration, previewUrl){
+  pendingMediaList.push({type, blob, mimeType, duration:duration||null, previewUrl:previewUrl||null});
+  renderModalMediaList();
+  // auto-set type pill if first media item
+  if(pendingMediaList.length===1){
+    const typeEl=document.getElementById('s-type');
+    if(typeEl&&typeEl.value==='idea') typeEl.value=type;
+    const heading=document.getElementById('save-heading');
+    if(heading) heading.textContent='Save '+(type==='audio'?'recording':type);
+  }
+  // show transcribe toggle if we have audio
+  const hasAudio=pendingMediaList.some(m=>m.type==='audio');
+  document.getElementById('transcribe-row').style.display=hasAudio?'':'none';
+}
+function removePendingMedia(idx){
+  const pm=pendingMediaList[idx];
+  if(pm?.previewUrl) URL.revokeObjectURL(pm.previewUrl);
+  pendingMediaList.splice(idx,1);
+  renderModalMediaList();
+  const hasAudio=pendingMediaList.some(m=>m.type==='audio');
+  document.getElementById('transcribe-row').style.display=hasAudio?'':'none';
+}
+function renderModalMediaList(){
+  const wrap=document.getElementById('modal-media-preview');
+  const list=document.getElementById('modal-media-items');
+  if(!wrap||!list) return;
+  if(!pendingMediaList.length){ wrap.style.display='none'; return; }
+  wrap.style.display='';
+  list.innerHTML=pendingMediaList.map((m,i)=>{
+    const thumb=m.type==='photo'
+      ?`<img src="${m.previewUrl||''}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;display:block">`
+      :m.type==='video'
+      ?`<video src="${m.previewUrl||''}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;display:block" muted playsinline></video>`
+      :`<div style="width:64px;height:64px;border-radius:8px;background:var(--paper3);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--rose)" stroke-width="1.5" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0014 0"/><line x1="12" y1="17" x2="12" y2="21"/><line x1="8" y1="21" x2="16" y2="21"/></svg><span style="font-size:10px;color:var(--ink3)">${m.duration?fmtDur(m.duration):''}</span></div>`;
+    return `<div style="position:relative;flex-shrink:0">${thumb}<button onclick="removePendingMedia(${i})" style="position:absolute;top:-5px;right:-5px;width:18px;height:18px;border-radius:50%;background:var(--ink);border:none;color:white;font-size:11px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center">×</button></div>`;
+  }).join('');
+}
 
 // ── TAG SUGGESTIONS (mood + genre as multi-select tag chips) ──
 // Sources: Universal Production Music + Audio Network + APM Music taxonomies
@@ -2677,22 +2714,19 @@ async function confirmSave(){
     tags:[...currentTags], bpm, key, mood, genre, status,
     duration:modalRecSec||null, transcript
   };
-  const blobForWaveform=(type==='audio'&&pendingBlob)?pendingBlob:null;
-  // Persist media blobs in IndexedDB (entry.data stays null in localStorage)
-  let mediaBlob=null, mediaMime=null;
-  if(pendingBlob&&type==='audio'){ mediaBlob=pendingBlob; mediaMime=pendingBlob.type; }
-  else if(pendingVideoBlob&&type==='video'){ mediaBlob=pendingVideoBlob; mediaMime=pendingVideoBlob.type; }
-  else if(pendingDataUrl&&(type==='photo'||type==='video')){
-    try{ const r=await fetch(pendingDataUrl); mediaBlob=await r.blob(); mediaMime=mediaBlob.type; }catch(_){}
-  }
-  if(mediaBlob){
-    try{
-      await idbPut(entry.id, mediaBlob, mediaMime);
-      entry.hasMedia=true; entry.mimeType=mediaMime;
-      // Populate media[] array (new model)
-      const mediaType=type==='photo'?'photo':type==='video'?'video':'audio';
-      entry.media=[{id:entry.id, type:mediaType, mimeType:mediaMime, duration:modalRecSec||null}];
-    }catch(err){ toast('Could not store media: '+(err.message||'IDB error')); }
+  // Save all pending media items to IDB
+  let blobForWaveform=null;
+  if(pendingMediaList.length>0){
+    entry.media=[]; entry.hasMedia=true;
+    for(const pm of pendingMediaList){
+      const mid=uid();
+      try{
+        await idbPut(mid, pm.blob, pm.mimeType);
+        entry.media.push({id:mid, type:pm.type, mimeType:pm.mimeType, duration:pm.duration||null});
+        if(pm.type==='audio'&&!blobForWaveform) blobForWaveform=pm.blob;
+      }catch(err){ toast('Could not store media: '+(err.message||'error')); }
+    }
+    if(entry.media.length>0) entry.mimeType=entry.media[0].mimeType;
   }
   const savedId=entry.id;
   entries.unshift(entry);
@@ -2703,7 +2737,7 @@ async function confirmSave(){
   }
   scheduleGdPush();
   closeSave(); render(); renderProjects(); renderHeatmap();
-  modalRecSec=0; pendingBlob=null; pendingDataUrl=null; pendingVideoBlob=null;
+  modalRecSec=0;
   toast('Saved');
   if(blobForWaveform){
     computeWaveform(blobForWaveform).then(waveform=>{
@@ -2925,17 +2959,15 @@ async function shootPhoto(){
     await _attachBlobToEntry(curEntry.id, blob, 'image/jpeg', 'photo');
     return;
   }
-  // If save modal already has media, warn and attach after saving
-  if(document.getElementById('save-overlay').classList.contains('show')&&(pendingBlob||pendingDataUrl||pendingVideoBlob)){
-    toast('Save this entry first — then use Add media for more files'); return;
-  }
-  pendingDataUrl=dataUrl;
+  pendingDataUrl=dataUrl; // legacy alias
   if(document.getElementById('save-overlay').classList.contains('show')){
-    document.getElementById('s-type').value='photo';
-    document.getElementById('save-heading').textContent='Save photo';
-    showModalMediaPreview('photo',dataUrl,null);
+    // Modal already open — ADD photo to pending list
+    const r=await fetch(dataUrl); const blob=await r.blob();
+    addPendingMedia('photo', blob, 'image/jpeg', null, dataUrl);
   } else {
     openSaveModal('photo');
+    const r=await fetch(dataUrl); const blob=await r.blob();
+    addPendingMedia('photo', blob, 'image/jpeg', null, dataUrl);
   }
   cameraReturnMode=null;
 }
@@ -2975,18 +3007,14 @@ async function startCamVideo(){
       await _attachBlobToEntry(curEntry.id, blob, mime, 'video');
       return;
     }
-    if(document.getElementById('save-overlay').classList.contains('show')&&(pendingBlob||pendingDataUrl||pendingVideoBlob)){
-      toast('Save this entry first — then use Add media for more files'); return;
-    }
-    pendingVideoBlob=blob;
-    pendingDataUrl=null;
+    pendingVideoBlob=blob; // legacy alias
     const previewUrl=URL.createObjectURL(blob);
     if(document.getElementById('save-overlay').classList.contains('show')){
-      document.getElementById('s-type').value='video';
-      document.getElementById('save-heading').textContent='Save video';
-      showModalMediaPreview('video', previewUrl, blob);
+      // Modal already open — ADD video to pending list
+      addPendingMedia('video', blob, mime, null, previewUrl);
     } else {
       openSaveModal('video');
+      addPendingMedia('video', blob, mime, null, previewUrl);
     }
     cameraReturnMode=null;
   };
