@@ -1634,7 +1634,7 @@ audio { display: none; }
 <div id="toast"></div>
 <div id="hm-tooltip" class="hm-tooltip"></div>
 <input type="file" id="file-in" style="display:none" onchange="handleFile(this)">
-<input type="file" id="attach-in" accept="image/*,video/*,audio/*" style="display:none" onchange="handleAttach(this)">
+<input type="file" id="attach-in" accept="image/*,video/*,audio/*,.txt,.md,.markdown" style="display:none" onchange="handleAttach(this)">
 
 <script>
 const DB='hum_entries', PJ='hum_projects', LV='hum_layout', ST='hum_settings';
@@ -2805,16 +2805,7 @@ function closeDetail(){
   document.getElementById('detail').classList.remove('open'); closeExpPop(); curEntry=null; updateFab();
 }
 function updateFab(){
-  const fab=document.getElementById('mob-fab'); if(!fab) return;
-  if(curEntry){
-    fab.innerHTML='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>';
-    fab.setAttribute('aria-label','Add media');
-    fab.onclick=()=>attachToEntry(curEntry.id);
-  } else {
-    fab.innerHTML='<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>';
-    fab.setAttribute('aria-label','New capture');
-    fab.onclick=openNewCapture;
-  }
+  // FAB always stays as "new capture" — "Add media" button is in the detail body
 }
 function toggleExpPop(ev){ ev.stopPropagation(); const p=document.getElementById('exp-pop'); p.classList.toggle('open'); }
 function closeExpPop(){ const p=document.getElementById('exp-pop'); if(p) p.classList.remove('open'); }
@@ -2832,6 +2823,22 @@ function delEntry(id){
   closeDetail(); render(); renderHeatmap(); toast('Deleted');
 }
 
+// Shared helper: store a blob as a new media item on an existing entry
+async function _attachBlobToEntry(entryId, blob, mimeType, mediaType){
+  const idx=entries.findIndex(x=>x.id===entryId); if(idx<0) return;
+  const mid=uid();
+  try{
+    await idbPut(mid, blob, mimeType);
+    const e=entries[idx];
+    if(!e.media) e.media=[];
+    e.media.push({id:mid, type:mediaType, mimeType, duration:null});
+    e.hasMedia=true;
+    try{ persist(); }catch(_){}
+    scheduleGdPush();
+    render(); openDetail(entryId); toast(mediaType.charAt(0).toUpperCase()+mediaType.slice(1)+' added');
+  }catch(err){ toast('Could not attach: '+(err.message||'error')); }
+}
+
 let attachTargetId=null;
 function attachToEntry(id){
   attachTargetId=id;
@@ -2839,25 +2846,21 @@ function attachToEntry(id){
 }
 async function handleAttach(input){
   const file=input.files[0]; if(!file||!attachTargetId) return;
-  const mime=file.type;
-  const mediaType=mime.startsWith('image')?'photo':mime.startsWith('video')?'video':'audio';
-  const idx=entries.findIndex(x=>x.id===attachTargetId);
-  if(idx<0){ attachTargetId=null; input.value=''; return; }
-  const mid=uid(); // new media item id
-  try{
-    await idbPut(mid, file, mime);
+  const mime=file.type||'';
+  const tid=attachTargetId; attachTargetId=null; input.value='';
+  // Text files → read content, append to note
+  if(mime.startsWith('text/')||/\.(txt|md|markdown)$/i.test(file.name)){
+    const text=await file.text();
+    const idx=entries.findIndex(x=>x.id===tid); if(idx<0) return;
     const e=entries[idx];
-    if(!e.media) e.media=[];
-    e.media.push({id:mid, type:mediaType, mimeType:mime, duration:null});
-    e.hasMedia=true;
-    // update primary type if entry has no media type yet
-    if(!['audio','photo','video'].includes(e.type)) e.type=mediaType;
+    e.note=(e.note?e.note+'\n\n':'')+'— '+file.name+' —\n'+text;
     try{ persist(); }catch(_){}
-    scheduleGdPush();
-    render(); openDetail(attachTargetId); toast('Added '+mediaType);
-  }catch(err){ toast('Attach failed: '+(err.message||'storage error')); }
-  attachTargetId=null;
-  input.value='';
+    render(); openDetail(tid); toast('Text added to note');
+    return;
+  }
+  // Media files → store in IDB
+  const mediaType=mime.startsWith('image')?'photo':mime.startsWith('video')?'video':'audio';
+  await _attachBlobToEntry(tid, file, mime, mediaType);
 }
 
 // ── CAMERA ──
@@ -2899,16 +2902,21 @@ async function flipCamera(){
   camFacing=camFacing==='environment'?'user':'environment';
   await startCamStream();
 }
-function shootPhoto(){
+async function shootPhoto(){
   const video=document.getElementById('cam-video');
   const canvas=document.getElementById('cam-canvas');
   canvas.width=video.videoWidth; canvas.height=video.videoHeight;
   canvas.getContext('2d').drawImage(video,0,0);
   const dataUrl=canvas.toDataURL('image/jpeg',0.9);
-  pendingDataUrl=dataUrl;
   closeCamera();
+  // If detail panel is open and camera wasn't launched from save modal → attach to entry
+  if(curEntry && !cameraReturnMode && !document.getElementById('save-overlay').classList.contains('show')){
+    const r=await fetch(dataUrl); const blob=await r.blob();
+    await _attachBlobToEntry(curEntry.id, blob, 'image/jpeg', 'photo');
+    return;
+  }
+  pendingDataUrl=dataUrl;
   if(document.getElementById('save-overlay').classList.contains('show')){
-    // modal already open (opened from +) — populate it
     document.getElementById('s-type').value='photo';
     document.getElementById('save-heading').textContent='Save photo';
     showModalMediaPreview('photo',dataUrl,null);
@@ -2944,13 +2952,18 @@ async function startCamVideo(){
   camMR=mr;
   camMR.ondataavailable=e=>{ if(e.data&&e.data.size>0) camChunks.push(e.data); };
   camMR.onerror=e=>{ toast('Recording error: '+(e.error?.message||e)); stopCamVideo(); };
-  camMR.onstop=()=>{
+  camMR.onstop=async()=>{
     const mime=camMR.mimeType||'video/mp4';
     const blob=new Blob(camChunks,{type:mime});
-    pendingVideoBlob=blob; // keep blob for saving
-    pendingDataUrl=null;
-    const previewUrl=URL.createObjectURL(blob); // use object URL for playable preview
     closeCamera();
+    // If detail panel is open and camera wasn't launched from save modal → attach to entry
+    if(curEntry && !cameraReturnMode && !document.getElementById('save-overlay').classList.contains('show')){
+      await _attachBlobToEntry(curEntry.id, blob, mime, 'video');
+      return;
+    }
+    pendingVideoBlob=blob;
+    pendingDataUrl=null;
+    const previewUrl=URL.createObjectURL(blob);
     if(document.getElementById('save-overlay').classList.contains('show')){
       document.getElementById('s-type').value='video';
       document.getElementById('save-heading').textContent='Save video';
