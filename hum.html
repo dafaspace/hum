@@ -838,12 +838,13 @@ body {
   position: fixed; bottom: 20px; left: 50%;
   transform: translateX(-50%) translateY(16px);
   background: var(--ink); color: white;
-  padding: 10px 22px; border-radius: 100px;
+  padding: 10px 18px; border-radius: 100px;
   font-size: 13px; font-weight: 400;
   opacity: 0; pointer-events: none; z-index: 300;
-  transition: all 0.22s; white-space: nowrap;
+  transition: opacity 0.22s, transform 0.22s; white-space: nowrap;
+  display: flex; align-items: center; gap: 4px;
 }
-#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
 
 /* ── SETTINGS ── */
 .settings-btn {
@@ -1213,6 +1214,9 @@ body {
 
   /* Padding at bottom so FAB doesn't cover last item */
   #content { padding-bottom: calc(100px + env(safe-area-inset-bottom)); }
+
+  /* Toast above the FAB on mobile (FAB is 58px at bottom 28px + safe-area) */
+  #toast { bottom: calc(104px + env(safe-area-inset-bottom)); }
 
   /* ── DETAIL ── */
   #detail { width: 100%; border-left: none; }
