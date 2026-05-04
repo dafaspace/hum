@@ -798,6 +798,26 @@ body {
 .dsec-label { font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink3); margin-bottom: 8px; display: block; font-weight: 500; }
 .detail-text { font-size: 14.5px; color: var(--ink2); line-height: 1.8; white-space: pre-wrap; }
 
+/* ── CHORD SECTION ── */
+.chord-pills { display: flex; flex-wrap: wrap; gap: 5px; }
+.chord-pill {
+  display: inline-flex; flex-direction: column; align-items: center;
+  background: var(--paper2); border: 1px solid var(--paper4);
+  border-radius: 10px; padding: 5px 10px; cursor: pointer;
+  transition: all 0.12s; min-width: 36px;
+}
+.chord-pill:hover { background: var(--paper3); border-color: var(--ink4); }
+.chord-pill-name { font-size: 13px; font-weight: 600; color: var(--ink); font-family: var(--sans); line-height: 1.2; }
+.chord-pill-t { font-size: 9px; color: var(--ink3); margin-top: 2px; font-family: var(--sans); }
+.chord-analyse-btn {
+  font-size: 11px; padding: 4px 11px; border-radius: 7px;
+  border: 1px solid var(--paper4); background: var(--paper2);
+  color: var(--ink2); cursor: pointer; font-family: var(--sans);
+  transition: all 0.12s;
+}
+.chord-analyse-btn:hover { background: var(--paper3); }
+.chord-analyse-btn:disabled { opacity: 0.5; pointer-events: none; }
+
 .detail-player { background: var(--paper2); border-radius: 14px; padding: 14px 16px; }
 .player-wave { height: 44px; display: flex; align-items: center; gap: 2px; margin-bottom: 12px; }
 .pwbar { border-radius: 2px; background: var(--rose); opacity: 0.55; flex: 1; max-width: 6px; }
@@ -2925,6 +2945,21 @@ function openDetail(id){
     const secLabel=mediaItems.length>1?`Media (${mediaItems.length})`:(mediaItems[0].type==='audio'?'Recording':mediaItems[0].type==='photo'?'Photo':'Video');
     h+=`<div class="dsec"><span class="dsec-label">${secLabel}</span>${mh}</div>`;
   }
+  // Chord section — only for entries with audio
+  const hasAudio=mediaItems.some(m=>m.type==='audio')||(e.type==='audio'&&(e.hasMedia||e.data));
+  if(hasAudio){
+    const chordHeader=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <span class="dsec-label" style="margin-bottom:0">Chords</span>
+      <div style="display:flex;gap:6px;align-items:center">
+        ${e.chords?.length?`<button class="chord-analyse-btn" onclick="copyChords('${e.id}')">Copy</button>`:''}
+        <button class="chord-analyse-btn" id="chord-btn-${e.id}" onclick="runChordAnalysis('${e.id}')">Analyse</button>
+      </div>
+    </div>`;
+    const chordBody=e.chords?.length
+      ? `<div class="chord-pills">${e.chords.map((c,i)=>`<div class="chord-pill" onclick="seekToChord('${e.id}',${c.t})"><span class="chord-pill-name">${escHtml(c.chord)}</span><span class="chord-pill-t">${fmtDur(Math.floor(c.t))}</span></div>`).join('')}</div>`
+      : `<div style="font-size:12px;color:var(--ink3)">Press Analyse to detect chords</div>`;
+    h+=`<div class="dsec">${chordHeader}${chordBody}</div>`;
+  }
   if(e.transcript) h+=`<div class="dsec"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><span class="dsec-label" style="margin-bottom:0">Transcript</span><button onclick="navigator.clipboard.writeText(${JSON.stringify(e.transcript)}).then(()=>toast('Copied'))" style="font-size:11px;padding:3px 9px;border-radius:6px;border:1px solid var(--paper4);background:var(--paper2);color:var(--ink2);cursor:pointer;font-family:var(--sans)">Copy</button></div><div class="detail-text">${escHtml(e.transcript)}</div></div>`;
   if(e.note||e.text) h+=`<div class="dsec"><span class="dsec-label">Note</span><div class="detail-text">${escHtml(e.note||e.text)}</div></div>`;
   const metas=[];
@@ -3434,6 +3469,131 @@ function audioBufferToWav(buf){
   new Int16Array(wavBuf,44).set(pcm);
   return new Blob([wavBuf],{type:'audio/wav'});
 }
+// ── CHORD DETECTION ────────────────────────────────────────────────────────
+// Template-matching on short-time chromagrams. Reuses _fftIP from key detection.
+// Chord types: major, minor, dom7, maj7, min7 × 12 roots = 60 templates.
+
+const _CNAMES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const _CHORD_TMPLS=(()=>{
+  const types={'':[0,4,7],'m':[0,3,7],'7':[0,4,7,10],'maj7':[0,4,7,11],'m7':[0,3,7,10]};
+  const out=[];
+  for(let r=0;r<12;r++){
+    for(const [sfx,ivls] of Object.entries(types)){
+      const tpl=new Float32Array(12);
+      ivls.forEach(i=>{tpl[(r+i)%12]=1;});
+      const mag=Math.sqrt(ivls.length);
+      for(let i=0;i<12;i++) tpl[i]/=mag;
+      out.push({name:_CNAMES[r]+sfx, tpl});
+    }
+  }
+  return out;
+})();
+
+async function analyzeChords(blob, bpm){
+  const ab=await blob.arrayBuffer();
+  const ctx=new (window.AudioContext||window.webkitAudioContext)({sampleRate:11025});
+  let buf;
+  try{ buf=await ctx.decodeAudioData(ab); }
+  finally{ ctx.close(); }
+  const sr=buf.sampleRate, data=buf.getChannelData(0);
+
+  // Segment: 1 beat if BPM known, else 0.5s — min 0.25s
+  const segSec=bpm?Math.max(0.25,60/bpm):0.5;
+  const segLen=Math.round(segSec*sr);
+  const hopLen=Math.round(segLen/2); // 50% overlap
+
+  const N=2048;
+  const hann=new Float32Array(N);
+  for(let i=0;i<N;i++) hann[i]=0.5*(1-Math.cos(2*Math.PI*i/(N-1)));
+
+  // Bin→pitch class map (C2–C7)
+  const binPC=new Int8Array(N/2).fill(-1);
+  for(let k=1;k<N/2;k++){
+    const freq=k*sr/N;
+    if(freq<65||freq>2100) continue;
+    const midi=Math.round(69+12*Math.log2(freq/440));
+    binPC[k]=((midi%12)+12)%12;
+  }
+
+  const raw=[];
+  for(let off=0;off+segLen<=data.length;off+=hopLen){
+    const t=off/sr;
+    const chroma=new Float32Array(12);
+    let nf=0;
+    for(let fo=off;fo+N<=off+segLen&&fo+N<=data.length;fo+=Math.round(N/2)){
+      const re=new Float32Array(N),im=new Float32Array(N);
+      for(let i=0;i<N;i++) re[i]=data[fo+i]*hann[i];
+      _fftIP(re,im);
+      for(let k=1;k<N/2;k++){
+        const pc=binPC[k]; if(pc<0) continue;
+        chroma[pc]+=Math.sqrt(re[k]*re[k]+im[k]*im[k]);
+      }
+      nf++;
+    }
+    if(!nf) continue;
+    // Normalise to unit length
+    let norm=0; for(let i=0;i<12;i++) norm+=chroma[i]*chroma[i];
+    norm=Math.sqrt(norm)||1; for(let i=0;i<12;i++) chroma[i]/=norm;
+    // Match templates
+    let best=-1,chord=null;
+    for(const tmpl of _CHORD_TMPLS){
+      let dot=0; for(let i=0;i<12;i++) dot+=chroma[i]*tmpl.tpl[i];
+      if(dot>best){best=dot;chord=tmpl.name;}
+    }
+    if(best>0.5) raw.push({t:Math.round(t*10)/10, chord});
+  }
+
+  // Deduplicate consecutive same chords
+  const merged=[];
+  for(const r of raw){
+    if(!merged.length||merged[merged.length-1].chord!==r.chord)
+      merged.push({t:r.t,chord:r.chord});
+  }
+  return merged;
+}
+
+async function runChordAnalysis(entryId){
+  const e=entries.find(x=>x.id===entryId); if(!e) return;
+  const btn=document.getElementById(`chord-btn-${entryId}`);
+  if(btn){btn.disabled=true;btn.textContent='Analysing…';}
+  try{
+    // Get first audio media blob
+    const audioItem=(e.media||[]).find(m=>m.type==='audio')||
+                    ((e.hasMedia&&e.type==='audio')?{id:e.id}:null);
+    if(!audioItem){ toast('No audio found'); return; }
+    let blob=null;
+    if(typeof e.data==='string'&&e.data.startsWith('data:')){
+      const r=await fetch(e.data); blob=await r.blob();
+    } else {
+      const rec=await idbGet(audioItem.id); blob=rec?.blob||null;
+    }
+    if(!blob){ toast('Audio not available'); return; }
+    const chords=await analyzeChords(blob, e.bpm||null);
+    if(!chords.length){ toast('No clear chords detected'); return; }
+    const idx=entries.findIndex(x=>x.id===entryId); if(idx<0) return;
+    entries[idx].chords=chords;
+    try{ persist(); }catch(_){}
+    openDetail(entryId);
+    toast(`Found ${chords.length} chord${chords.length===1?'':'s'}`);
+  }catch(err){
+    toast('Analysis failed: '+(err.message||'error'));
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent='Re-analyse';}
+  }
+}
+
+function seekToChord(entryId, t){
+  // Find first audio player in detail panel and seek
+  const audio=document.querySelector('#detail-body audio');
+  if(audio&&audio.duration) audio.currentTime=t;
+}
+
+function copyChords(entryId){
+  const e=entries.find(x=>x.id===entryId); if(!e?.chords?.length) return;
+  const text=e.chords.map(c=>c.chord).join(' - ');
+  navigator.clipboard.writeText(text).then(()=>toast('Chords copied'));
+}
+
 // ── AUTO BPM + KEY HELPER ──────────────────────────────────────────────────
 // Runs both detections in parallel after audio blob is ready.
 function _autoBpmKey(blob){
