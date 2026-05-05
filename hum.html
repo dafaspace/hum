@@ -2913,6 +2913,7 @@ async function confirmSave(){
   scheduleGdPush();
   closeSave(); render(); renderProjects(); renderHeatmap();
   modalRecSec=0;
+  openDetail(savedId);
   toast('Saved');
   if(blobForWaveform){
     computeWaveform(blobForWaveform).then(waveform=>{
