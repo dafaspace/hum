@@ -1459,6 +1459,25 @@ audio { display: none; }
       </div>
       <div id="transcript-text" style="font-size:13px;color:var(--ink2);line-height:1.7;white-space:pre-wrap"></div>
     </div>
+    <!-- Chord + MIDI analysis (shown when audio is pending) -->
+    <div id="modal-analysis-row" class="transcribe-row" style="display:none">
+      <span id="modal-analysis-status" style="font-size:11px;color:var(--ink3);flex:1"></span>
+      <button class="chord-analyse-btn" id="modal-chord-btn" onclick="modalAnalyseChords()">Chords</button>
+      <button class="chord-analyse-btn" id="modal-midi-btn" onclick="modalGenerateMidi()">MIDI</button>
+    </div>
+    <!-- Chord result in modal -->
+    <div id="modal-chord-box" style="display:none;margin-top:8px;background:var(--paper2);border-radius:10px;padding:10px 12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <span style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink3);font-weight:500">Chords</span>
+        <button onclick="if(pendingChords)navigator.clipboard.writeText(pendingChords.map(c=>c.chord).join(' - ')).then(()=>toast('Copied'))" style="font-size:11px;padding:3px 9px;border-radius:6px;border:1px solid var(--paper4);background:var(--paper3);color:var(--ink2);cursor:pointer;font-family:var(--sans)">Copy</button>
+      </div>
+      <div id="modal-chord-pills" class="chord-pills"></div>
+    </div>
+    <!-- MIDI result in modal -->
+    <div id="modal-midi-box" style="display:none;margin-top:8px;background:var(--paper2);border-radius:10px;padding:10px 12px">
+      <span style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink3);font-weight:500">MIDI</span>
+      <div id="modal-midi-info" style="font-size:13px;color:var(--ink2);margin-top:4px"></div>
+    </div>
     <!-- transcript-fg kept for WAV conversion status only, always hidden -->
     <div id="transcript-fg" style="display:none">
       <div id="transcript-status-wav"></div>
@@ -1724,6 +1743,8 @@ const DB='hum_entries', PJ='hum_projects', LV='hum_layout', ST='hum_settings';
 let entries=JSON.parse(localStorage.getItem(DB)||'[]');
 let settings=JSON.parse(localStorage.getItem(ST)||'{}');
 let pendingTranscript=null;
+let pendingChords=null; // [{t, chord}] from modal analysis
+let pendingMidi=null;   // [{t, d, p, v}] from modal MIDI generation
 let projects=JSON.parse(localStorage.getItem(PJ)||'[]');
 let layout=localStorage.getItem(LV)||'grid';
 let view='all', curEntry=null, typeFilter='';
@@ -2411,7 +2432,7 @@ let cameraReturnMode=null; // 'photo'|'video'|null — camera was opened from mo
 let modalRecording=false, modalRecInterval=null, modalRecSec=0, modalRecStream=null;
 
 function openNewCapture(){
-  pendingMediaList=[]; pendingBlob=null; pendingDataUrl=null; pendingVideoBlob=null; pendingTranscript=null;
+  pendingMediaList=[]; pendingBlob=null; pendingDataUrl=null; pendingVideoBlob=null; pendingTranscript=null; pendingChords=null; pendingMidi=null;
   cameraReturnMode=null;
   openSaveModal('idea', true);
 }
@@ -2616,6 +2637,58 @@ function toggleAutoTranscribe(){
   updateTranscribePill();
 }
 
+// ── MODAL CHORD + MIDI ANALYSIS ──
+function _getPendingAudioBlob(){
+  const item=pendingMediaList.find(m=>m.type==='audio');
+  return item?.blob||null;
+}
+
+async function modalAnalyseChords(){
+  const blob=_getPendingAudioBlob(); if(!blob){ toast('No audio'); return; }
+  const btn=document.getElementById('modal-chord-btn');
+  const status=document.getElementById('modal-analysis-status');
+  if(btn){ btn.disabled=true; btn.textContent='Analysing…'; }
+  try{
+    const bpm=parseInt(document.getElementById('s-bpm').value)||null;
+    const chords=await analyzeChords(blob, bpm);
+    if(!chords.length){ toast('No clear chords detected'); return; }
+    pendingChords=chords;
+    const box=document.getElementById('modal-chord-box');
+    const pills=document.getElementById('modal-chord-pills');
+    pills.innerHTML=chords.map(c=>`<div class="chord-pill"><span class="chord-pill-name">${escHtml(c.chord)}</span><span class="chord-pill-t">${fmtDur(Math.floor(c.t))}</span></div>`).join('');
+    box.style.display='';
+    if(status) status.textContent=`${chords.length} chord${chords.length===1?'':'s'}`;
+  }catch(err){
+    toast('Chord analysis failed'); if(status) status.textContent='';
+  }finally{
+    if(btn){ btn.disabled=false; btn.textContent='Chords'; }
+  }
+}
+
+async function modalGenerateMidi(){
+  const blob=_getPendingAudioBlob(); if(!blob){ toast('No audio'); return; }
+  const btn=document.getElementById('modal-midi-btn');
+  const status=document.getElementById('modal-analysis-status');
+  if(btn){ btn.disabled=true; btn.textContent='Working…'; }
+  try{
+    const notes=await generateMidi(blob, msg=>{ if(status) status.textContent=msg; });
+    if(!notes.length){ toast('No notes detected'); return; }
+    pendingMidi=notes;
+    const lo=Math.min(...notes.map(n=>n.p));
+    const hi=Math.max(...notes.map(n=>n.p));
+    const box=document.getElementById('modal-midi-box');
+    const info=document.getElementById('modal-midi-info');
+    info.textContent=`${notes.length} notes · ${midiToNoteName(lo)}–${midiToNoteName(hi)}`;
+    box.style.display='';
+    if(status) status.textContent='MIDI ready';
+  }catch(err){
+    toast('MIDI generation failed');
+    if(status) status.textContent='';
+  }finally{
+    if(btn){ btn.disabled=false; btn.textContent='MIDI'; }
+  }
+}
+
 // ── CAMERA FROM MODAL ──
 let camPendingVideoMode=false;
 function openCameraForModal(mode){
@@ -2672,6 +2745,12 @@ function openSaveModal(type, isNew){
   // media row: show only for new captures
   document.getElementById('modal-media-row').style.display=isNew?'':'none';
   document.getElementById('modal-rec-bar').style.display='none';
+  // analysis rows — hidden until audio added
+  document.getElementById('modal-analysis-row').style.display='none';
+  document.getElementById('modal-analysis-status').textContent='';
+  document.getElementById('modal-chord-box').style.display='none';
+  document.getElementById('modal-midi-box').style.display='none';
+  pendingChords=null; pendingMidi=null;
   // render pending media list (may already have items if opened from camera)
   renderModalMediaList();
   // transcribe toggle — show if any audio in list
@@ -2694,7 +2773,7 @@ function closeSave(){
   if(modalRecording) cancelModalAudio();
   document.getElementById('save-overlay').classList.remove('show');
   pendingMediaList.forEach(m=>{ if(m.previewUrl&&m.type!=='photo') URL.revokeObjectURL(m.previewUrl); });
-  pendingMediaList=[]; pendingBlob=null; pendingDataUrl=null; pendingVideoBlob=null; pendingTranscript=null; editingId=null;
+  pendingMediaList=[]; pendingBlob=null; pendingDataUrl=null; pendingVideoBlob=null; pendingTranscript=null; pendingChords=null; pendingMidi=null; editingId=null;
   cameraReturnMode=null;
 }
 
@@ -2711,17 +2790,25 @@ function addPendingMedia(type, blob, mimeType, duration, previewUrl){
     const heading=document.getElementById('save-heading');
     if(heading) heading.textContent='Save '+(type==='audio'?'recording':type);
   }
-  // show transcribe toggle if we have audio
-  const hasAudio=pendingMediaList.some(m=>m.type==='audio');
-  document.getElementById('transcribe-row').style.display=hasAudio?'':'none';
+  // show transcribe + analysis toggles if we have audio
+  _updateModalAudioRows();
 }
 function removePendingMedia(idx){
   const pm=pendingMediaList[idx];
   if(pm?.previewUrl) URL.revokeObjectURL(pm.previewUrl);
   pendingMediaList.splice(idx,1);
   renderModalMediaList();
+  _updateModalAudioRows();
+}
+function _updateModalAudioRows(){
   const hasAudio=pendingMediaList.some(m=>m.type==='audio');
   document.getElementById('transcribe-row').style.display=hasAudio?'':'none';
+  document.getElementById('modal-analysis-row').style.display=hasAudio?'':'none';
+  if(!hasAudio){
+    document.getElementById('modal-chord-box').style.display='none';
+    document.getElementById('modal-midi-box').style.display='none';
+    pendingChords=null; pendingMidi=null;
+  }
 }
 function renderModalMediaList(){
   const wrap=document.getElementById('modal-media-preview');
@@ -2887,7 +2974,9 @@ async function confirmSave(){
     id:uid(), ts:Date.now(), type,
     name:name||null, project:proj||null, note,
     tags:[...currentTags], bpm, key, mood, genre, status,
-    duration:modalRecSec||null, transcript
+    duration:modalRecSec||null, transcript,
+    chords:pendingChords||undefined,
+    midi:pendingMidi||undefined
   };
   // Save all pending media items to IDB
   let blobForWaveform=null;
