@@ -3668,14 +3668,24 @@ async function downloadMidi(entryId){
 // Chord types: major, minor, dom7, maj7, min7 × 12 roots = 60 templates.
 
 const _CNAMES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+// Weighted chord templates: root=1.0, 5th=0.85, 3rd=0.7, 7th=0.6
+// Then normalised to unit length for cosine similarity.
 const _CHORD_TMPLS=(()=>{
-  const types={'':[0,4,7],'m':[0,3,7],'7':[0,4,7,10],'maj7':[0,4,7,11],'m7':[0,3,7,10]};
+  const types={
+    '':    [[0,1.0],[4,0.7],[7,0.85]],            // major
+    'm':   [[0,1.0],[3,0.7],[7,0.85]],            // minor
+    '7':   [[0,1.0],[4,0.65],[7,0.8],[10,0.6]],   // dom7
+    'maj7':[[0,1.0],[4,0.65],[7,0.8],[11,0.6]],   // maj7
+    'm7':  [[0,1.0],[3,0.65],[7,0.8],[10,0.6]]    // min7
+  };
   const out=[];
   for(let r=0;r<12;r++){
-    for(const [sfx,ivls] of Object.entries(types)){
+    for(const [sfx,intervals] of Object.entries(types)){
       const tpl=new Float32Array(12);
-      ivls.forEach(i=>{tpl[(r+i)%12]=1;});
-      const mag=Math.sqrt(ivls.length);
+      intervals.forEach(([i,w])=>{tpl[(r+i)%12]=w;});
+      // Normalise to unit length
+      let mag=0; for(let i=0;i<12;i++) mag+=tpl[i]*tpl[i];
+      mag=Math.sqrt(mag)||1;
       for(let i=0;i<12;i++) tpl[i]/=mag;
       out.push({name:_CNAMES[r]+sfx, tpl});
     }
@@ -3685,56 +3695,82 @@ const _CHORD_TMPLS=(()=>{
 
 async function analyzeChords(blob, bpm){
   const ab=await blob.arrayBuffer();
-  const ctx=new (window.AudioContext||window.webkitAudioContext)({sampleRate:11025});
+  // 22050 Hz for better frequency resolution
+  const ctx=new (window.AudioContext||window.webkitAudioContext)({sampleRate:22050});
   let buf;
   try{ buf=await ctx.decodeAudioData(ab); }
   finally{ ctx.close(); }
   const sr=buf.sampleRate, data=buf.getChannelData(0);
 
-  // Segment: 1 beat if BPM known, else 0.5s — min 0.25s
-  const segSec=bpm?Math.max(0.25,60/bpm):0.5;
+  // Long segments: 2 sec, hop 1 sec — chords rarely change faster
+  const segSec=2.0;
+  const hopSec=1.0;
   const segLen=Math.round(segSec*sr);
-  const hopLen=Math.round(segLen/2); // 50% overlap
+  const hopLen=Math.round(hopSec*sr);
 
-  const N=2048;
+  // 8192-point FFT → freq resolution ~2.7 Hz at 22050 Hz
+  // Separates semitones even in low octaves (C2=65 Hz vs C#2=69 Hz)
+  const N=8192;
   const hann=new Float32Array(N);
   for(let i=0;i<N;i++) hann[i]=0.5*(1-Math.cos(2*Math.PI*i/(N-1)));
 
-  // Bin→pitch class map (C2–C7)
+  // Bin→pitch class map (C2–B5, ~65–1000 Hz)
+  // Upper limit kept low to avoid harmonic contamination from upper partials
   const binPC=new Int8Array(N/2).fill(-1);
   for(let k=1;k<N/2;k++){
     const freq=k*sr/N;
-    if(freq<65||freq>2100) continue;
+    if(freq<60||freq>1050) continue;
     const midi=Math.round(69+12*Math.log2(freq/440));
     binPC[k]=((midi%12)+12)%12;
   }
+
+  const hpsOrder=3; // Harmonic Product Spectrum order
+  const hpsLen=Math.floor(N/2/hpsOrder); // usable bins after HPS
 
   const raw=[];
   for(let off=0;off+segLen<=data.length;off+=hopLen){
     const t=off/sr;
     const chroma=new Float32Array(12);
     let nf=0;
+
+    // Multiple FFT frames within each segment
     for(let fo=off;fo+N<=off+segLen&&fo+N<=data.length;fo+=Math.round(N/2)){
       const re=new Float32Array(N),im=new Float32Array(N);
       for(let i=0;i<N;i++) re[i]=data[fo+i]*hann[i];
       _fftIP(re,im);
-      for(let k=1;k<N/2;k++){
+
+      // Compute magnitude spectrum
+      const mag=new Float32Array(N/2);
+      for(let k=0;k<N/2;k++) mag[k]=Math.sqrt(re[k]*re[k]+im[k]*im[k]);
+
+      // Harmonic Product Spectrum: S(k)×S(2k)×S(3k)
+      // Emphasises fundamentals by requiring energy at harmonic positions
+      for(let k=1;k<hpsLen;k++){
         const pc=binPC[k]; if(pc<0) continue;
-        chroma[pc]+=Math.sqrt(re[k]*re[k]+im[k]*im[k]);
+        let hps=mag[k];
+        for(let h=2;h<=hpsOrder;h++) hps*=(k*h<mag.length)?mag[k*h]:0;
+        // Cube root compresses dynamic range after multiplication
+        chroma[pc]+=Math.cbrt(Math.max(0,hps));
       }
       nf++;
     }
     if(!nf) continue;
+
     // Normalise to unit length
     let norm=0; for(let i=0;i<12;i++) norm+=chroma[i]*chroma[i];
     norm=Math.sqrt(norm)||1; for(let i=0;i<12;i++) chroma[i]/=norm;
-    // Match templates
-    let best=-1,chord=null;
+
+    // Match templates — track best and second-best
+    let best=-1,chord=null,secondBest=-1;
     for(const tmpl of _CHORD_TMPLS){
       let dot=0; for(let i=0;i<12;i++) dot+=chroma[i]*tmpl.tpl[i];
-      if(dot>best){best=dot;chord=tmpl.name;}
+      if(dot>best){ secondBest=best; best=dot; chord=tmpl.name; }
+      else if(dot>secondBest){ secondBest=dot; }
     }
-    if(best>0.5) raw.push({t:Math.round(t*10)/10, chord});
+    // Accept only if high confidence AND clear margin over runner-up
+    if(best>0.7&&(best-secondBest)>0.04){
+      raw.push({t:Math.round(t*10)/10, chord, score:best});
+    }
   }
 
   // Deduplicate consecutive same chords
