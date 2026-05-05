@@ -818,6 +818,24 @@ body {
 .chord-analyse-btn:hover { background: var(--paper3); }
 .chord-analyse-btn:disabled { opacity: 0.5; pointer-events: none; }
 
+/* ── MIDI SECTION ── */
+.midi-info {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+  gap: 10px; margin-bottom: 10px;
+}
+.midi-info-cell {
+  background: var(--paper2); border-radius: 10px; padding: 8px 10px;
+}
+.midi-info-k { font-size: 9.5px; color: var(--ink3); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 2px; }
+.midi-info-v { font-size: 13px; font-weight: 600; color: var(--ink); font-family: var(--sans); }
+.midi-progress {
+  font-size: 12px; color: var(--ink2); padding: 8px 12px;
+  background: var(--paper2); border-radius: 10px;
+}
+.midi-warn {
+  font-size: 11px; color: var(--ink3); margin-top: 6px; line-height: 1.5;
+}
+
 .detail-player { background: var(--paper2); border-radius: 14px; padding: 14px 16px; }
 .player-wave { height: 44px; display: flex; align-items: center; gap: 2px; margin-bottom: 12px; }
 .pwbar { border-radius: 2px; background: var(--rose); opacity: 0.55; flex: 1; max-width: 6px; }
@@ -2960,6 +2978,32 @@ function openDetail(id){
       : `<div style="font-size:12px;color:var(--ink3)">Press Analyse to detect chords</div>`;
     h+=`<div class="dsec">${chordHeader}${chordBody}</div>`;
   }
+  // MIDI section — only for audio entries
+  if(hasAudio){
+    const hasMidi=Array.isArray(e.midi)&&e.midi.length>0;
+    const midiHeader=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <span class="dsec-label" style="margin-bottom:0">MIDI</span>
+      <div style="display:flex;gap:6px;align-items:center">
+        ${hasMidi?`<button class="chord-analyse-btn" onclick="downloadMidi('${e.id}')">Download .mid</button>`:''}
+        <button class="chord-analyse-btn" id="midi-btn-${e.id}" onclick="runMidiGeneration('${e.id}')">${hasMidi?'Re-analyse':'Generate MIDI'}</button>
+      </div>
+    </div>`;
+    let midiBody;
+    if(hasMidi){
+      const lo=Math.min(...e.midi.map(n=>n.p));
+      const hi=Math.max(...e.midi.map(n=>n.p));
+      const lastEnd=Math.max(...e.midi.map(n=>n.t+n.d));
+      midiBody=`<div class="midi-info">
+        <div class="midi-info-cell"><div class="midi-info-k">Notes</div><div class="midi-info-v">${e.midi.length}</div></div>
+        <div class="midi-info-cell"><div class="midi-info-k">Range</div><div class="midi-info-v">${midiToNoteName(lo)}–${midiToNoteName(hi)}</div></div>
+        <div class="midi-info-cell"><div class="midi-info-k">Length</div><div class="midi-info-v">${fmtDur(Math.ceil(lastEnd))}</div></div>
+      </div><div id="midi-status-${e.id}"></div>`;
+    } else {
+      midiBody=`<div id="midi-status-${e.id}" style="font-size:12px;color:var(--ink3)">Press Generate to extract notes from audio</div>
+        <div class="midi-warn">First run downloads ~10 MB (basic-pitch model + TensorFlow.js). Subsequent runs are instant — model is cached.</div>`;
+    }
+    h+=`<div class="dsec">${midiHeader}${midiBody}</div>`;
+  }
   if(e.transcript) h+=`<div class="dsec"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><span class="dsec-label" style="margin-bottom:0">Transcript</span><button onclick="navigator.clipboard.writeText(${JSON.stringify(e.transcript)}).then(()=>toast('Copied'))" style="font-size:11px;padding:3px 9px;border-radius:6px;border:1px solid var(--paper4);background:var(--paper2);color:var(--ink2);cursor:pointer;font-family:var(--sans)">Copy</button></div><div class="detail-text">${escHtml(e.transcript)}</div></div>`;
   if(e.note||e.text) h+=`<div class="dsec"><span class="dsec-label">Note</span><div class="detail-text">${escHtml(e.note||e.text)}</div></div>`;
   const metas=[];
@@ -3469,6 +3513,156 @@ function audioBufferToWav(buf){
   new Int16Array(wavBuf,44).set(pcm);
   return new Blob([wavBuf],{type:'audio/wav'});
 }
+// ── AUDIO → MIDI (basic-pitch by Spotify, ICASSP 2022) ─────────────────────
+// Loads basic-pitch + midi-writer-js lazily from esm.sh on first use.
+// Model & libs are browser-cached after initial download (~10 MB total).
+
+let _bpLibs=null; // {pitch, noteFramesToTime, addPitchBendsToNoteEvents, outputToNotesPoly, MidiWriter}
+
+async function loadAudioToMidiLibs(onStatus){
+  if(_bpLibs) return _bpLibs;
+  onStatus?.('Loading basic-pitch + TensorFlow.js…');
+  const [bp, mw] = await Promise.all([
+    import('https://esm.sh/@spotify/basic-pitch@1.0.1'),
+    import('https://esm.sh/midi-writer-js@3.1.1')
+  ]);
+  onStatus?.('Initialising model…');
+  const modelUrl='https://cdn.jsdelivr.net/npm/@spotify/basic-pitch@1.0.1/model/model.json';
+  _bpLibs={
+    pitch: new bp.BasicPitch(modelUrl),
+    noteFramesToTime: bp.noteFramesToTime,
+    addPitchBendsToNoteEvents: bp.addPitchBendsToNoteEvents,
+    outputToNotesPoly: bp.outputToNotesPoly,
+    MidiWriter: mw.default||mw
+  };
+  return _bpLibs;
+}
+
+// basic-pitch wants AudioBuffer @ 22050 Hz mono
+async function _resampleTo22050Mono(audioBuffer){
+  const targetSr=22050;
+  if(audioBuffer.sampleRate===targetSr&&audioBuffer.numberOfChannels===1) return audioBuffer;
+  const length=Math.floor(audioBuffer.duration*targetSr);
+  const offline=new OfflineAudioContext(1,length,targetSr);
+  const src=offline.createBufferSource(); src.buffer=audioBuffer;
+  src.connect(offline.destination); src.start();
+  return await offline.startRendering();
+}
+
+async function generateMidi(blob, onStatus){
+  const libs=await loadAudioToMidiLibs(onStatus);
+  onStatus?.('Decoding audio…');
+  const ab=await blob.arrayBuffer();
+  const ctx=new (window.AudioContext||window.webkitAudioContext)();
+  let audioBuffer;
+  try{ audioBuffer=await ctx.decodeAudioData(ab); }
+  finally{ ctx.close(); }
+  onStatus?.('Resampling to 22050 Hz…');
+  const resampled=await _resampleTo22050Mono(audioBuffer);
+  onStatus?.('Running inference…');
+  const frames=[], onsets=[], contours=[];
+  await libs.pitch.evaluateModel(
+    resampled,
+    (f,o,c)=>{ frames.push(...f); onsets.push(...o); contours.push(...c); },
+    (p)=>{ onStatus?.(`Inference ${Math.round(p*100)}%…`); }
+  );
+  onStatus?.('Extracting notes…');
+  const notes=libs.noteFramesToTime(
+    libs.addPitchBendsToNoteEvents(
+      contours,
+      libs.outputToNotesPoly(frames, onsets, 0.25, 0.25, 5, 5)
+    )
+  );
+  // Compact storage: {t, d, p, v} = startTime, duration, pitchMidi, velocity (0-127)
+  return notes.map(n=>({
+    t: Math.round(n.startTimeSeconds*1000)/1000,
+    d: Math.round(n.durationSeconds*1000)/1000,
+    p: n.pitchMidi,
+    v: Math.max(1,Math.min(127,Math.round((n.amplitude||0.5)*127)))
+  }));
+}
+
+function notesToMidiBlob(notes, bpm){
+  const MidiWriter=_bpLibs?.MidiWriter; if(!MidiWriter) throw new Error('Libs not loaded');
+  const tempo=bpm||120;
+  const TPQ=128; // midi-writer-js default ticks per quarter
+  const ticksPerSec=(tempo/60)*TPQ;
+  const track=new MidiWriter.Track();
+  track.setTempo(tempo);
+  notes.forEach(n=>{
+    const startTick=Math.round(n.t*ticksPerSec);
+    const durTicks=Math.max(1,Math.round(n.d*ticksPerSec));
+    track.addEvent(new MidiWriter.NoteEvent({
+      pitch:[n.p],
+      duration:'T'+durTicks,
+      startTick,
+      velocity:n.v
+    }));
+  });
+  const writer=new MidiWriter.Writer([track]);
+  // buildFile() returns Uint8Array in v3, string in older
+  const data=writer.buildFile();
+  const arr=typeof data==='string' ? Uint8Array.from(data, c=>c.charCodeAt(0)) : data;
+  return new Blob([arr],{type:'audio/midi'});
+}
+
+function midiToNoteName(midi){
+  const names=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+  const oct=Math.floor(midi/12)-1;
+  return names[midi%12]+oct;
+}
+
+async function runMidiGeneration(entryId){
+  const e=entries.find(x=>x.id===entryId); if(!e) return;
+  const btn=document.getElementById(`midi-btn-${entryId}`);
+  const status=document.getElementById(`midi-status-${entryId}`);
+  const setStatus=msg=>{ if(status) status.innerHTML=`<div class="midi-progress">${msg}</div>`; };
+  if(btn){ btn.disabled=true; btn.textContent='Working…'; }
+  try{
+    const audioItem=(e.media||[]).find(m=>m.type==='audio')||
+                    ((e.hasMedia&&e.type==='audio')?{id:e.id}:null);
+    if(!audioItem){ toast('No audio found'); return; }
+    let blob=null;
+    if(typeof e.data==='string'&&e.data.startsWith('data:')){
+      const r=await fetch(e.data); blob=await r.blob();
+    } else {
+      const rec=await idbGet(audioItem.id); blob=rec?.blob||null;
+    }
+    if(!blob){ toast('Audio not available'); return; }
+    const notes=await generateMidi(blob, setStatus);
+    if(!notes.length){ toast('No notes detected'); return; }
+    const idx=entries.findIndex(x=>x.id===entryId); if(idx<0) return;
+    entries[idx].midi=notes;
+    try{ persist(); }catch(_){}
+    openDetail(entryId);
+    toast(`Generated ${notes.length} note${notes.length===1?'':'s'}`);
+  }catch(err){
+    console.error('MIDI generation failed', err);
+    if(status) status.innerHTML=`<div class="midi-progress" style="color:var(--rose)">Failed: ${escHtml(err.message||'unknown error')}</div>`;
+    toast('MIDI generation failed');
+  }finally{
+    if(btn){ btn.disabled=false; btn.textContent=e.midi?.length?'Re-analyse':'Generate MIDI'; }
+  }
+}
+
+async function downloadMidi(entryId){
+  const e=entries.find(x=>x.id===entryId); if(!e?.midi?.length) return;
+  try{
+    if(!_bpLibs) await loadAudioToMidiLibs();
+    const blob=notesToMidiBlob(e.midi, e.bpm||120);
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;
+    a.download=(slugify(e.name||autoTitle(e))||'capture')+'.mid';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+    toast('MIDI downloaded');
+  }catch(err){
+    console.error('MIDI export failed', err);
+    toast('Download failed: '+(err.message||'error'));
+  }
+}
+
 // ── CHORD DETECTION ────────────────────────────────────────────────────────
 // Template-matching on short-time chromagrams. Reuses _fftIP from key detection.
 // Chord types: major, minor, dom7, maj7, min7 × 12 roots = 60 templates.
