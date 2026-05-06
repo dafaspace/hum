@@ -1462,6 +1462,7 @@ audio { display: none; }
     <!-- Chord + MIDI analysis (shown when audio is pending) -->
     <div id="modal-analysis-row" class="transcribe-row" style="display:none">
       <span id="modal-analysis-status" style="font-size:11px;color:var(--ink3);flex:1"></span>
+      <button class="chord-analyse-btn" id="modal-hum-btn" onclick="modalHumAnalyse()">Melody</button>
       <button class="chord-analyse-btn" id="modal-chord-btn" onclick="modalAnalyseChords()">Chords</button>
       <button class="chord-analyse-btn" id="modal-midi-btn" onclick="modalGenerateMidi()">MIDI</button>
     </div>
@@ -1477,6 +1478,14 @@ audio { display: none; }
     <div id="modal-midi-box" style="display:none;margin-top:8px;background:var(--paper2);border-radius:10px;padding:10px 12px">
       <span style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink3);font-weight:500">MIDI</span>
       <div id="modal-midi-info" style="font-size:13px;color:var(--ink2);margin-top:4px"></div>
+    </div>
+    <!-- Melody (hum) result in modal -->
+    <div id="modal-hum-box" style="display:none;margin-top:8px;background:var(--paper2);border-radius:10px;padding:10px 12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <span style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink3);font-weight:500">Melody</span>
+        <span id="modal-hum-info" style="font-size:11px;color:var(--ink3)"></span>
+      </div>
+      <div id="modal-hum-roll"></div>
     </div>
     <!-- transcript-fg kept for WAV conversion status only, always hidden -->
     <div id="transcript-fg" style="display:none">
@@ -1743,8 +1752,9 @@ const DB='hum_entries', PJ='hum_projects', LV='hum_layout', ST='hum_settings';
 let entries=JSON.parse(localStorage.getItem(DB)||'[]');
 let settings=JSON.parse(localStorage.getItem(ST)||'{}');
 let pendingTranscript=null;
-let pendingChords=null; // [{t, chord}] from modal analysis
-let pendingMidi=null;   // [{t, d, p, v}] from modal MIDI generation
+let pendingChords=null;  // [{t, chord}] from modal analysis
+let pendingMidi=null;    // [{t, d, p, v}] from modal MIDI generation
+let pendingMelody=null;  // [{t, dur, pitch}] from hum pitch tracker
 let projects=JSON.parse(localStorage.getItem(PJ)||'[]');
 let layout=localStorage.getItem(LV)||'grid';
 let view='all', curEntry=null, typeFilter='';
@@ -2432,7 +2442,7 @@ let cameraReturnMode=null; // 'photo'|'video'|null — camera was opened from mo
 let modalRecording=false, modalRecInterval=null, modalRecSec=0, modalRecStream=null;
 
 function openNewCapture(){
-  pendingMediaList=[]; pendingBlob=null; pendingDataUrl=null; pendingVideoBlob=null; pendingTranscript=null; pendingChords=null; pendingMidi=null;
+  pendingMediaList=[]; pendingBlob=null; pendingDataUrl=null; pendingVideoBlob=null; pendingTranscript=null; pendingChords=null; pendingMidi=null; pendingMelody=null;
   cameraReturnMode=null;
   openSaveModal('idea', true);
 }
@@ -2643,6 +2653,35 @@ function _getPendingAudioBlob(){
   return item?.blob||null;
 }
 
+async function modalHumAnalyse(){
+  const blob=_getPendingAudioBlob(); if(!blob){ toast('No audio'); return; }
+  const btn=document.getElementById('modal-hum-btn');
+  const status=document.getElementById('modal-analysis-status');
+  if(btn){ btn.disabled=true; btn.textContent='Tracking…'; }
+  try{
+    if(status) status.textContent='Tracking pitch…';
+    const frames=await humPitchTrack(blob);
+    const notes=humSegmentNotes(frames);
+    if(!notes.length){ toast('No melody detected — try humming more clearly'); if(status) status.textContent=''; return; }
+    pendingMelody=notes;
+    const totalDur=Math.max(...notes.map(n=>n.t+n.dur));
+    const lo=Math.min(...notes.map(n=>n.pitch));
+    const hi=Math.max(...notes.map(n=>n.pitch));
+    const box=document.getElementById('modal-hum-box');
+    const roll=document.getElementById('modal-hum-roll');
+    const info=document.getElementById('modal-hum-info');
+    roll.innerHTML=renderHumPianoRoll(notes,totalDur);
+    if(info) info.textContent=`${notes.length} notes · ${midiToNoteName(lo)}–${midiToNoteName(hi)}`;
+    box.style.display='';
+    if(status) status.textContent=`${notes.length} notes`;
+  }catch(err){
+    toast('Melody analysis failed');
+    if(status) status.textContent='';
+  }finally{
+    if(btn){ btn.disabled=false; btn.textContent='Melody'; }
+  }
+}
+
 async function modalAnalyseChords(){
   const blob=_getPendingAudioBlob(); if(!blob){ toast('No audio'); return; }
   const btn=document.getElementById('modal-chord-btn');
@@ -2750,7 +2789,8 @@ function openSaveModal(type, isNew){
   document.getElementById('modal-analysis-status').textContent='';
   document.getElementById('modal-chord-box').style.display='none';
   document.getElementById('modal-midi-box').style.display='none';
-  pendingChords=null; pendingMidi=null;
+  document.getElementById('modal-hum-box').style.display='none';
+  pendingChords=null; pendingMidi=null; pendingMelody=null;
   // render pending media list (may already have items if opened from camera)
   renderModalMediaList();
   // transcribe toggle — show if any audio in list
@@ -2773,7 +2813,7 @@ function closeSave(){
   if(modalRecording) cancelModalAudio();
   document.getElementById('save-overlay').classList.remove('show');
   pendingMediaList.forEach(m=>{ if(m.previewUrl&&m.type!=='photo') URL.revokeObjectURL(m.previewUrl); });
-  pendingMediaList=[]; pendingBlob=null; pendingDataUrl=null; pendingVideoBlob=null; pendingTranscript=null; pendingChords=null; pendingMidi=null; editingId=null;
+  pendingMediaList=[]; pendingBlob=null; pendingDataUrl=null; pendingVideoBlob=null; pendingTranscript=null; pendingChords=null; pendingMidi=null; pendingMelody=null; editingId=null;
   cameraReturnMode=null;
 }
 
@@ -2807,7 +2847,8 @@ function _updateModalAudioRows(){
   if(!hasAudio){
     document.getElementById('modal-chord-box').style.display='none';
     document.getElementById('modal-midi-box').style.display='none';
-    pendingChords=null; pendingMidi=null;
+    document.getElementById('modal-hum-box').style.display='none';
+    pendingChords=null; pendingMidi=null; pendingMelody=null;
   }
 }
 function renderModalMediaList(){
@@ -2976,7 +3017,8 @@ async function confirmSave(){
     tags:[...currentTags], bpm, key, mood, genre, status,
     duration:modalRecSec||null, transcript,
     chords:pendingChords||undefined,
-    midi:pendingMidi||undefined
+    midi:pendingMidi||undefined,
+    melody:pendingMelody||undefined
   };
   // Save all pending media items to IDB
   let blobForWaveform=null;
@@ -3603,6 +3645,132 @@ function audioBufferToWav(buf){
   new Int16Array(wavBuf,44).set(pcm);
   return new Blob([wavBuf],{type:'audio/wav'});
 }
+// ── HUMMING → MELODY (YIN pitch tracker, pure JS) ────────────────────────────
+// YIN algorithm: de Cheveigné & Kawahara, JASA 2002.
+// No external deps — runs on existing decoded AudioBuffer.
+
+// Process one windowed frame → {tau, conf}
+// tau = fundamental period in samples; conf = 1 − normalised difference
+function _yinFrame(frame, half){
+  // Step 1: squared difference function
+  const d=new Float32Array(half);
+  for(let tau=1;tau<half;tau++){
+    let s=0;
+    for(let i=0;i<half;i++){ const x=frame[i]-frame[i+tau]; s+=x*x; }
+    d[tau]=s;
+  }
+  // Step 2: cumulative mean normalised difference
+  const cm=new Float32Array(half); cm[0]=1;
+  let run=0;
+  for(let tau=1;tau<half;tau++){
+    run+=d[tau];
+    cm[tau]=run>0 ? d[tau]*tau/run : 1;
+  }
+  // Step 3: first local minimum below threshold
+  const THRESH=0.12;
+  let tau=-1;
+  for(let t=2;t<half;t++){
+    if(cm[t]<THRESH){ while(t+1<half&&cm[t+1]<cm[t]) t++; tau=t; break; }
+  }
+  if(tau<2) return {tau:-1,conf:0};
+  // Step 4: parabolic interpolation for sub-sample accuracy
+  if(tau>0&&tau<half-1){
+    const s0=cm[tau-1],s1=cm[tau],s2=cm[tau+1];
+    const dn=2*(2*s1-s2-s0);
+    if(Math.abs(dn)>1e-8) tau=tau+(s2-s0)/dn;
+  }
+  return {tau, conf:Math.max(0,1-cm[Math.round(tau)])};
+}
+
+// Analyse blob → per-frame pitch array [{t, freq, midi, conf}]
+async function humPitchTrack(blob){
+  const ab=await blob.arrayBuffer();
+  const ctx=new (window.AudioContext||window.webkitAudioContext)();
+  let buf;
+  try{ buf=await ctx.decodeAudioData(ab); }
+  finally{ ctx.close(); }
+  const sr=buf.sampleRate;
+  const data=buf.getChannelData(0);
+
+  const FRAME=2048; // ~46 ms @ 44100 — long enough to detect 60+ Hz period
+  const HOP=512;    // ~11 ms hop → good time resolution
+  const half=FRAME>>1;
+
+  // Hann window
+  const hann=new Float32Array(FRAME);
+  for(let i=0;i<FRAME;i++) hann[i]=0.5*(1-Math.cos(2*Math.PI*i/(FRAME-1)));
+
+  const frames=[];
+  for(let off=0;off+FRAME<=data.length;off+=HOP){
+    const frame=new Float32Array(FRAME);
+    for(let i=0;i<FRAME;i++) frame[i]=data[off+i]*hann[i];
+    const {tau,conf}=_yinFrame(frame,half);
+    const t=Math.round((off/sr)*1000)/1000;
+    if(tau>0&&conf>0.45){
+      const freq=sr/tau;
+      // Human voice + most instruments: 60 Hz (B1) – 1500 Hz (F#6)
+      if(freq>=60&&freq<=1500){
+        frames.push({t,freq:Math.round(freq*10)/10,midi:Math.round(69+12*Math.log2(freq/440)),conf:Math.round(conf*100)/100});
+        continue;
+      }
+    }
+    frames.push({t,freq:0,midi:-1,conf:0}); // unvoiced
+  }
+  return frames;
+}
+
+// Segment continuous pitch frames → discrete notes [{t, dur, pitch}]
+// Consecutive voiced frames with similar pitch (≤ TOL semitones) = one note.
+function humSegmentNotes(frames){
+  const notes=[];
+  let start=-1, pitches=[];
+  const CONF=0.5;   // min confidence to count as voiced
+  const TOL=0.8;    // semitone tolerance (handles slight vibrato/intonation drift)
+  const MIN_F=4;    // minimum frames (~44 ms) to register as a note
+
+  const flush=(endT)=>{
+    if(start>=0&&pitches.length>=MIN_F){
+      const s=[...pitches].sort((a,b)=>a-b);
+      notes.push({t:start, dur:Math.round((endT-start)*1000)/1000, pitch:s[Math.floor(s.length/2)]});
+    }
+    start=-1; pitches=[];
+  };
+
+  for(let i=0;i<=frames.length;i++){
+    const f=frames[i];
+    const voiced=f&&f.conf>=CONF&&f.midi>0;
+    if(voiced){
+      if(start<0){ start=f.t; pitches=[f.midi]; }
+      else{
+        const med=pitches[Math.floor(pitches.length/2)];
+        if(Math.abs(f.midi-med)<=TOL) pitches.push(f.midi);
+        else{ flush(f.t); start=f.t; pitches=[f.midi]; }
+      }
+    } else {
+      flush(f ? f.t : (frames[frames.length-1]?.t||0));
+    }
+  }
+  return notes;
+}
+
+// SVG mini piano roll for modal preview (plum-coloured note rects)
+function renderHumPianoRoll(notes, totalDur){
+  if(!notes.length) return '';
+  const W=280, H=72;
+  const pitches=notes.map(n=>n.pitch);
+  const lo=Math.min(...pitches)-1, hi=Math.max(...pitches)+1;
+  const span=Math.max(hi-lo,4);
+  const rects=notes.map(n=>{
+    const x=((n.t/totalDur)*W).toFixed(1);
+    const w=Math.max(4,((n.dur/totalDur)*W-1)).toFixed(1);
+    const y=(H-((n.pitch-lo)/span)*H).toFixed(1);
+    const h=Math.max(5,(H/span-1)).toFixed(1);
+    return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="2" fill="var(--plum)" opacity="0.82" title="${midiToNoteName(n.pitch)}"/>`;
+  }).join('');
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" `+
+    `style="width:100%;height:${H}px;display:block;border-radius:6px;background:var(--paper3)">${rects}</svg>`;
+}
+
 // ── AUDIO → MIDI (basic-pitch by Spotify, ICASSP 2022) ─────────────────────
 // Loads basic-pitch + midi-writer-js lazily from esm.sh on first use.
 // Model & libs are browser-cached after initial download (~10 MB total).
