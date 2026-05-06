@@ -3762,32 +3762,35 @@ const _CNAMES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 // Then normalised to unit length for cosine similarity.
 const _CHORD_TMPLS=(()=>{
   const types={
-    '':    [[0,1.0],[4,0.7],[7,0.85]],            // major
-    'm':   [[0,1.0],[3,0.7],[7,0.85]],            // minor
-    '7':   [[0,1.0],[4,0.65],[7,0.8],[10,0.6]],   // dom7
-    'maj7':[[0,1.0],[4,0.65],[7,0.8],[11,0.6]],   // maj7
-    'm7':  [[0,1.0],[3,0.65],[7,0.8],[10,0.6]]    // min7
+    '':    {iv:[[0,1.0],[4,0.7],[7,0.85]],         triad:true},  // major
+    'm':   {iv:[[0,1.0],[3,0.7],[7,0.85]],         triad:true},  // minor
+    '7':   {iv:[[0,1.0],[4,0.65],[7,0.8],[10,0.6]],triad:false}, // dom7
+    'maj7':{iv:[[0,1.0],[4,0.65],[7,0.8],[11,0.6]],triad:false}, // maj7
+    'm7':  {iv:[[0,1.0],[3,0.65],[7,0.8],[10,0.6]],triad:false}  // min7
   };
   const out=[];
   for(let r=0;r<12;r++){
-    for(const [sfx,intervals] of Object.entries(types)){
+    for(const [sfx,info] of Object.entries(types)){
       const tpl=new Float32Array(12);
-      intervals.forEach(([i,w])=>{tpl[(r+i)%12]=w;});
+      info.iv.forEach(([i,w])=>{tpl[(r+i)%12]=w;});
       // Normalise to unit length
       let mag=0; for(let i=0;i<12;i++) mag+=tpl[i]*tpl[i];
       mag=Math.sqrt(mag)||1;
       for(let i=0;i<12;i++) tpl[i]/=mag;
-      out.push({name:_CNAMES[r]+sfx, tpl});
+      out.push({name:_CNAMES[r]+sfx, tpl, triad:info.triad});
     }
   }
   return out;
 })();
 
 // Best chord match for a given chromagram (unit-length input)
+// Triad bias: 4-note templates (7/maj7/m7) have more freedom to fit noisy
+// chromagrams, so we lightly favour triads (×1.08) for parsimony.
 function _bestChord(chroma){
   let best=-1,chord=null,second=-1;
   for(const tmpl of _CHORD_TMPLS){
     let dot=0; for(let i=0;i<12;i++) dot+=chroma[i]*tmpl.tpl[i];
+    if(tmpl.triad) dot*=1.08;
     if(dot>best){second=best;best=dot;chord=tmpl.name;}
     else if(dot>second) second=dot;
   }
@@ -3872,8 +3875,11 @@ async function analyzeChords(blob, bpm){
     const t=off/sr;
     const votes={};  // chord → count
 
+    // Skip first 120ms of the very first segment (attack transient noise)
+    const warmup = (off===0) ? Math.round(sr*0.12) : 0;
+
     // Collect per-frame votes within this segment
-    for(let fo=off;fo+N<=off+segLen&&fo+N<=data.length;fo+=frameHop){
+    for(let fo=off+warmup;fo+N<=off+segLen&&fo+N<=data.length;fo+=frameHop){
       const chroma=_frameChroma(data,fo,N,hann,binPC);
       let norm=0; for(let i=0;i<12;i++) norm+=chroma[i]*chroma[i];
       norm=Math.sqrt(norm)||1; for(let i=0;i<12;i++) chroma[i]/=norm;
