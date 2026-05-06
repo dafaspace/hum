@@ -3794,7 +3794,31 @@ function _bestChord(chroma){
   return {chord,score:best,margin:best-second};
 }
 
-// Build a chromagram from one FFT frame (magnitude, C2–C6 range only)
+// Harmonic suppression (HPCP technique):
+// Natural overtone series of a note at pitch class r produces energy at:
+//   2nd harmonic → (r+0)%12  (octave, same PC — no problem)
+//   3rd harmonic → (r+7)%12  (perfect 5th)
+//   5th harmonic → (r+4)%12  (major 3rd)
+//   7th harmonic → (r+10)%12 (minor 7th)
+// So energy at pitch class p has phantom contributions from notes below it:
+//   P5-below  = (p+5)%12  (whose 3rd harmonic lands at p)
+//   M3-below  = (p+8)%12  (whose 5th harmonic lands at p)
+//   m7-below  = (p+2)%12  (whose 7th harmonic lands at p)
+// Subtract weighted estimates; clamp to 0.
+function _suppressHarmonics(c){
+  const out=new Float32Array(12);
+  for(let i=0;i<12;i++){
+    out[i]=Math.max(0,
+      c[i]
+      - 0.38*c[(i+5)%12]   // 3rd harmonic (P5 above root) bleeds here
+      - 0.18*c[(i+8)%12]   // 5th harmonic (M3 above root) bleeds here
+      - 0.10*c[(i+2)%12]   // 7th harmonic (m7 above root) bleeds here
+    );
+  }
+  return out;
+}
+
+// Build a chromagram from one FFT frame, with harmonic suppression
 function _frameChroma(data,offset,N,hann,binPC){
   const re=new Float32Array(N),im=new Float32Array(N);
   for(let i=0;i<N;i++) re[i]=data[offset+i]*hann[i];
@@ -3804,7 +3828,7 @@ function _frameChroma(data,offset,N,hann,binPC){
     const pc=binPC[k]; if(pc<0) continue;
     chroma[pc]+=Math.sqrt(re[k]*re[k]+im[k]*im[k]);
   }
-  return chroma;
+  return _suppressHarmonics(chroma);
 }
 
 async function analyzeChords(blob, bpm){
@@ -3855,7 +3879,7 @@ async function analyzeChords(blob, bpm){
       norm=Math.sqrt(norm)||1; for(let i=0;i<12;i++) chroma[i]/=norm;
       const {chord,score,margin}=_bestChord(chroma);
       // Only count confident individual frames
-      if(score>0.65&&margin>0.03) votes[chord]=(votes[chord]||0)+1;
+      if(score>0.60&&margin>0.04) votes[chord]=(votes[chord]||0)+1;
     }
 
     const totalVotes=Object.values(votes).reduce((a,b)=>a+b,0);
