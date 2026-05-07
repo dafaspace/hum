@@ -2670,10 +2670,7 @@ async function modalHumAnalyse(){
     const box=document.getElementById('modal-hum-box');
     const roll=document.getElementById('modal-hum-roll');
     const info=document.getElementById('modal-hum-info');
-    const noteNames=notes.map(n=>midiToNoteName(n.pitch)).join('  ');
-    roll.innerHTML=renderHumPianoRoll(notes,totalDur)
-      +`<div style="margin-top:6px;font-size:12px;color:var(--ink2);letter-spacing:0.04em;line-height:1.8;word-break:break-all">${noteNames}</div>`
-      +`<button id="hum-play-btn" onclick="playMelodyNotes(pendingMelody,this)" style="margin-top:8px;font-size:12px;padding:4px 14px;border-radius:8px;border:none;background:var(--plum);color:#fff;cursor:pointer;font-family:var(--sans)">▶ Play</button>`;
+    roll.innerHTML=_renderHumResult(notes);
     if(info) info.textContent=`${notes.length} notes · ${midiToNoteName(lo)}–${midiToNoteName(hi)}`;
     box.style.display='';
     if(status) status.textContent=`${notes.length} notes`;
@@ -3787,26 +3784,133 @@ function humSegmentNotes(frames){
   return merged;
 }
 
-// SVG piano roll: note rects with name labels on wider notes
+// ── Scale tables & helpers ────────────────────────────────────────────────────
+const _SCALES={
+  'maj':           [0,2,4,5,7,9,11],
+  'min':           [0,2,3,5,7,8,10],
+  'harmonic min':  [0,2,3,5,7,8,11],
+  'dorian':        [0,2,3,5,7,9,10],
+  'phrygian':      [0,1,3,5,7,8,10],
+  'mixolydian':    [0,2,4,5,7,9,10],
+  'pentatonic maj':[0,2,4,7,9],
+  'pentatonic min':[0,3,5,7,10],
+  'blues':         [0,3,5,6,7,10],
+};
+
+const _BLACK_PCS=new Set([1,3,6,8,10]);
+function isBlackKey(midi){ return _BLACK_PCS.has(((midi%12)+12)%12); }
+
+// Parse "C min", "F# maj" etc. → {root:0-11, mode:'maj'|'min'}
+function _parseKeyField(s){
+  if(!s) return null;
+  const nm={'C':0,'C#':1,'Db':1,'D':2,'D#':3,'Eb':3,'E':4,'F':5,'F#':6,'Gb':6,'G':7,'G#':8,'Ab':8,'A':9,'A#':10,'Bb':10,'B':11};
+  const m=s.match(/^([A-G][#b]?)\s+(maj|min)$/);
+  if(!m) return null;
+  return {root:nm[m[1]]??0, mode:m[2]};
+}
+
+// Snap each note to the nearest in-scale pitch (within ±3 semitones)
+function quantizeToScale(notes, rootPc, intervals){
+  const vPCs=new Set(intervals.map(iv=>(rootPc+iv)%12));
+  return notes.map(n=>{
+    if(vPCs.has(((n.pitch%12)+12)%12)) return n;
+    let best=n.pitch, bestDist=99;
+    for(let d=-3;d<=3;d++){
+      const c=n.pitch+d;
+      if(c>=0&&vPCs.has(((c%12)+12)%12)&&Math.abs(d)<bestDist){ bestDist=Math.abs(d); best=c; }
+    }
+    return {...n, pitch:best};
+  });
+}
+
+// ── Piano roll with keyboard pane ─────────────────────────────────────────────
 function renderHumPianoRoll(notes, totalDur){
   if(!notes.length) return '';
-  const W=280, H=80;
+  const H=90, KW=22;
+
   const pitches=notes.map(n=>n.pitch);
   const lo=Math.min(...pitches)-1, hi=Math.max(...pitches)+1;
-  const span=Math.max(hi-lo,4);
-  const rowH=H/span;
-  const elems=notes.map(n=>{
-    const x=((n.t/totalDur)*W);
-    const w=Math.max(5,((n.dur/totalDur)*W)-1);
-    const y=H-((n.pitch-lo+1)/span*H);
-    const h=Math.max(6,rowH-1);
-    const name=midiToNoteName(n.pitch);
-    // Show label if rect is wide enough
-    const label=w>18 ? `<text x="${(x+w/2).toFixed(1)}" y="${(y+h/2+3.5).toFixed(1)}" text-anchor="middle" font-size="8" fill="#fff" font-family="sans-serif" opacity="0.9">${name}</text>` : '';
-    return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="2" fill="var(--plum)" opacity="0.85"/>${label}`;
-  }).join('');
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" `+
-    `style="width:100%;height:${H}px;display:block;border-radius:6px;background:var(--paper3)">${elems}</svg>`;
+  const rows=hi-lo+1;
+  const rowH=H/rows;
+
+  // ── Keyboard (left pane) ──
+  let kb='';
+  for(let p=hi;p>=lo;p--){
+    const y=((hi-p)*rowH).toFixed(1);
+    const h=rowH.toFixed(1);
+    const blk=isBlackKey(p);
+    kb+=`<rect x="0" y="${y}" width="${KW}" height="${h}" fill="${blk?'#c5bdb5':'#faf8f5'}" stroke="#e0d9c9" stroke-width="0.5"/>`;
+    if(p%12===0){
+      const ty=(parseFloat(y)+rowH*.5+3.5).toFixed(1);
+      kb+=`<text x="${KW-3}" y="${ty}" text-anchor="end" font-size="6.5" fill="#a8a195" font-family="sans-serif">C${Math.floor(p/12)-1}</text>`;
+    }
+  }
+  const kbSvg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${KW} ${H}" `+
+    `style="width:${KW}px;height:${H}px;flex-shrink:0;display:block">${kb}</svg>`;
+
+  // ── Roll (right pane) ──
+  const RW=258;
+  let roll='';
+  // Lane backgrounds for black-key rows
+  for(let p=hi;p>=lo;p--){
+    if(isBlackKey(p)){
+      const y=((hi-p)*rowH).toFixed(1);
+      roll+=`<rect x="0" y="${y}" width="${RW}" height="${rowH.toFixed(1)}" fill="rgba(0,0,0,0.04)"/>`;
+    }
+  }
+  // Note rects (no text inside — keyboard provides pitch reference)
+  notes.forEach(n=>{
+    const x=(n.t/totalDur*RW).toFixed(1);
+    const w=Math.max(3,n.dur/totalDur*RW-1).toFixed(1);
+    const y=((hi-n.pitch)*rowH).toFixed(1);
+    const h=Math.max(rowH-1,3).toFixed(1);
+    roll+=`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="2" fill="var(--plum)" opacity="0.85"/>`;
+  });
+  const rollSvg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${RW} ${H}" `+
+    `style="width:100%;height:${H}px;display:block;background:var(--paper3)">${roll}</svg>`;
+
+  return `<div style="display:flex;border-radius:6px;overflow:hidden;border:1px solid var(--paper4)">${kbSvg}${rollSvg}</div>`;
+}
+
+// Build the full hum-box content (piano roll + note list + play + quantize controls)
+function _renderHumResult(notes){
+  if(!notes.length) return '';
+  const totalDur=Math.max(...notes.map(n=>n.t+n.dur));
+  const noteNames=notes.map(n=>midiToNoteName(n.pitch)).join('  ');
+
+  // Pre-fill root/mode from the modal's key field
+  const parsed=_parseKeyField(document.getElementById('s-key')?.value||'');
+  const rootOpts=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B']
+    .map((name,i)=>`<option value="${i}"${parsed?.root===i?' selected':''}>${name}</option>`).join('');
+  const modeOpts=Object.keys(_SCALES)
+    .map(m=>`<option value="${m}"${parsed?.mode===m?' selected':''}>${m}</option>`).join('');
+
+  const sel='font-size:11px;padding:3px 5px;border-radius:6px;border:1px solid var(--paper4);background:var(--paper3);color:var(--ink2);font-family:var(--sans)';
+  const btn='font-size:11px;padding:4px 10px;border-radius:7px;border:none;cursor:pointer;font-family:var(--sans)';
+
+  return renderHumPianoRoll(notes,totalDur)
+    +`<div style="margin-top:5px;font-size:11px;color:var(--ink2);letter-spacing:0.04em;line-height:1.9;word-break:break-all">${noteNames}</div>`
+    +`<div style="display:flex;gap:6px;align-items:center;margin-top:8px;flex-wrap:wrap">`
+    +`<button id="hum-play-btn" onclick="playMelodyNotes(pendingMelody,this)" style="${btn};background:var(--plum);color:#fff">▶ Play</button>`
+    +`<select id="hum-q-root" style="${sel}">${rootOpts}</select>`
+    +`<select id="hum-q-mode" style="${sel}">${modeOpts}</select>`
+    +`<button onclick="humQuantize()" style="${btn};background:var(--paper4);color:var(--ink2)">Snap to scale</button>`
+    +`</div>`;
+}
+
+// Apply scale quantization and re-render
+function humQuantize(){
+  if(!pendingMelody?.length) return;
+  const root=parseInt(document.getElementById('hum-q-root')?.value)||0;
+  const mode=document.getElementById('hum-q-mode')?.value||'maj';
+  pendingMelody=quantizeToScale(pendingMelody, root, _SCALES[mode]||_SCALES['maj']);
+  const roll=document.getElementById('modal-hum-roll');
+  if(roll) roll.innerHTML=_renderHumResult(pendingMelody);
+  const lo=Math.min(...pendingMelody.map(n=>n.pitch));
+  const hi=Math.max(...pendingMelody.map(n=>n.pitch));
+  const info=document.getElementById('modal-hum-info');
+  if(info) info.textContent=`${pendingMelody.length} notes · ${midiToNoteName(lo)}–${midiToNoteName(hi)}`;
+  toast('Snapped to scale');
 }
 
 // Play detected melody notes via Web Audio (triangle osc, preserves rhythm)
