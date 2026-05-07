@@ -2670,7 +2670,10 @@ async function modalHumAnalyse(){
     const box=document.getElementById('modal-hum-box');
     const roll=document.getElementById('modal-hum-roll');
     const info=document.getElementById('modal-hum-info');
-    roll.innerHTML=renderHumPianoRoll(notes,totalDur);
+    const noteNames=notes.map(n=>midiToNoteName(n.pitch)).join('  ');
+    roll.innerHTML=renderHumPianoRoll(notes,totalDur)
+      +`<div style="margin-top:6px;font-size:12px;color:var(--ink2);letter-spacing:0.04em;line-height:1.8;word-break:break-all">${noteNames}</div>`
+      +`<button id="hum-play-btn" onclick="playMelodyNotes(pendingMelody,this)" style="margin-top:8px;font-size:12px;padding:4px 14px;border-radius:8px;border:none;background:var(--plum);color:#fff;cursor:pointer;font-family:var(--sans)">▶ Play</button>`;
     if(info) info.textContent=`${notes.length} notes · ${midiToNoteName(lo)}–${midiToNoteName(hi)}`;
     box.style.display='';
     if(status) status.textContent=`${notes.length} notes`;
@@ -3682,7 +3685,7 @@ function _yinFrame(frame, half){
   return {tau, conf:Math.max(0,1-cm[Math.round(tau)])};
 }
 
-// Analyse blob → per-frame pitch array [{t, freq, midi, conf}]
+// Analyse blob → per-frame pitch array [{t, freq, midi, conf, rms}]
 async function humPitchTrack(blob){
   const ab=await blob.arrayBuffer();
   const ctx=new (window.AudioContext||window.webkitAudioContext)();
@@ -3703,30 +3706,52 @@ async function humPitchTrack(blob){
   const frames=[];
   for(let off=0;off+FRAME<=data.length;off+=HOP){
     const frame=new Float32Array(FRAME);
-    for(let i=0;i<FRAME;i++) frame[i]=data[off+i]*hann[i];
+    let rmsSum=0;
+    for(let i=0;i<FRAME;i++){ frame[i]=data[off+i]*hann[i]; rmsSum+=data[off+i]*data[off+i]; }
+    const rms=Math.sqrt(rmsSum/FRAME);
     const {tau,conf}=_yinFrame(frame,half);
     const t=Math.round((off/sr)*1000)/1000;
     if(tau>0&&conf>0.45){
       const freq=sr/tau;
       // Human voice + most instruments: 60 Hz (B1) – 1500 Hz (F#6)
       if(freq>=60&&freq<=1500){
-        frames.push({t,freq:Math.round(freq*10)/10,midi:Math.round(69+12*Math.log2(freq/440)),conf:Math.round(conf*100)/100});
+        frames.push({t,freq:Math.round(freq*10)/10,midi:Math.round(69+12*Math.log2(freq/440)),conf:Math.round(conf*100)/100,rms});
         continue;
       }
     }
-    frames.push({t,freq:0,midi:-1,conf:0}); // unvoiced
+    frames.push({t,freq:0,midi:-1,conf:0,rms}); // unvoiced
   }
   return frames;
 }
 
 // Segment continuous pitch frames → discrete notes [{t, dur, pitch}]
-// Consecutive voiced frames with similar pitch (≤ TOL semitones) = one note.
+// Key fixes: energy gate, median filter on pitch, merge adjacent same-pitch notes.
 function humSegmentNotes(frames){
+  if(!frames.length) return [];
+
+  // Energy gate: frames below 4% of max RMS = silence, force unvoiced
+  const maxRms=Math.max(...frames.map(f=>f.rms||0));
+  const rmsFloor=maxRms*0.04;
+
+  // Median filter on MIDI values (window ±3 frames = ±33ms) to kill vibrato artifacts
+  const WIN=3;
+  const smoothed=frames.map((f,i)=>{
+    if(!f||f.midi<0||(f.rms||0)<rmsFloor) return {...f,midi:-1,conf:0};
+    const slice=[];
+    for(let j=Math.max(0,i-WIN);j<=Math.min(frames.length-1,i+WIN);j++){
+      const g=frames[j];
+      if(g.midi>0&&g.conf>=0.45&&(g.rms||0)>=rmsFloor) slice.push(g.midi);
+    }
+    if(!slice.length) return {...f,midi:-1};
+    slice.sort((a,b)=>a-b);
+    return {...f,midi:slice[Math.floor(slice.length/2)]};
+  });
+
   const notes=[];
   let start=-1, pitches=[];
-  const CONF=0.5;   // min confidence to count as voiced
-  const TOL=0.8;    // semitone tolerance (handles slight vibrato/intonation drift)
-  const MIN_F=4;    // minimum frames (~44 ms) to register as a note
+  const CONF=0.50;  // min confidence
+  const TOL=1.2;    // semitone tolerance — wider for real voice drift
+  const MIN_F=8;    // ~88 ms minimum note (filters out transients)
 
   const flush=(endT)=>{
     if(start>=0&&pitches.length>=MIN_F){
@@ -3736,8 +3761,8 @@ function humSegmentNotes(frames){
     start=-1; pitches=[];
   };
 
-  for(let i=0;i<=frames.length;i++){
-    const f=frames[i];
+  for(let i=0;i<=smoothed.length;i++){
+    const f=smoothed[i];
     const voiced=f&&f.conf>=CONF&&f.midi>0;
     if(voiced){
       if(start<0){ start=f.t; pitches=[f.midi]; }
@@ -3747,28 +3772,80 @@ function humSegmentNotes(frames){
         else{ flush(f.t); start=f.t; pitches=[f.midi]; }
       }
     } else {
-      flush(f ? f.t : (frames[frames.length-1]?.t||0));
+      flush(f ? f.t : (smoothed[smoothed.length-1]?.t||0));
     }
   }
-  return notes;
+
+  // Merge adjacent notes of same pitch with gap < 120ms (legato phrasing)
+  const merged=[];
+  for(const n of notes){
+    const prev=merged[merged.length-1];
+    if(prev&&prev.pitch===n.pitch&&(n.t-(prev.t+prev.dur))<0.12){
+      prev.dur=Math.round((n.t+n.dur-prev.t)*1000)/1000;
+    } else { merged.push({...n}); }
+  }
+  return merged;
 }
 
-// SVG mini piano roll for modal preview (plum-coloured note rects)
+// SVG piano roll: note rects with name labels on wider notes
 function renderHumPianoRoll(notes, totalDur){
   if(!notes.length) return '';
-  const W=280, H=72;
+  const W=280, H=80;
   const pitches=notes.map(n=>n.pitch);
   const lo=Math.min(...pitches)-1, hi=Math.max(...pitches)+1;
   const span=Math.max(hi-lo,4);
-  const rects=notes.map(n=>{
-    const x=((n.t/totalDur)*W).toFixed(1);
-    const w=Math.max(4,((n.dur/totalDur)*W-1)).toFixed(1);
-    const y=(H-((n.pitch-lo)/span)*H).toFixed(1);
-    const h=Math.max(5,(H/span-1)).toFixed(1);
-    return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="2" fill="var(--plum)" opacity="0.82" title="${midiToNoteName(n.pitch)}"/>`;
+  const rowH=H/span;
+  const elems=notes.map(n=>{
+    const x=((n.t/totalDur)*W);
+    const w=Math.max(5,((n.dur/totalDur)*W)-1);
+    const y=H-((n.pitch-lo+1)/span*H);
+    const h=Math.max(6,rowH-1);
+    const name=midiToNoteName(n.pitch);
+    // Show label if rect is wide enough
+    const label=w>18 ? `<text x="${(x+w/2).toFixed(1)}" y="${(y+h/2+3.5).toFixed(1)}" text-anchor="middle" font-size="8" fill="#fff" font-family="sans-serif" opacity="0.9">${name}</text>` : '';
+    return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="2" fill="var(--plum)" opacity="0.85"/>${label}`;
   }).join('');
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" `+
-    `style="width:100%;height:${H}px;display:block;border-radius:6px;background:var(--paper3)">${rects}</svg>`;
+    `style="width:100%;height:${H}px;display:block;border-radius:6px;background:var(--paper3)">${elems}</svg>`;
+}
+
+// Play detected melody notes via Web Audio (triangle osc, preserves rhythm)
+let _humPlayCtx=null;
+function playMelodyNotes(notes, btn){
+  // Toggle: stop if already playing
+  if(_humPlayCtx){ _humPlayCtx.close(); _humPlayCtx=null; if(btn) btn.textContent='▶ Play'; return; }
+  if(!notes?.length) return;
+
+  const ctx=new (window.AudioContext||window.webkitAudioContext)();
+  _humPlayCtx=ctx;
+  if(btn) btn.textContent='■ Stop';
+
+  const master=ctx.createGain(); master.gain.value=0.35; master.connect(ctx.destination);
+  const offset=notes[0].t; // normalise so first note starts at t=0
+  const totalDur=Math.max(...notes.map(n=>(n.t-offset)+n.dur));
+
+  notes.forEach(n=>{
+    const freq=440*Math.pow(2,(n.pitch-69)/12);
+    const osc=ctx.createOscillator();
+    const gain=ctx.createGain();
+    osc.connect(gain); gain.connect(master);
+    osc.type='triangle'; // warmer than sine, vaguely voice-like
+    osc.frequency.value=freq;
+    const t0=ctx.currentTime+0.05+(n.t-offset);
+    const t1=t0+n.dur;
+    const atk=Math.min(0.03,n.dur*0.15);
+    const rel=Math.min(0.06,n.dur*0.25);
+    gain.gain.setValueAtTime(0,t0);
+    gain.gain.linearRampToValueAtTime(0.9,t0+atk);
+    gain.gain.setValueAtTime(0.9,t1-rel);
+    gain.gain.linearRampToValueAtTime(0,t1);
+    osc.start(t0); osc.stop(t1);
+  });
+
+  // Auto-reset button when done
+  setTimeout(()=>{
+    if(_humPlayCtx===ctx){ ctx.close(); _humPlayCtx=null; if(btn) btn.textContent='▶ Play'; }
+  },(totalDur+0.6)*1000);
 }
 
 // ── AUDIO → MIDI (basic-pitch by Spotify, ICASSP 2022) ─────────────────────
