@@ -1754,7 +1754,8 @@ let settings=JSON.parse(localStorage.getItem(ST)||'{}');
 let pendingTranscript=null;
 let pendingChords=null;  // [{t, chord}] from modal analysis
 let pendingMidi=null;    // [{t, d, p, v}] from modal MIDI generation
-let pendingMelody=null;  // [{t, dur, pitch}] from hum pitch tracker
+let pendingMelody=null;          // [{t, dur, pitch}] from hum pitch tracker (current state)
+let pendingMelodyOriginal=null;  // deep copy of analysis result (for Reset)
 let projects=JSON.parse(localStorage.getItem(PJ)||'[]');
 let layout=localStorage.getItem(LV)||'grid';
 let view='all', curEntry=null, typeFilter='';
@@ -2442,7 +2443,7 @@ let cameraReturnMode=null; // 'photo'|'video'|null — camera was opened from mo
 let modalRecording=false, modalRecInterval=null, modalRecSec=0, modalRecStream=null;
 
 function openNewCapture(){
-  pendingMediaList=[]; pendingBlob=null; pendingDataUrl=null; pendingVideoBlob=null; pendingTranscript=null; pendingChords=null; pendingMidi=null; pendingMelody=null;
+  pendingMediaList=[]; pendingBlob=null; pendingDataUrl=null; pendingVideoBlob=null; pendingTranscript=null; pendingChords=null; pendingMidi=null; pendingMelody=null; pendingMelodyOriginal=null;
   cameraReturnMode=null;
   openSaveModal('idea', true);
 }
@@ -2664,6 +2665,7 @@ async function modalHumAnalyse(){
     const notes=humSegmentNotes(frames);
     if(!notes.length){ toast('No melody detected — try humming more clearly'); if(status) status.textContent=''; return; }
     pendingMelody=notes;
+    pendingMelodyOriginal=JSON.parse(JSON.stringify(notes)); // snapshot for Reset
     const totalDur=Math.max(...notes.map(n=>n.t+n.dur));
     const lo=Math.min(...notes.map(n=>n.pitch));
     const hi=Math.max(...notes.map(n=>n.pitch));
@@ -2790,7 +2792,7 @@ function openSaveModal(type, isNew){
   document.getElementById('modal-chord-box').style.display='none';
   document.getElementById('modal-midi-box').style.display='none';
   document.getElementById('modal-hum-box').style.display='none';
-  pendingChords=null; pendingMidi=null; pendingMelody=null;
+  pendingChords=null; pendingMidi=null; pendingMelody=null; pendingMelodyOriginal=null;
   // render pending media list (may already have items if opened from camera)
   renderModalMediaList();
   // transcribe toggle — show if any audio in list
@@ -2813,7 +2815,7 @@ function closeSave(){
   if(modalRecording) cancelModalAudio();
   document.getElementById('save-overlay').classList.remove('show');
   pendingMediaList.forEach(m=>{ if(m.previewUrl&&m.type!=='photo') URL.revokeObjectURL(m.previewUrl); });
-  pendingMediaList=[]; pendingBlob=null; pendingDataUrl=null; pendingVideoBlob=null; pendingTranscript=null; pendingChords=null; pendingMidi=null; pendingMelody=null; editingId=null;
+  pendingMediaList=[]; pendingBlob=null; pendingDataUrl=null; pendingVideoBlob=null; pendingTranscript=null; pendingChords=null; pendingMidi=null; pendingMelody=null; pendingMelodyOriginal=null; editingId=null;
   cameraReturnMode=null;
 }
 
@@ -2848,7 +2850,7 @@ function _updateModalAudioRows(){
     document.getElementById('modal-chord-box').style.display='none';
     document.getElementById('modal-midi-box').style.display='none';
     document.getElementById('modal-hum-box').style.display='none';
-    pendingChords=null; pendingMidi=null; pendingMelody=null;
+    pendingChords=null; pendingMidi=null; pendingMelody=null; pendingMelodyOriginal=null;
   }
 }
 function renderModalMediaList(){
@@ -3826,7 +3828,7 @@ function quantizeToScale(notes, rootPc, intervals){
 // ── Piano roll with keyboard pane ─────────────────────────────────────────────
 function renderHumPianoRoll(notes, totalDur){
   if(!notes.length) return '';
-  const H=90, KW=22;
+  const H=130, KW=24;        // taller for label readability
 
   const pitches=notes.map(n=>n.pitch);
   const lo=Math.min(...pitches)-1, hi=Math.max(...pitches)+1;
@@ -3839,32 +3841,43 @@ function renderHumPianoRoll(notes, totalDur){
     const y=((hi-p)*rowH).toFixed(1);
     const h=rowH.toFixed(1);
     const blk=isBlackKey(p);
-    kb+=`<rect x="0" y="${y}" width="${KW}" height="${h}" fill="${blk?'#c5bdb5':'#faf8f5'}" stroke="#e0d9c9" stroke-width="0.5"/>`;
+    // Darker black keys (was #c5bdb5) — high contrast
+    kb+=`<rect x="0" y="${y}" width="${KW}" height="${h}" fill="${blk?'#3a342d':'#fbf8f2'}" stroke="#d2ccbf" stroke-width="0.4"/>`;
     if(p%12===0){
       const ty=(parseFloat(y)+rowH*.5+3.5).toFixed(1);
-      kb+=`<text x="${KW-3}" y="${ty}" text-anchor="end" font-size="6.5" fill="#a8a195" font-family="sans-serif">C${Math.floor(p/12)-1}</text>`;
+      kb+=`<text x="${KW-3}" y="${ty}" text-anchor="end" font-size="7" fill="#6a635a" font-family="sans-serif" font-weight="500">C${Math.floor(p/12)-1}</text>`;
     }
   }
   const kbSvg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${KW} ${H}" `+
     `style="width:${KW}px;height:${H}px;flex-shrink:0;display:block">${kb}</svg>`;
 
   // ── Roll (right pane) ──
-  const RW=258;
+  const RW=256;
   let roll='';
-  // Lane backgrounds for black-key rows
+  // Lane backgrounds for black-key rows (subtle stripe)
   for(let p=hi;p>=lo;p--){
     if(isBlackKey(p)){
       const y=((hi-p)*rowH).toFixed(1);
-      roll+=`<rect x="0" y="${y}" width="${RW}" height="${rowH.toFixed(1)}" fill="rgba(0,0,0,0.04)"/>`;
+      roll+=`<rect x="0" y="${y}" width="${RW}" height="${rowH.toFixed(1)}" fill="rgba(0,0,0,0.05)"/>`;
     }
   }
-  // Note rects (no text inside — keyboard provides pitch reference)
+  // Note rects + labels (with stroke outline so they read on any contrast)
   notes.forEach(n=>{
-    const x=(n.t/totalDur*RW).toFixed(1);
-    const w=Math.max(3,n.dur/totalDur*RW-1).toFixed(1);
-    const y=((hi-n.pitch)*rowH).toFixed(1);
-    const h=Math.max(rowH-1,3).toFixed(1);
-    roll+=`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="2" fill="var(--plum)" opacity="0.85"/>`;
+    const x=n.t/totalDur*RW;
+    const w=Math.max(3, n.dur/totalDur*RW - 1);
+    const y=(hi-n.pitch)*rowH;
+    const h=Math.max(rowH-1, 3);
+    roll+=`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="2" fill="var(--plum)" opacity="0.92"/>`;
+    // Label: full name if room, else short pitch class. Hidden on tiny rects.
+    if(w >= 11 && h >= 7){
+      const full=midiToNoteName(n.pitch);                  // "C4", "C#5"
+      const short=full.replace(/-?\d+$/,'');               // "C", "C#"
+      const label=(w >= 22) ? full : short;
+      const fontSize=Math.min(8.5, h - 1.5);
+      const tx=(x + 2.5).toFixed(1);
+      const ty=(y + h*.5 + fontSize*.35).toFixed(1);
+      roll+=`<text x="${tx}" y="${ty}" font-size="${fontSize}" font-family="sans-serif" font-weight="600" fill="#fff" stroke="#2a2622" stroke-width="0.5" stroke-opacity="0.85" paint-order="stroke">${label}</text>`;
+    }
   });
   const rollSvg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${RW} ${H}" `+
     `style="width:100%;height:${H}px;display:block;background:var(--paper3)">${roll}</svg>`;
@@ -3888,6 +3901,13 @@ function _renderHumResult(notes){
   const sel='font-size:11px;padding:3px 5px;border-radius:6px;border:1px solid var(--paper4);background:var(--paper3);color:var(--ink2);font-family:var(--sans)';
   const btn='font-size:11px;padding:4px 10px;border-radius:7px;border:none;cursor:pointer;font-family:var(--sans)';
 
+  // Reset button only meaningful if current ≠ original
+  const isModified = pendingMelodyOriginal &&
+    JSON.stringify(notes.map(n=>n.pitch)) !== JSON.stringify(pendingMelodyOriginal.map(n=>n.pitch));
+  const resetBtn = isModified
+    ? `<button onclick="humResetMelody()" title="Restore original melody" style="${btn};background:var(--paper4);color:var(--ink2)">↺ Reset</button>`
+    : '';
+
   return renderHumPianoRoll(notes,totalDur)
     +`<div style="margin-top:5px;font-size:11px;color:var(--ink2);letter-spacing:0.04em;line-height:1.9;word-break:break-all">${noteNames}</div>`
     +`<div style="display:flex;gap:6px;align-items:center;margin-top:8px;flex-wrap:wrap">`
@@ -3895,15 +3915,18 @@ function _renderHumResult(notes){
     +`<select id="hum-q-root" style="${sel}">${rootOpts}</select>`
     +`<select id="hum-q-mode" style="${sel}">${modeOpts}</select>`
     +`<button onclick="humQuantize()" style="${btn};background:var(--paper4);color:var(--ink2)">Snap to scale</button>`
+    +resetBtn
     +`</div>`;
 }
 
-// Apply scale quantization and re-render
+// Apply scale quantization. Always quantises from ORIGINAL — prevents
+// compounding errors when changing scales multiple times.
 function humQuantize(){
-  if(!pendingMelody?.length) return;
+  if(!pendingMelodyOriginal?.length && !pendingMelody?.length) return;
+  const source = pendingMelodyOriginal || pendingMelody; // fallback for safety
   const root=parseInt(document.getElementById('hum-q-root')?.value)||0;
   const mode=document.getElementById('hum-q-mode')?.value||'maj';
-  pendingMelody=quantizeToScale(pendingMelody, root, _SCALES[mode]||_SCALES['maj']);
+  pendingMelody=quantizeToScale(source, root, _SCALES[mode]||_SCALES['maj']);
   const roll=document.getElementById('modal-hum-roll');
   if(roll) roll.innerHTML=_renderHumResult(pendingMelody);
   const lo=Math.min(...pendingMelody.map(n=>n.pitch));
@@ -3911,6 +3934,19 @@ function humQuantize(){
   const info=document.getElementById('modal-hum-info');
   if(info) info.textContent=`${pendingMelody.length} notes · ${midiToNoteName(lo)}–${midiToNoteName(hi)}`;
   toast('Snapped to scale');
+}
+
+// Restore the unmodified melody captured at analysis time.
+function humResetMelody(){
+  if(!pendingMelodyOriginal?.length) return;
+  pendingMelody=JSON.parse(JSON.stringify(pendingMelodyOriginal));
+  const roll=document.getElementById('modal-hum-roll');
+  if(roll) roll.innerHTML=_renderHumResult(pendingMelody);
+  const lo=Math.min(...pendingMelody.map(n=>n.pitch));
+  const hi=Math.max(...pendingMelody.map(n=>n.pitch));
+  const info=document.getElementById('modal-hum-info');
+  if(info) info.textContent=`${pendingMelody.length} notes · ${midiToNoteName(lo)}–${midiToNoteName(hi)}`;
+  toast('Restored original');
 }
 
 // Play detected melody notes via Web Audio (triangle osc, preserves rhythm)
