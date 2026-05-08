@@ -2661,7 +2661,9 @@ async function modalHumAnalyse(){
   if(btn){ btn.disabled=true; btn.textContent='Tracking…'; }
   try{
     if(status) status.textContent='Tracking pitch…';
-    const frames=await humPitchTrack(blob);
+    const frames=await humPitchTrack(blob,(p)=>{
+      if(status) status.textContent=`Tracking pitch ${Math.round(p*100)}%`;
+    });
     const notes=humSegmentNotes(frames);
     if(!notes.length){ toast('No melody detected — try humming more clearly'); if(status) status.textContent=''; return; }
     pendingMelody=notes;
@@ -3685,7 +3687,10 @@ function _yinFrame(frame, half){
 }
 
 // Analyse blob → per-frame pitch array [{t, freq, midi, conf, rms}]
-async function humPitchTrack(blob){
+// FRAME=4096 (~93 ms @ 44100) — needed to reliably detect notes down to ~50 Hz
+// (covers full guitar range incl. low E2 = 82 Hz, and bass voices).
+// HOP=1024 (~23 ms) keeps compute manageable while preserving melody timing.
+async function humPitchTrack(blob, onProgress){
   const ab=await blob.arrayBuffer();
   const ctx=new (window.AudioContext||window.webkitAudioContext)();
   let buf;
@@ -3694,15 +3699,17 @@ async function humPitchTrack(blob){
   const sr=buf.sampleRate;
   const data=buf.getChannelData(0);
 
-  const FRAME=2048; // ~46 ms @ 44100 — long enough to detect 60+ Hz period
-  const HOP=512;    // ~11 ms hop → good time resolution
+  const FRAME=4096;
+  const HOP=1024;
   const half=FRAME>>1;
 
   // Hann window
   const hann=new Float32Array(FRAME);
   for(let i=0;i<FRAME;i++) hann[i]=0.5*(1-Math.cos(2*Math.PI*i/(FRAME-1)));
 
+  const total=Math.max(1,Math.floor((data.length-FRAME)/HOP)+1);
   const frames=[];
+  let processed=0;
   for(let off=0;off+FRAME<=data.length;off+=HOP){
     const frame=new Float32Array(FRAME);
     let rmsSum=0;
@@ -3712,14 +3719,25 @@ async function humPitchTrack(blob){
     const t=Math.round((off/sr)*1000)/1000;
     if(tau>0&&conf>0.45){
       const freq=sr/tau;
-      // Human voice + most instruments: 60 Hz (B1) – 1500 Hz (F#6)
-      if(freq>=60&&freq<=1500){
+      // 50 Hz (G1) – 1500 Hz (F#6): bass guitar / low male voice → high register
+      if(freq>=50&&freq<=1500){
         frames.push({t,freq:Math.round(freq*10)/10,midi:Math.round(69+12*Math.log2(freq/440)),conf:Math.round(conf*100)/100,rms});
-        continue;
+        processed++;
+      } else {
+        frames.push({t,freq:0,midi:-1,conf:0,rms});
+        processed++;
       }
+    } else {
+      frames.push({t,freq:0,midi:-1,conf:0,rms});
+      processed++;
     }
-    frames.push({t,freq:0,midi:-1,conf:0,rms}); // unvoiced
+    // Yield every 16 frames so the UI stays responsive on long recordings
+    if(processed%16===0){
+      onProgress?.(processed/total);
+      await new Promise(r=>setTimeout(r,0));
+    }
   }
+  onProgress?.(1);
   return frames;
 }
 
@@ -3750,7 +3768,7 @@ function humSegmentNotes(frames){
   let start=-1, pitches=[];
   const CONF=0.50;  // min confidence
   const TOL=1.2;    // semitone tolerance — wider for real voice drift
-  const MIN_F=8;    // ~88 ms minimum note (filters out transients)
+  const MIN_F=4;    // ~92 ms minimum note @ 23ms hop (filters out transients)
 
   const flush=(endT)=>{
     if(start>=0&&pitches.length>=MIN_F){
