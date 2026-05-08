@@ -3793,11 +3793,17 @@ function humSegmentNotes(frames){
     }
   }
 
-  // Merge adjacent notes of same pitch with gap < 120ms (legato phrasing)
+  // Merge adjacent notes of same pitch only when gap < 40ms AND both are short
+  // micro-fragments (< 180ms). Longer notes with a pause between them are
+  // intentional repetitions (e.g. C-C in humming) and must stay separate.
+  const MIN_DUR_FOR_MERGE = 0.18; // notes longer than this are never merged
+  const MAX_GAP_FOR_MERGE = 0.04; // gap must be < 40ms to merge
   const merged=[];
   for(const n of notes){
     const prev=merged[merged.length-1];
-    if(prev&&prev.pitch===n.pitch&&(n.t-(prev.t+prev.dur))<0.12){
+    const gap = prev ? n.t-(prev.t+prev.dur) : Infinity;
+    const bothShort = prev && prev.dur < MIN_DUR_FOR_MERGE && n.dur < MIN_DUR_FOR_MERGE;
+    if(prev && prev.pitch===n.pitch && gap < MAX_GAP_FOR_MERGE && bothShort){
       prev.dur=Math.round((n.t+n.dur-prev.t)*1000)/1000;
     } else { merged.push({...n}); }
   }
