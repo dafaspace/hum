@@ -3742,22 +3742,39 @@ async function humPitchTrack(blob, onProgress){
 }
 
 // Segment continuous pitch frames → discrete notes [{t, dur, pitch}]
-// Key fixes: energy gate, median filter on pitch, merge adjacent same-pitch notes.
 function humSegmentNotes(frames){
   if(!frames.length) return [];
 
-  // Energy gate: frames below 4% of max RMS = silence, force unvoiced
+  // Energy gate: absolute silence below 4% of peak
   const maxRms=Math.max(...frames.map(f=>f.rms||0));
   const rmsFloor=maxRms*0.04;
 
-  // Median filter on MIDI values (window ±3 frames = ±33ms) to kill vibrato artifacts
-  const WIN=3;
+  // Articulation detection: even if YIN stays confident, a relative RMS dip
+  // means the singer re-attacked — treat it as a note boundary.
+  // A frame is an articulation boundary when its RMS < 58% of the local peak
+  // in a ±5-frame window (±115ms). This catches C-C, D-D humming re-attacks
+  // that never go fully silent.
+  const BREAK_WIN=5, BREAK_RATIO=0.58;
+  const isBoundary=frames.map((f,i)=>{
+    const rms=f?.rms||0;
+    if(rms<rmsFloor) return false; // absolute silence handled by gate
+    let localMax=0;
+    for(let j=Math.max(0,i-BREAK_WIN);j<=Math.min(frames.length-1,i+BREAK_WIN);j++){
+      if(j!==i) localMax=Math.max(localMax, frames[j]?.rms||0);
+    }
+    // Only fire when surrounded by noticeably louder frames
+    return localMax>rmsFloor*4 && rms<localMax*BREAK_RATIO;
+  });
+
+  // Median filter on MIDI values (window ±2 frames = ±46ms).
+  // Boundary frames are excluded so they can't bridge the gap.
+  const WIN=2;
   const smoothed=frames.map((f,i)=>{
-    if(!f||f.midi<0||(f.rms||0)<rmsFloor) return {...f,midi:-1,conf:0};
+    if(!f||f.midi<0||(f.rms||0)<rmsFloor||isBoundary[i]) return {...f,midi:-1,conf:0};
     const slice=[];
     for(let j=Math.max(0,i-WIN);j<=Math.min(frames.length-1,i+WIN);j++){
       const g=frames[j];
-      if(g.midi>0&&g.conf>=0.45&&(g.rms||0)>=rmsFloor) slice.push(g.midi);
+      if(g.midi>0&&g.conf>=0.45&&(g.rms||0)>=rmsFloor&&!isBoundary[j]) slice.push(g.midi);
     }
     if(!slice.length) return {...f,midi:-1};
     slice.sort((a,b)=>a-b);
