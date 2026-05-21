@@ -3049,6 +3049,21 @@ function createInlineProject(){
   document.getElementById('s-proj-new-name').value='';
   toast('Project created');
 }
+// If the inline new-project form is open with a typed name but the user never
+// clicked Create, commit it on save so the project (and the note's link to it)
+// is never silently lost. Returns the new project id, or null.
+function _commitInlineProjectIfPending(){
+  const form=document.getElementById('s-proj-new');
+  if(!form || form.style.display==='none') return null;
+  const nameEl=document.getElementById('s-proj-new-name');
+  const name=nameEl?.value.trim();
+  if(!name) return null;
+  const p={id:uid(), name, desc:'', color:inlineProjColor, template:'free', ts:Date.now()};
+  projects.push(p);
+  renderProjects();
+  form.style.display='none'; if(nameEl) nameEl.value='';
+  return p.id;
+}
 function refreshProjSelect(selectId){
   const sel=document.getElementById('s-proj');
   const cur=selectId||sel.value;
@@ -3092,7 +3107,11 @@ function rmTag(i){ currentTags.splice(i,1); renderTags(); }
 async function confirmSave(){
   const type=document.getElementById('s-type').value;
   const name=document.getElementById('s-name').value.trim();
-  const proj=document.getElementById('s-proj').value;
+  let proj=document.getElementById('s-proj').value;
+  // Auto-commit a half-finished inline project, and never persist the sentinel
+  const _newProj=_commitInlineProjectIfPending();
+  if(_newProj) proj=_newProj;
+  if(proj==='__new__') proj='';
   const note=document.getElementById('s-note').value.trim();
   const ta=document.getElementById('s-transcript');
   const transcript=(ta.style.display!=='none'?ta.value.trim():'')||null;
