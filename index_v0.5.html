@@ -495,14 +495,6 @@ body {
 .card-tag { font-size: 11px; color: var(--ink3); background: var(--paper2); padding: 2px 8px; border-radius: 100px; }
 .card-dur { font-size: 11px; color: var(--ink3); margin-left: auto; font-variant-numeric: tabular-nums; }
 .card-bpm { font-size: 11px; color: var(--warm2); background: var(--warm-soft); padding: 2px 8px; border-radius: 100px; font-weight: 500; }
-/* Project chip — consistent across card & stream */
-.proj-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--ink2); }
-.proj-chip-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-/* Content indicators (chords / MIDI / melody / transcript) + status dot */
-.content-badges { display: inline-flex; align-items: center; gap: 8px; }
-.cbadge { display: inline-flex; align-items: center; gap: 3px; color: var(--ink3); font-size: 10px; font-variant-numeric: tabular-nums; }
-.cbadge svg { width: 12px; height: 12px; display: block; }
-.status-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
 
 /* ── STREAM VIEW ── */
 .stream { max-width: 720px; margin: 0 auto; }
@@ -2428,29 +2420,6 @@ async function populateLazyMedia(){
   }
 }
 
-// Content indicators — signal what's *inside* an entry (chords/MIDI/melody/transcript)
-// so the compact card & stream views honestly preview the valuable content.
-function contentBadges(e){
-  const items=[];
-  if(e.chords&&e.chords.length) items.push(`<span class="cbadge" title="${e.chords.length} chords"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 3v10M7 3v10M11 3v10M2 6h11M2 10h11"/></svg>${e.chords.length}</span>`);
-  if(Array.isArray(e.midi)&&e.midi.length) items.push(`<span class="cbadge" title="MIDI · ${e.midi.length} notes"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="4" width="12" height="8" rx="1"/><path d="M5 4v8M8 4v8M11 4v8"/></svg></span>`);
-  if(e.melody&&e.melody.length) items.push(`<span class="cbadge" title="Melody · ${e.melody.length} notes"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 11V3.5l7-1V10"/><circle cx="4.3" cy="11.2" r="1.7"/><circle cx="11.3" cy="10.2" r="1.7"/></svg></span>`);
-  if(e.transcript) items.push(`<span class="cbadge" title="Has transcript"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M3 4h10M3 7h10M3 10h7M3 13h4"/></svg></span>`);
-  if(!items.length) return '';
-  return `<span class="content-badges">${items.join('')}</span>`;
-}
-// Subtle status dot — shown only for non-default states (dev/done/archived)
-function statusDot(e){
-  const map={dev:['var(--warm)','In progress'],done:['var(--sage)','Done'],archived:['var(--ink3)','Archived']};
-  const s=map[e.status]; if(!s) return '';
-  return `<span class="cbadge" title="${s[1]}"><span class="status-dot" style="background:${s[0]}"></span></span>`;
-}
-// Consistent project chip (color dot + name) used by both card & stream
-function projChip(proj){
-  if(!proj) return '';
-  return `<span class="proj-chip"><span class="proj-chip-dot" style="background:${proj.color}"></span>${escHtml(proj.name)}</span>`;
-}
-
 function cardHtml(e){
   const proj=projects.find(p=>p.id===e.project);
   const acc=proj?`<div class="card-accent" style="background:${proj.color}"></div>`:'';
@@ -2475,14 +2444,11 @@ function cardHtml(e){
     if(t) body=`<div class="card-preview">${escHtml(t)}</div>`;
   }
   const foot=[
-    projChip(proj),
     `<span class="card-date">${fmtDate(e.ts)}</span>`,
     e.bpm?`<span class="card-bpm">${e.bpm} bpm</span>`:'',
     e.key?`<span class="card-tag">${escHtml(e.key)}</span>`:'',
-    ...(e.tags||[]).slice(0,3).map(t=>`<span class="card-tag">#${escHtml(t)}</span>`),
-    e.duration?`<span class="card-dur">${fmtDur(e.duration)}</span>`:'',
-    statusDot(e),
-    contentBadges(e)
+    ...(e.tags||[]).slice(0,2).map(t=>`<span class="card-tag">#${escHtml(t)}</span>`),
+    e.duration?`<span class="card-dur">${fmtDur(e.duration)}</span>`:''
   ].filter(Boolean).join('');
   return `<div class="card" onclick="openDetail('${e.id}')">${acc}<div class="card-head"><div class="card-title">${escHtml(e.name||autoTitle(e))}</div>${tpill}</div>${body}<div class="card-foot">${foot}</div></div>`;
 }
@@ -2528,9 +2494,7 @@ function streamItemHtml(e){
     e.bpm?`<span class="card-bpm">${e.bpm} bpm</span>`:'',
     e.key?`<span class="card-tag">${escHtml(e.key)}</span>`:'',
     ...(e.tags||[]).slice(0,3).map(t=>`<span class="card-tag">#${escHtml(t)}</span>`),
-    e.duration?`<span class="card-dur">${fmtDur(e.duration)}</span>`:'',
-    statusDot(e),
-    contentBadges(e)
+    e.duration?`<span class="card-dur">${fmtDur(e.duration)}</span>`:''
   ].filter(Boolean).join('');
   return `<div class="stream-entry" onclick="openDetail('${e.id}')">${acc}
     <div class="stream-time">${time}${proj?` · <span style="color:${proj.color}">●</span> ${escHtml(proj.name)}`:''} ${tpill}</div>
