@@ -916,10 +916,27 @@ body {
 #cap-rec-btn.recording { animation: capRecBreath 2s ease-in-out infinite; }
 #cap-rec-btn.recording .srec-shape { width: 22px; height: 22px; border-radius: 5px; }
 #cap-timer { font-family: var(--sans); font-size: 26px; font-weight: 300; color: var(--ink); font-variant-numeric: tabular-nums; }
-.cap-title { width: 100%; border: none; background: none; font-family: var(--serif); font-size: 20px; color: var(--ink); padding: 2px 4px; margin: -2px -4px; border-radius: 6px; outline: none; transition: background 0.15s; }
+.cap-title { width: 100%; border: none; border-bottom: 1px dashed var(--ink4); background: none; font-family: var(--serif); font-size: 20px; color: var(--ink); padding: 2px 4px 4px; margin: -2px -4px 0; border-radius: 4px 4px 0 0; outline: none; transition: background 0.15s, border-color 0.15s; }
 .cap-title:hover { background: var(--paper2); }
-.cap-title:focus { background: var(--paper2); }
+.cap-title:focus { background: var(--paper2); border-bottom: 1px solid var(--warm); }
+.cap-x { width: 32px; height: 32px; border-radius: 8px; border: none; background: none; color: var(--ink3); cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin: -2px -6px 0 4px; transition: all 0.15s; }
+.cap-x:hover { background: var(--paper2); color: var(--ink); }
+.cap-x svg { width: 18px; height: 18px; }
+.cap-proj-wrap { position: relative; display: inline-block; margin-top: 7px; }
+.cap-proj-trigger { display: inline-flex; align-items: center; gap: 6px; background: none; border: none; padding: 3px 7px; margin-left: -7px; border-radius: 8px; cursor: pointer; font-family: var(--sans); font-size: 12px; color: var(--ink2); transition: background 0.15s; max-width: 100%; }
+.cap-proj-trigger:hover { background: var(--paper2); }
+.cap-proj-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink4); flex-shrink: 0; }
+.cap-proj-chev { width: 13px; height: 13px; flex-shrink: 0; color: var(--ink3); }
+#cap-proj-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cap-proj-menu { position: absolute; top: calc(100% + 5px); left: -7px; min-width: 210px; max-height: 280px; overflow-y: auto; background: var(--paper); border: 1px solid var(--paper4); border-radius: 12px; box-shadow: 0 8px 28px rgba(42,38,34,0.18); z-index: 10; padding: 5px; }
+.cap-proj-item { display: flex; align-items: center; gap: 9px; padding: 9px 10px; border-radius: 8px; cursor: pointer; font-family: var(--sans); font-size: 13px; color: var(--ink); }
+.cap-proj-item:hover { background: var(--paper2); }
+.cap-proj-item.sel { background: var(--paper3); }
+.cap-proj-item-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.cap-proj-item.cap-proj-new { color: var(--warm2); font-weight: 500; border-bottom: 1px solid var(--paper3); border-radius: 8px 8px 0 0; margin-bottom: 2px; }
+.cap-proj-new-plus { width: 16px; display: inline-flex; justify-content: center; font-size: 16px; line-height: 1; flex-shrink: 0; }
 #cap-rec-row { display: flex; align-items: center; justify-content: center; gap: 16px; }
+.cap-arrow-spacer { min-width: 90px; flex-shrink: 0; }
 .cap-arrow { height: 40px; min-width: 90px; border-radius: 20px; border: 1px solid var(--paper4); background: var(--paper2); color: var(--ink3); cursor: pointer; display: flex; align-items: center; justify-content: center; font-family: var(--sans); font-size: 12px; font-weight: 400; letter-spacing: 0.01em; padding: 0 18px; transition: all 0.15s; flex-shrink: 0; opacity: 0.7; }
 .cap-arrow:not([disabled]):hover { border-color: var(--ink4); color: var(--ink2); opacity: 1; }
 .cap-arrow[disabled] { opacity: 0.25; cursor: default; pointer-events: none; }
@@ -1846,9 +1863,17 @@ audio { display: none; }
   <div id="capture-panel">
     <div id="cap-head">
       <div style="flex:1;min-width:0">
-        <input id="cap-title" class="cap-title" oninput="capTitleEdit(this)" placeholder="Untitled">
-        <div class="session-sub" id="cap-sub">Inbox</div>
+        <input id="cap-title" class="cap-title" oninput="capTitleEdit(this)" placeholder="Untitled" title="Tap to rename">
+        <div class="cap-proj-wrap">
+          <button class="cap-proj-trigger" id="cap-proj-trigger" onclick="toggleCapProjMenu(event)">
+            <span class="cap-proj-dot" id="cap-proj-dot"></span>
+            <span id="cap-proj-label">Drafts</span>
+            <svg class="cap-proj-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="cap-proj-menu" id="cap-proj-menu" style="display:none"></div>
+        </div>
       </div>
+      <button class="cap-x" onclick="closeCapture()" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
     </div>
     <div id="cap-takes"></div>
     <div id="cap-rec-area">
@@ -1856,7 +1881,7 @@ audio { display: none; }
       <div id="cap-rec-row">
         <button class="cap-arrow" id="cap-cancel" onclick="cancelCapRec()" disabled>Cancel</button>
         <button id="cap-rec-btn" onclick="toggleCapRec()" aria-label="Record"><span class="srec-shape"></span></button>
-        <button class="cap-arrow" id="cap-close" onclick="closeCapture()">Close</button>
+        <span class="cap-arrow-spacer"></span>
       </div>
     </div>
   </div>
@@ -3755,7 +3780,56 @@ function capTitleEdit(el){
 }
 function updateCapSub(){
   const p=projects.find(x=>x.id===capProject);
-  const sub=document.getElementById('cap-sub'); if(sub) sub.textContent=p?p.name:'Inbox';
+  const label=document.getElementById('cap-proj-label'); if(label) label.textContent = p?p.name:'Drafts';
+  const dot=document.getElementById('cap-proj-dot'); if(dot) dot.style.background = p?p.color:'var(--ink4)';
+}
+function toggleCapProjMenu(e){
+  if(e) e.stopPropagation();
+  const menu=document.getElementById('cap-proj-menu'); if(!menu) return;
+  if(menu.style.display!=='none'){ closeCapProjMenu(); return; }
+  renderCapProjMenu();
+  menu.style.display='block';
+  setTimeout(()=>document.addEventListener('click',_capProjOutside),0);
+}
+function _capProjOutside(e){
+  const wrap=document.getElementById('cap-proj-trigger')?.parentElement;
+  if(wrap && !wrap.contains(e.target)) closeCapProjMenu();
+}
+function closeCapProjMenu(){
+  const menu=document.getElementById('cap-proj-menu'); if(menu) menu.style.display='none';
+  document.removeEventListener('click',_capProjOutside);
+}
+function renderCapProjMenu(){
+  const menu=document.getElementById('cap-proj-menu'); if(!menu) return;
+  let html=`<div class="cap-proj-item ${!capProject?'sel':''}" onclick="selectCapProj(null)"><span class="cap-proj-item-dot" style="background:var(--ink4)"></span>Drafts</div>`;
+  html+=`<div class="cap-proj-item cap-proj-new" onclick="startCapNewProject(event)"><span class="cap-proj-new-plus">+</span>New project</div>`;
+  html+=projects.map(p=>`<div class="cap-proj-item ${capProject===p.id?'sel':''}" onclick="selectCapProj('${p.id}')"><span class="cap-proj-item-dot" style="background:${p.color}"></span>${escHtml(p.name)}</div>`).join('');
+  menu.innerHTML=html;
+}
+function selectCapProj(id){
+  capProject = id || null;
+  if(capEntry){ capEntry.project=capProject; try{persist();}catch(_){} }
+  if(!(capEntry&&capEntry.name) && !capPendingName) _refreshCapTitle();
+  updateCapSub();
+  closeCapProjMenu();
+}
+function startCapNewProject(e){
+  if(e) e.stopPropagation();
+  const menu=document.getElementById('cap-proj-menu'); if(!menu) return;
+  menu.innerHTML=`<div style="padding:5px"><input id="cap-newproj-in" class="finput" type="text" placeholder="Project name…" style="width:100%" onkeydown="if(event.key==='Enter'){event.preventDefault();commitCapNewProject()}else if(event.key==='Escape'){closeCapProjMenu()}"></div>`;
+  const inp=document.getElementById('cap-newproj-in'); if(inp) inp.focus();
+}
+function commitCapNewProject(){
+  const inp=document.getElementById('cap-newproj-in'); const name=inp&&inp.value.trim();
+  if(!name){ closeCapProjMenu(); return; }
+  const palette=['#9580a8','#7fa0c0','#88a896','#e8a87c','#c47878'];
+  const color=palette[projects.length % palette.length];
+  const p={id:uid(), name, desc:'', color, template:'free', ts:Date.now()};
+  projects.push(p);
+  try{persist();}catch(_){}
+  renderProjects();
+  selectCapProj(p.id);
+  toast('Project created');
 }
 // Flank arrows: ← cancel only while recording; → new note only when idle with takes
 function _updateCapControls(){
@@ -3837,6 +3911,7 @@ function closeCapture(){
   const ov=document.getElementById('capture-overlay');
   if(!ov||ov.style.display==='none') return;
   if(capRecording) stopCapRec();
+  closeCapProjMenu();
   document.querySelectorAll('#cap-takes audio').forEach(a=>a.pause());
   ov.style.display='none';
   const fab=document.getElementById('mob-fab'); if(fab) fab.style.display='';
