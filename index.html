@@ -959,6 +959,20 @@ body {
   display: flex; align-items: center; gap: 4px;
 }
 #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
+#sw-update-bar {
+  position: fixed; bottom: calc(80px + env(safe-area-inset-bottom)); left: 50%;
+  transform: translateX(-50%) translateY(8px);
+  background: var(--ink); color: var(--paper);
+  border-radius: 100px; padding: 7px 8px 7px 16px;
+  display: flex; align-items: center; gap: 10px;
+  font-family: var(--sans); font-size: 13px; font-weight: 400;
+  box-shadow: 0 4px 20px rgba(42,38,34,0.28);
+  z-index: 290; white-space: nowrap;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.25s, transform 0.25s;
+}
+#sw-update-bar.show { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
+#sw-update-bar button { background: var(--warm); color: #fff; border: none; border-radius: 100px; padding: 5px 13px; font-family: var(--sans); font-size: 12px; font-weight: 500; cursor: pointer; }
 
 /* ── SETTINGS ── */
 .settings-btn {
@@ -5272,58 +5286,77 @@ document.addEventListener('click',e=>{ const pop=document.getElementById('exp-po
 // ── PWA SERVICE WORKER (inline via blob) ──
 if ('serviceWorker' in navigator) {
   const swCode = `
-const CACHE = 'hum-v3';
-const FONTS = [
-  'https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&family=Geist:wght@300;400;500&display=swap'
-];
-self.addEventListener('install', e => {
-  e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(FONTS).catch(()=>{}))
-  );
-  self.skipWaiting();
-});
+const CACHE = 'hum-v4';
+self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', e => {
-  // Delete ALL old caches (including hum-v1, hum-v2 which may have cached HTML)
-  e.waitUntil(caches.keys().then(keys =>
-    Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
-  ));
-  self.clients.claim();
+  e.waitUntil(
+    caches.keys()
+      .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+      .then(() => self.clients.claim())
+  );
 });
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
-  const url = e.request.url;
-  // Network-first for HTML — always get fresh app
-  if (url.endsWith('.html') || url.endsWith('/') || !url.includes('.')) {
+  const u = e.request.url;
+  // Fonts: cache-first (they never change)
+  if (u.includes('fonts.g')) {
     e.respondWith(
-      fetch(e.request).catch(() => caches.match(e.request))
+      caches.match(e.request).then(hit => hit || fetch(e.request).then(r => {
+        if (r.ok) caches.open(CACHE).then(c => c.put(e.request, r.clone()));
+        return r;
+      }))
     );
     return;
   }
-  // Cache-first for fonts only
-  e.respondWith(
-    caches.match(e.request).then(cached => {
-      if (cached) return cached;
-      return fetch(e.request).then(res => {
-        if (res && res.status === 200 && url.includes('fonts.g')) {
-          caches.open(CACHE).then(c => c.put(e.request, res.clone()));
-        }
-        return res;
-      }).catch(() => cached);
-    })
-  );
+  // App shell (HTML): stale-while-revalidate with bypass of browser HTTP cache
+  if (u.endsWith('.html') || u.endsWith('/') || !u.includes('.')) {
+    e.respondWith(
+      caches.open(CACHE).then(async cache => {
+        const cached = await cache.match(e.request);
+        // Background fetch — always bypass browser HTTP cache so GH Pages CDN is skipped
+        const refresh = fetch(new Request(u, {cache: 'no-cache'}))
+          .then(async r => {
+            if (!r || !r.ok) return r;
+            const newTag = r.headers.get('etag') || r.headers.get('last-modified');
+            const oldTag = cached && (cached.headers.get('etag') || cached.headers.get('last-modified'));
+            await cache.put(e.request, r.clone());
+            // Notify page only when content actually changed (new deploy)
+            if (cached && newTag && oldTag && newTag !== oldTag) {
+              const clients = await self.clients.matchAll({type: 'window', includeUncontrolled: true});
+              clients.forEach(c => c.postMessage({type: 'SW_UPDATE'}));
+            }
+            return r;
+          }).catch(() => null);
+        // Serve cache instantly if available, else wait for network
+        return cached || refresh.then(r => r || new Response('App offline — check your connection', {status: 503, headers: {'Content-Type': 'text/plain'}}));
+      })
+    );
+    return;
+  }
+  // Everything else: network pass-through
+  e.respondWith(fetch(e.request).catch(() => new Response('', {status: 408})));
 });
 `;
   const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
   if (isLocal) {
-    // On localhost: unregister any stale SWs so we always get fresh files
     navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(r => r.unregister()));
   } else {
     const swBlob = new Blob([swCode], {type: 'application/javascript'});
     const swUrl  = URL.createObjectURL(swBlob);
-    navigator.serviceWorker.register(swUrl, {type: 'classic'})
-      .then(() => {})
-      .catch(() => {});
+    navigator.serviceWorker.register(swUrl, {type: 'classic'}).catch(() => {});
+    // Listen for update notifications from SW
+    navigator.serviceWorker.addEventListener('message', e => {
+      if (e.data && e.data.type === 'SW_UPDATE') _showSwUpdateBar();
+    });
   }
+}
+function _showSwUpdateBar() {
+  if (document.getElementById('sw-update-bar')) return;
+  const bar = document.createElement('div');
+  bar.id = 'sw-update-bar';
+  bar.innerHTML = '<span>New version available</span><button onclick="location.reload()">↻ Reload</button>';
+  document.body.appendChild(bar);
+  requestAnimationFrame(() => bar.classList.add('show'));
 }
 </script>
 </body>
