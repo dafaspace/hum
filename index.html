@@ -954,6 +954,51 @@ body {
 .modal-add-take { display: flex; align-items: center; justify-content: center; gap: 7px; width: 100%; padding: 9px; border-radius: 10px; border: 1px dashed var(--paper4); background: none; color: var(--ink3); font-family: var(--sans); font-size: 12px; cursor: pointer; transition: all 0.15s; }
 .modal-add-take:hover { border-color: var(--warm); color: var(--warm2); background: var(--warm-soft); }
 
+/* ── Unified note window ── */
+#note-head { flex-shrink: 0; padding: 18px 22px 10px; border-bottom: 1px solid var(--paper4); }
+#note-title-row { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 10px; gap: 6px; }
+.note-title { flex: 1; min-width: 0; border: none; border-bottom: 1px dashed var(--ink4); background: none; font-family: var(--serif); font-size: 19px; color: var(--ink); padding: 2px 0 4px; outline: none; transition: border-color 0.15s; }
+.note-title:focus { border-bottom: 1px solid var(--warm); }
+.note-head-btns { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.note-hbtn { width: 28px; height: 28px; border-radius: 7px; border: 1px solid var(--paper4); background: var(--paper2); cursor: pointer; color: var(--ink2); display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.15s; }
+.note-hbtn svg { width: 13px; height: 13px; }
+.note-hbtn:hover { border-color: var(--ink4); color: var(--ink); }
+.note-hbtn.danger:hover { border-color: var(--rose); color: var(--rose); background: var(--rose-soft); }
+#note-meta-row { display: flex; align-items: center; gap: 5px; }
+#note-meta-row .cap-proj-wrap { flex: 1.5; min-width: 0; display: block; margin-top: 0; }
+#note-meta-row .cap-proj-trigger { margin-left: 0; width: 100%; min-width: 0; padding: 4px 6px; }
+.note-meta-sel { flex: 1; min-width: 0; border: 1px solid var(--paper4); background: var(--paper2); border-radius: 8px; font-family: var(--sans); font-size: 11px; color: var(--ink2); padding: 4px; outline: none; cursor: pointer; }
+.note-meta-sel:focus { border-color: var(--warm); }
+.note-meta-num { width: 52px; flex-shrink: 0; border: 1px solid var(--paper4); background: var(--paper2); border-radius: 8px; font-family: var(--sans); font-size: 11px; color: var(--ink2); padding: 4px 5px; outline: none; text-align: center; }
+.note-meta-num:focus { border-color: var(--warm); }
+.note-key-sel { width: 72px; flex-shrink: 0; flex: none; }
+#note-body { flex: 1; overflow-y: auto; min-height: 0; display: flex; flex-direction: column; gap: 8px; padding: 12px 22px 14px; }
+.note-section { }
+.note-tag-wrap { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; min-height: 38px; padding: 6px 10px; background: var(--paper2); border: 1px solid var(--paper4); border-radius: 10px; cursor: text; transition: border-color 0.15s; }
+.note-tag-wrap:focus-within { border-color: var(--warm); }
+.note-tag-in { border: none; background: none; outline: none; font-family: var(--sans); font-size: 12px; color: var(--ink); min-width: 60px; flex: 1; padding: 2px 0; }
+.note-tag-in::placeholder { color: var(--ink4); }
+.note-tag-drop { background: var(--paper); border: 1px solid var(--paper4); border-radius: 10px; box-shadow: 0 4px 14px rgba(42,38,34,0.12); overflow: hidden; margin-top: 2px; }
+.note-tag-drop-item { padding: 8px 12px; font-family: var(--sans); font-size: 12px; color: var(--ink2); cursor: pointer; }
+.note-tag-drop-item:hover, .note-tag-drop-item.focused { background: var(--paper2); color: var(--ink); }
+.ntchip { display: inline-flex; align-items: center; gap: 2px; background: var(--paper3); border-radius: 20px; font-family: var(--sans); font-size: 11px; color: var(--ink2); padding: 3px 8px; white-space: nowrap; }
+.ntchip-x { cursor: pointer; color: var(--ink3); padding: 0 2px; font-size: 12px; line-height: 1; margin-left: 2px; }
+.ntchip-x:hover { color: var(--rose); }
+.note-text-area { width: 100%; min-height: 72px; max-height: 180px; border: 1px solid var(--paper4); background: var(--paper2); border-radius: 10px; font-family: var(--sans); font-size: 13px; color: var(--ink); padding: 10px 12px; outline: none; resize: none; line-height: 1.65; box-sizing: border-box; transition: border-color 0.15s; }
+.note-text-area:focus { border-color: var(--warm); }
+.note-text-area::placeholder { color: var(--ink4); font-size: 12px; }
+.note-visuals-inner { display: flex; gap: 7px; overflow-x: auto; }
+.note-visual-thumb { height: 80px; width: auto; border-radius: 8px; object-fit: cover; flex-shrink: 0; }
+.note-attach-btn { display: flex; align-items: center; gap: 7px; width: 100%; padding: 9px 12px; border-radius: 10px; border: 1px dashed var(--paper4); background: none; color: var(--ink3); font-family: var(--sans); font-size: 12px; cursor: pointer; transition: all 0.15s; }
+.note-attach-btn:hover { border-color: var(--ink4); color: var(--ink2); }
+.note-take { background: var(--paper2); border-radius: 10px; padding: 8px 10px; }
+.note-take + .note-take { margin-top: 6px; }
+.note-take-head { display: flex; align-items: center; margin-bottom: 6px; }
+.note-take-label { font-family: var(--sans); font-size: 11px; font-weight: 500; color: var(--ink2); flex: 1; }
+.note-take-dur { font-family: var(--sans); font-size: 11px; color: var(--ink3); margin-right: 6px; }
+.note-take-del { width: 22px; height: 22px; border: none; background: none; cursor: pointer; color: var(--ink3); display: flex; align-items: center; justify-content: center; border-radius: 5px; padding: 0; flex-shrink: 0; transition: all 0.12s; }
+.note-take-del:hover { color: var(--rose); background: var(--rose-soft); }
+
 
 /* ── PROJECT MODAL ── */
 #proj-overlay { position: fixed; inset: 0; z-index: 110; background: rgba(250,247,242,0.9); backdrop-filter: blur(14px); display: none; align-items: center; justify-content: center; padding: 20px; }
@@ -1859,12 +1904,23 @@ audio { display: none; }
 <input type="file" id="file-in" style="display:none" onchange="handleFile(this)">
 <input type="file" id="attach-in" accept="image/*,video/*,audio/*,.txt,.md,.markdown" style="display:none" onchange="handleAttach(this)">
 
-<!-- UNIFIED CAPTURE -->
+<!-- UNIFIED NOTE WINDOW -->
 <div id="capture-overlay" style="display:none">
   <div id="capture-panel">
-    <div id="cap-head">
-      <div style="flex:1;min-width:0">
-        <input id="cap-title" class="cap-title" oninput="capTitleEdit(this)" placeholder="Untitled" title="Tap to rename">
+    <!-- ── FIXED HEADER ── -->
+    <div id="note-head">
+      <div id="note-title-row">
+        <input id="cap-title" class="note-title" placeholder="Untitled" oninput="capTitleEdit(this)" autocomplete="off">
+        <div class="note-head-btns">
+          <div class="exp-pop-wrap">
+            <button class="note-hbtn" id="note-exp-btn" onclick="toggleNoteExpPop(event)" title="Export" style="display:none"><svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 1v7M3.5 4l3-3 3 3"/><path d="M2 9v2.5h9V9"/></svg></button>
+            <div class="exp-pop" id="note-exp-pop" style="display:none"><button class="exp-pop-item" onclick="expTxt();closeNoteExpPop()">TXT</button><button class="exp-pop-item" onclick="expMd();closeNoteExpPop()">MD</button><button class="exp-pop-item" onclick="expJson();closeNoteExpPop()">JSON</button><button class="exp-pop-item" onclick="expAudio();closeNoteExpPop()">Audio</button></div>
+          </div>
+          <button class="note-hbtn danger" id="note-del-btn" onclick="noteDelete()" title="Delete" style="display:none"><svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3.5h9M5 3.5V2h3v1.5"/><path d="M3.5 3.5l.7 7h4.6l.7-7"/><line x1="5.5" y1="5.5" x2="5.5" y2="9"/><line x1="7.5" y1="5.5" x2="7.5" y2="9"/></svg></button>
+          <button class="cap-x" onclick="closeNote()" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+        </div>
+      </div>
+      <div id="note-meta-row">
         <div class="cap-proj-wrap">
           <button class="cap-proj-trigger" id="cap-proj-trigger" onclick="toggleCapProjMenu(event)">
             <span class="cap-proj-dot" id="cap-proj-dot"></span>
@@ -1873,10 +1929,35 @@ audio { display: none; }
           </button>
           <div class="cap-proj-menu" id="cap-proj-menu" style="display:none"></div>
         </div>
+        <select class="note-meta-sel" id="note-status" onchange="noteFieldChange('status',this.value)">
+          <option value="raw">Sketch</option><option value="dev">In progress</option><option value="done">Done</option><option value="archived">Archived</option>
+        </select>
+        <input class="note-meta-num" id="note-bpm" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="BPM" oninput="noteFieldChange('bpm',parseInt(this.value)||null)">
+        <select class="note-meta-sel note-key-sel" id="note-key" onchange="noteFieldChange('key',this.value)">
+          <option value="">Key</option>
+          <option value="C maj">C maj</option><option value="C# maj">C♯ maj</option><option value="Db maj">D♭ maj</option><option value="D maj">D maj</option><option value="Eb maj">E♭ maj</option><option value="E maj">E maj</option><option value="F maj">F maj</option><option value="F# maj">F♯ maj</option><option value="G maj">G maj</option><option value="Ab maj">A♭ maj</option><option value="A maj">A maj</option><option value="Bb maj">B♭ maj</option><option value="B maj">B maj</option>
+          <option value="C min">C min</option><option value="C# min">C♯ min</option><option value="D min">D min</option><option value="D# min">D♯ min</option><option value="Eb min">E♭ min</option><option value="E min">E min</option><option value="F min">F min</option><option value="F# min">F♯ min</option><option value="G min">G min</option><option value="G# min">G♯ min</option><option value="Ab min">A♭ min</option><option value="A min">A min</option><option value="Bb min">B♭ min</option><option value="B min">B min</option>
+        </select>
       </div>
-      <button class="cap-x" onclick="closeCapture()" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
     </div>
-    <div id="cap-takes"></div>
+    <!-- ── SCROLL BODY ── -->
+    <div id="note-body">
+      <div class="note-section" id="note-tag-section">
+        <div class="note-tag-wrap" id="note-tag-wrap" onclick="document.getElementById('note-tag-in').focus()">
+          <input class="note-tag-in" id="note-tag-in" placeholder="Tags…" onkeydown="noteTagKey(event)" oninput="noteTagInput(event)" autocomplete="off" autocorrect="off" spellcheck="false">
+        </div>
+        <div id="note-tag-drop" class="note-tag-drop" style="display:none"></div>
+      </div>
+      <div id="note-takes" class="note-section"></div>
+      <div class="note-section">
+        <textarea id="note-text" class="note-text-area" placeholder="Notes, lyrics, ideas…" oninput="noteFieldChange('note',this.value)" rows="3"></textarea>
+      </div>
+      <div id="note-visuals-section" class="note-section" style="display:none">
+        <div id="note-visuals-inner" class="note-visuals-inner"></div>
+      </div>
+      <button class="note-attach-btn" onclick="noteAttach()"><svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 1v10M1 6h10"/></svg>Photo, video or file</button>
+    </div>
+    <!-- ── FIXED FOOTER ── -->
     <div id="cap-rec-area">
       <div id="cap-timer" style="display:none">0:00</div>
       <div id="cap-rec-row">
@@ -3304,7 +3385,8 @@ async function confirmSave(){
 function blobToDataUrl(b){ return new Promise(r=>{ const fr=new FileReader(); fr.onload=e=>r(e.target.result); fr.readAsDataURL(b); }); }
 
 // ── DETAIL ──
-function openDetail(id){
+function openDetail(id){ openNote(id); }
+function _openDetailLegacy(id){
   const e=entries.find(x=>x.id===id); if(!e) return;
   curEntry=e;
   const panel=document.getElementById('detail');
@@ -3445,7 +3527,8 @@ function cycleSpeed(mid){
   const spds=[1,1.5,2,0.75]; _detailSpeedIdx[mid]=((_detailSpeedIdx[mid]||0)+1)%spds.length;
   a.playbackRate=spds[_detailSpeedIdx[mid]]; b.textContent=spds[_detailSpeedIdx[mid]]+'×';
 }
-function closeDetail(){
+function closeDetail(){ closeNote(); }
+function _closeDetailLegacy(){
   document.querySelectorAll('#detail-body audio').forEach(a=>a.pause());
   document.getElementById('detail').classList.remove('open'); closeExpPop(); curEntry=null; updateFab();
 }
@@ -3454,7 +3537,8 @@ function updateFab(){
   // contextual "Add media" button lives inside detail, and two stacked + buttons
   // are confusing. Setting display:'' restores CSS/media-query control.
   const fab=document.getElementById('mob-fab');
-  if(fab) fab.style.display = curEntry ? 'none' : '';
+  const noteOpen = document.getElementById('capture-overlay')?.style.display !== 'none';
+  if(fab) fab.style.display = (curEntry || noteOpen) ? 'none' : '';
 }
 function toggleExpPop(ev){ ev.stopPropagation(); const p=document.getElementById('exp-pop'); p.classList.toggle('open'); }
 function closeExpPop(){ const p=document.getElementById('exp-pop'); if(p) p.classList.remove('open'); }
@@ -3749,24 +3833,12 @@ function wireCaptureButton(el){
 // UNIFIED CAPTURE — one flow: open → tap to record → takes accumulate
 // into ONE note (auto-saved to Inbox, auto-synced). Metadata later.
 // ═══════════════════════════════════════════════════════════════════
-let capEntry=null, capProject=null;
+let capEntry=null, capProject=null, capPendingFields={};
+let noteTags=[], noteTagDropIdx=-1;
 let capRec=null, capChunks=[], capStream=null, capSec=0, capTimer=null, capRecording=false;
 let capAutoName='', capPendingName=null; // editable title state
 
-function openCapture(){
-  capEntry=null; capPendingName=null;
-  capProject = projects.find(p=>p.id===view) ? view : null;
-  capRecording=false; capSec=0;
-  _refreshCapTitle();
-  _resetCapRecUI();
-  renderCapTakes();
-  updateCapSub();
-  document.getElementById('capture-overlay').style.display='flex';
-  const fab=document.getElementById('mob-fab'); if(fab) fab.style.display='none';
-  // The "+" tap is the user gesture → start recording immediately.
-  // If the mic is blocked/denied, toggleCapRec falls back to the idle orb (tap to retry).
-  toggleCapRec();
-}
+function openCapture(){ openNote(null); }
 // Show the auto-generated name; only persist a name once the user edits it.
 function _refreshCapTitle(){
   capAutoName=autoTitle({ts:Date.now(), type:'audio', project:capProject});
@@ -3885,8 +3957,14 @@ async function onCapRecStop(){
   const mime=blob.type||'audio/webm';
   if(!capEntry){
     capEntry={ id:uid(), ts:Date.now(), type:'audio', name:capPendingName||null, project:capProject||null,
-      note:'', tags:[], bpm:null, key:null, mood:null, genre:null, status:'raw', duration:null, transcript:null, media:[], hasMedia:true };
+      note:capPendingFields.note||'', tags:capPendingFields.tags||[], bpm:capPendingFields.bpm||null,
+      key:capPendingFields.key||'', status:capPendingFields.status||'raw',
+      mood:null, genre:null, duration:null, transcript:null, media:[], hasMedia:true };
+    capPendingFields={};
     entries.unshift(capEntry);
+    curEntry=capEntry;
+    const expBtn=document.getElementById('note-exp-btn'); if(expBtn) expBtn.style.display='';
+    const delBtn=document.getElementById('note-del-btn'); if(delBtn) delBtn.style.display='';
   }
   const mid=uid();
   try{ await idbPut(mid, blob, mime); }catch(err){ toast('Could not store take: '+(err.message||'error')); return; }
@@ -3895,69 +3973,214 @@ async function onCapRecStop(){
   if(!capEntry.duration) capEntry.duration=dur||null;
   try{ persist(); }catch(_){ toast('Storage full'); return; }
   scheduleGdPush();
-  renderCapTakes(); updateCapSub();
-  // Background BPM/key detection → store on the note (not on hidden modal fields)
+  renderNoteTakes(); updateCapSub();
+  // Background BPM/key detection
   const target=capEntry;
-  if(target&&target.bpm==null) detectBpm(blob).then(bpm=>{ if(bpm!=null&&target.bpm==null){ target.bpm=bpm; try{persist();}catch(_){} } }).catch(()=>{});
-  if(target&&!target.key) detectKey(blob).then(key=>{ if(key&&!target.key){ target.key=key; try{persist();}catch(_){} } }).catch(()=>{});
+  if(target&&target.bpm==null) detectBpm(blob).then(bpm=>{ if(bpm!=null&&target.bpm==null){ target.bpm=bpm; if(capEntry===target){ const el=document.getElementById('note-bpm'); if(el&&!el.value) el.value=bpm; } try{persist();}catch(_){} } }).catch(()=>{});
+  if(target&&!target.key) detectKey(blob).then(key=>{ if(key&&!target.key){ target.key=key; if(capEntry===target){ const el=document.getElementById('note-key'); if(el&&!el.value) el.value=key; } try{persist();}catch(_){} } }).catch(()=>{});
 }
-function newCapNote(){
-  if(capRecording) return; // arrow is hidden while recording, but guard anyway
-  capEntry=null; capPendingName=null;
-  _refreshCapTitle();
-  renderCapTakes(); updateCapSub();
-  toast('New note');
-}
-function closeCapture(){
-  const ov=document.getElementById('capture-overlay');
-  if(!ov||ov.style.display==='none') return;
-  if(capRecording) stopCapRec();
-  closeCapProjMenu();
-  document.querySelectorAll('#cap-takes audio').forEach(a=>a.pause());
-  ov.style.display='none';
-  const fab=document.getElementById('mob-fab'); if(fab) fab.style.display='';
-  render(); renderProjects(); renderHeatmap();
-  capEntry=null;
-}
-function renderCapTakes(){
-  const wrap=document.getElementById('cap-takes'); if(!wrap) return;
-  const audio=((capEntry&&capEntry.media)||[]).filter(m=>m.type==='audio');
-  _updateCapControls();
-  if(!audio.length){
-    wrap.innerHTML='';
-    return;
-  }
-  wrap.innerHTML=audio.map((m,i)=>{
-    const mid=m.id;
-    return `<div class="sess-take">
-      <div class="sess-take-top">
-        <span class="session-take-name">Take ${i+1}</span>
-        <button class="session-take-act" onclick="deleteCapTake('${mid}')" title="Delete"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>
-      </div>
-      <div class="player-row">
-        <button class="play-btn2" id="play-${mid}" onclick="togglePlay('${mid}')"><svg viewBox="0 0 12 12"><polygon points="2,1 11,6 2,11"/></svg></button>
-        <div class="player-prog" onclick="seekA(event,'${mid}')"><div class="player-fill" id="pfill-${mid}"></div></div>
-        <span class="player-t" id="ptim-${mid}">${m.duration?fmtDur(m.duration):'—'}</span>
-        <button id="spd-${mid}" class="spd-btn" onclick="cycleSpeed('${mid}')">1×</button>
-      </div>
-      <audio id="da-${mid}" data-mid="${mid}"></audio>
-    </div>`;
-  }).join('');
-  (async()=>{ for(const m of audio){ const url=await getMediaUrl(m.id); if(!url) continue; const da=document.getElementById(`da-${m.id}`); if(da){ da.src=url; wireAudioPlayer(m.id); } } })();
-}
+function closeCapture(){ closeNote(); }
+function renderCapTakes(){ renderNoteTakes(); }
 function deleteCapTake(mid){
   if(!capEntry) return;
   idbDelete(mid);
   capEntry.media=capEntry.media.filter(m=>m.id!==mid);
   if(!capEntry.media.length && !(capEntry.note&&capEntry.note.trim())){
     entries=entries.filter(e=>e.id!==capEntry.id);
-    capEntry=null;
+    capEntry=null; curEntry=null;
   } else {
     capEntry.duration=(capEntry.media[0]&&capEntry.media[0].duration)||null;
   }
   try{ persist(); }catch(_){}
   scheduleGdPush();
-  renderCapTakes(); updateCapSub();
+  renderNoteTakes(); updateCapSub();
+}
+
+/* ══════════════════════════════════════════
+   UNIFIED NOTE WINDOW
+══════════════════════════════════════════ */
+function openNote(id){
+  // Close detail panel if open
+  document.getElementById('detail')?.classList.remove('open');
+  // Reset state
+  capPendingFields={}; capPendingName=null; noteTags=[];
+  if(id){
+    capEntry=entries.find(e=>e.id===id)||null;
+    if(!capEntry) return;
+    capProject=capEntry.project||null;
+    noteTags=[...(capEntry.tags||[])];
+  } else {
+    capEntry=null;
+    capProject=projects.find(p=>p.id===view)?view:null;
+  }
+  capRecording=false; capSec=0;
+  _refreshCapTitle();
+  _resetCapRecUI();
+  updateCapSub();
+  _refreshNoteFields();
+  renderNoteTags();
+  renderNoteTakes();
+  renderNoteVisuals();
+  // Show/hide action buttons
+  const expBtn=document.getElementById('note-exp-btn'); if(expBtn) expBtn.style.display=id?'':'none';
+  const delBtn=document.getElementById('note-del-btn'); if(delBtn) delBtn.style.display=id?'':'none';
+  curEntry=capEntry;
+  document.getElementById('capture-overlay').style.display='flex';
+  const fab=document.getElementById('mob-fab'); if(fab) fab.style.display='none';
+  // New entry → start recording immediately
+  if(!id) toggleCapRec();
+}
+function closeNote(){
+  const ov=document.getElementById('capture-overlay');
+  if(!ov||ov.style.display==='none') return;
+  if(capRecording) stopCapRec();
+  closeCapProjMenu();
+  closeNoteTagDrop();
+  document.querySelectorAll('#note-takes audio').forEach(a=>a.pause());
+  ov.style.display='none';
+  const fab=document.getElementById('mob-fab'); if(fab) fab.style.display='';
+  render(); renderProjects(); renderHeatmap();
+  capEntry=null; curEntry=null;
+}
+function _refreshNoteFields(){
+  const e=capEntry;
+  const st=document.getElementById('note-status'); if(st) st.value=(e&&e.status)||'raw';
+  const bpm=document.getElementById('note-bpm'); if(bpm) bpm.value=(e&&e.bpm)||'';
+  const key=document.getElementById('note-key'); if(key) key.value=(e&&e.key)||'';
+  const txt=document.getElementById('note-text'); if(txt) txt.value=(e&&(e.note||e.text))||'';
+}
+function noteFieldChange(field,value){
+  if(capEntry){ capEntry[field]=value; try{persist();}catch(_){} }
+  else { capPendingFields[field]=value; }
+}
+// ── Tags (Keep-style) ──
+function getTagVocab(){
+  const s=new Set(); entries.forEach(e=>(e.tags||[]).forEach(t=>s.add(t))); return [...s].sort();
+}
+function renderNoteTags(){
+  const wrap=document.getElementById('note-tag-wrap'); const inp=document.getElementById('note-tag-in');
+  if(!wrap||!inp) return;
+  wrap.querySelectorAll('.ntchip').forEach(el=>el.remove());
+  noteTags.forEach((t,i)=>{
+    const chip=document.createElement('span'); chip.className='ntchip';
+    chip.innerHTML=`#${escHtml(t)}<span class="ntchip-x" onclick="noteRemoveTag(${i})">×</span>`;
+    wrap.insertBefore(chip,inp);
+  });
+  if(capEntry){ capEntry.tags=[...noteTags]; try{persist();}catch(_){} }
+  else { capPendingFields.tags=[...noteTags]; }
+}
+function noteAddTag(tag){
+  tag=tag.replace(/[#,\s]/g,'').trim(); if(!tag||noteTags.includes(tag)) return;
+  noteTags.push(tag); renderNoteTags(); closeNoteTagDrop();
+}
+function noteRemoveTag(i){ noteTags.splice(i,1); renderNoteTags(); }
+function noteTagKey(e){
+  if(e.key==='Enter'||e.key===' '||e.key===','){
+    e.preventDefault();
+    const drop=document.getElementById('note-tag-drop');
+    if(drop.style.display!=='none'&&noteTagDropIdx>=0){
+      const items=drop.querySelectorAll('.note-tag-drop-item');
+      if(items[noteTagDropIdx]){ noteAddTag(items[noteTagDropIdx].dataset.tag); e.target.value=''; return; }
+    }
+    noteAddTag(e.target.value); e.target.value='';
+  } else if(e.key==='Backspace'&&!e.target.value&&noteTags.length){
+    noteTags.pop(); renderNoteTags();
+  } else if(e.key==='ArrowDown'){ e.preventDefault(); noteTagDropMove(1); }
+  else if(e.key==='ArrowUp'){ e.preventDefault(); noteTagDropMove(-1); }
+  else if(e.key==='Escape'){ closeNoteTagDrop(); }
+}
+function noteTagInput(e){
+  const v=e.target.value;
+  if(v.endsWith(' ')||v.endsWith(',')){ noteAddTag(v); e.target.value=''; return; }
+  const q=v.replace(/^#/,'').toLowerCase().trim();
+  if(q.length<1){ closeNoteTagDrop(); return; }
+  const vocab=getTagVocab().filter(t=>t.toLowerCase().startsWith(q)&&!noteTags.includes(t));
+  if(!vocab.length){ closeNoteTagDrop(); return; }
+  _renderNoteTagDrop(vocab.slice(0,7));
+}
+function _renderNoteTagDrop(items){
+  const drop=document.getElementById('note-tag-drop'); noteTagDropIdx=-1;
+  drop.innerHTML=items.map(t=>`<div class="note-tag-drop-item" data-tag="${escHtml(t)}" onclick="noteAddTag('${escHtml(t)}');document.getElementById('note-tag-in').value=''">#${escHtml(t)}</div>`).join('');
+  drop.style.display='';
+}
+function noteTagDropMove(dir){
+  const drop=document.getElementById('note-tag-drop');
+  const items=drop.querySelectorAll('.note-tag-drop-item'); if(!items.length) return;
+  if(noteTagDropIdx>=0) items[noteTagDropIdx].classList.remove('focused');
+  noteTagDropIdx=Math.max(0,Math.min(items.length-1,(noteTagDropIdx<0?-1:noteTagDropIdx)+dir));
+  items[noteTagDropIdx].classList.add('focused');
+}
+function closeNoteTagDrop(){
+  const drop=document.getElementById('note-tag-drop'); if(drop) drop.style.display='none'; noteTagDropIdx=-1;
+}
+// ── Takes ──
+function renderNoteTakes(){
+  const wrap=document.getElementById('note-takes'); if(!wrap) return;
+  _updateCapControls();
+  const audio=((capEntry&&capEntry.media)||[]).filter(m=>m.type==='audio');
+  if(!audio.length){ wrap.innerHTML=''; return; }
+  wrap.innerHTML=audio.map((m,i)=>`<div class="note-take">
+    <div class="note-take-head">
+      <span class="note-take-label">Take ${i+1}</span>
+      <span class="note-take-dur">${m.duration?fmtDur(m.duration):''}</span>
+      <button class="note-take-del" onclick="deleteCapTake('${m.id}')" title="Delete take"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>
+    </div>
+    <div class="player-row">
+      <button class="play-btn2" id="play-${m.id}" onclick="togglePlay('${m.id}')"><svg viewBox="0 0 12 12"><polygon points="2,1 11,6 2,11"/></svg></button>
+      <div class="player-prog" onclick="seekA(event,'${m.id}')"><div class="player-fill" id="pfill-${m.id}"></div></div>
+      <span class="player-t" id="ptim-${m.id}">${m.duration?fmtDur(m.duration):'—'}</span>
+      <button id="spd-${m.id}" class="spd-btn" onclick="cycleSpeed('${m.id}')">1×</button>
+    </div>
+    <audio id="da-${m.id}" data-mid="${m.id}"></audio>
+  </div>`).join('');
+  (async()=>{
+    for(const m of audio){
+      let url=(typeof capEntry?.data==='string'&&capEntry.data.startsWith('data:')&&m.id===capEntry?.id)?capEntry.data:await getMediaUrl(m.id);
+      if(!url) continue;
+      const da=document.getElementById(`da-${m.id}`); if(da){ da.src=url; wireAudioPlayer(m.id); }
+    }
+  })();
+}
+// ── Visuals ──
+function renderNoteVisuals(){
+  const section=document.getElementById('note-visuals-section');
+  const inner=document.getElementById('note-visuals-inner');
+  if(!section||!inner) return;
+  const vis=((capEntry&&capEntry.media)||[]).filter(m=>m.type==='photo'||m.type==='video');
+  if(!vis.length){ section.style.display='none'; return; }
+  section.style.display='';
+  inner.innerHTML=vis.map(m=>m.type==='photo'
+    ?`<img data-mid="${m.id}" class="note-visual-thumb" alt="">`
+    :`<video data-mid="${m.id}" class="note-visual-thumb" muted playsinline></video>`).join('');
+  (async()=>{
+    for(const m of vis){
+      const url=await getMediaUrl(m.id); if(!url) continue;
+      const el=inner.querySelector(`[data-mid="${m.id}"]`); if(el) el.src=url;
+    }
+  })();
+}
+// ── Delete / Export ──
+function noteDelete(){
+  if(!capEntry) return;
+  if(!confirm('Delete this note?')) return;
+  delEntry(capEntry.id); closeNote();
+}
+function noteAttach(){
+  if(!capEntry){
+    toast('Record a take first, then attach files'); return;
+  }
+  attachTargetId=capEntry.id;
+  document.getElementById('attach-in').click();
+}
+function toggleNoteExpPop(e){
+  if(e) e.stopPropagation();
+  const pop=document.getElementById('note-exp-pop');
+  if(!pop) return;
+  const open=pop.style.display!=='none';
+  pop.style.display=open?'none':'block';
+}
+function closeNoteExpPop(){
+  const pop=document.getElementById('note-exp-pop'); if(pop) pop.style.display='none';
 }
 async function handleAttach(input){
   const file=input.files[0]; if(!file||!attachTargetId) return;
@@ -5354,7 +5577,7 @@ migrateLegacyMedia().then(()=>{ migrateMediaArray(); render(); }).catch(err=>con
 if(settings.gdClientId) loadGsi();
 wireCaptureButton(document.getElementById('capture-btn'));
 wireCaptureButton(document.getElementById('mob-fab'));
-document.addEventListener('keydown',e=>{ if(e.key==='Escape'){closeCapture();closeDetail();closeSave();closeProjModal();closeSettings();cancelRecording();} });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){closeNote();closeSave();closeProjModal();closeSettings();cancelRecording();} });
 document.addEventListener('click',e=>{ const pop=document.getElementById('exp-pop'); if(pop&&pop.classList.contains('open')&&!pop.closest('.exp-pop-wrap').contains(e.target)) closeExpPop(); });
 
 // ── PWA SERVICE WORKER (inline via blob) ──
