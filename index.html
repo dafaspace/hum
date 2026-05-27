@@ -916,14 +916,15 @@ body {
 #cap-rec-btn.recording { animation: capRecBreath 2s ease-in-out infinite; }
 #cap-rec-btn.recording .srec-shape { width: 22px; height: 22px; border-radius: 5px; }
 #cap-timer { font-family: var(--sans); font-size: 26px; font-weight: 300; color: var(--ink); font-variant-numeric: tabular-nums; }
-.cap-title { width: 100%; border: none; border-bottom: 1px dashed var(--ink4); background: none; font-family: var(--serif); font-size: 20px; color: var(--ink); padding: 2px 4px 4px; margin: -2px -4px 0; border-radius: 4px 4px 0 0; outline: none; transition: background 0.15s, border-color 0.15s; }
+.cap-title { width: 90%; border: none; border-bottom: 1px dashed var(--ink4); background: none; font-family: var(--serif); font-size: 20px; color: var(--ink); padding: 2px 4px 4px; margin: -2px -4px 0; border-radius: 4px 4px 0 0; outline: none; transition: background 0.15s, border-color 0.15s; }
 .cap-title:hover { background: var(--paper2); }
 .cap-title:focus { background: var(--paper2); border-bottom: 1px solid var(--warm); }
 .cap-x { width: 32px; height: 32px; border-radius: 8px; border: none; background: none; color: var(--ink3); cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin: -2px -6px 0 4px; transition: all 0.15s; }
 .cap-x:hover { background: var(--paper2); color: var(--ink); }
 .cap-x svg { width: 18px; height: 18px; }
 .cap-proj-wrap { position: relative; display: inline-block; margin-top: 7px; }
-.cap-proj-trigger { display: inline-flex; align-items: center; gap: 6px; background: none; border: none; padding: 3px 7px; margin-left: -7px; border-radius: 8px; cursor: pointer; font-family: var(--sans); font-size: 12px; color: var(--ink2); transition: background 0.15s; max-width: 100%; }
+.cap-proj-trigger { display: inline-flex; align-items: center; gap: 6px; background: none; border: none; padding: 3px 7px; margin-left: -7px; border-radius: 8px; cursor: pointer; font-family: var(--sans); font-size: 12px; color: var(--ink2); transition: background 0.15s; min-width: 175px; max-width: 100%; justify-content: flex-start; }
+.cap-proj-trigger .cap-proj-chev { margin-left: auto; }
 .cap-proj-trigger:hover { background: var(--paper2); }
 .cap-proj-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink4); flex-shrink: 0; }
 .cap-proj-chev { width: 13px; height: 13px; flex-shrink: 0; color: var(--ink3); }
