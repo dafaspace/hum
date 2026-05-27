@@ -910,20 +910,19 @@ body {
 #cap-head { display: flex; align-items: flex-start; justify-content: space-between; padding: 22px 22px 14px; }
 #cap-takes { flex: 1; overflow-y: auto; padding: 0 22px; min-height: 80px; }
 #cap-rec-area { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 18px 22px calc(20px + env(safe-area-inset-bottom)); border-top: 1px solid var(--paper4); }
-#cap-rec-btn { width: 68px; height: 68px; border-radius: 50%; border: none; background: var(--warm); cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 18px rgba(222,169,122,0.45); transition: transform 0.15s, background 0.2s; }
+#cap-rec-btn { width: 68px; height: 68px; border-radius: 50%; border: none; background: var(--rose); cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 20px rgba(196,120,120,0.40); transition: transform 0.15s; }
 #cap-rec-btn:hover { transform: scale(1.05); }
 #cap-rec-btn .srec-shape { width: 26px; height: 26px; border-radius: 50%; background: #fff; transition: all 0.2s; }
-#cap-rec-btn.recording { background: var(--rose); box-shadow: 0 4px 18px rgba(196,120,120,0.5); animation: srecPulse 1.6s ease-in-out infinite; }
+#cap-rec-btn.recording { animation: capRecBreath 2s ease-in-out infinite; }
 #cap-rec-btn.recording .srec-shape { width: 22px; height: 22px; border-radius: 5px; }
 #cap-timer { font-family: var(--sans); font-size: 26px; font-weight: 300; color: var(--ink); font-variant-numeric: tabular-nums; }
 .cap-title { width: 100%; border: none; background: none; font-family: var(--serif); font-size: 20px; color: var(--ink); padding: 2px 4px; margin: -2px -4px; border-radius: 6px; outline: none; transition: background 0.15s; }
 .cap-title:hover { background: var(--paper2); }
 .cap-title:focus { background: var(--paper2); }
 #cap-rec-row { display: flex; align-items: center; justify-content: center; gap: 16px; }
-.cap-arrow { height: 44px; min-width: 96px; border-radius: 22px; border: 1px solid var(--paper4); background: var(--paper2); color: var(--ink2); cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; font-family: var(--sans); font-size: 12px; font-weight: 450; letter-spacing: 0.01em; padding: 0 16px; transition: all 0.15s; flex-shrink: 0; }
-.cap-arrow svg { width: 16px; height: 16px; flex-shrink: 0; }
-.cap-arrow:not([disabled]):hover { border-color: var(--warm); color: var(--warm2); background: var(--warm-soft); }
-.cap-arrow[disabled] { opacity: 0.28; cursor: default; pointer-events: none; }
+.cap-arrow { height: 40px; min-width: 90px; border-radius: 20px; border: 1px solid var(--paper4); background: var(--paper2); color: var(--ink3); cursor: pointer; display: flex; align-items: center; justify-content: center; font-family: var(--sans); font-size: 12px; font-weight: 400; letter-spacing: 0.01em; padding: 0 18px; transition: all 0.15s; flex-shrink: 0; opacity: 0.7; }
+.cap-arrow:not([disabled]):hover { border-color: var(--ink4); color: var(--ink2); opacity: 1; }
+.cap-arrow[disabled] { opacity: 0.25; cursor: default; pointer-events: none; }
 #session-rec-area { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 18px 22px calc(24px + env(safe-area-inset-bottom)); border-top: 1px solid var(--paper4); }
 #session-rec-btn { width: 68px; height: 68px; border-radius: 50%; border: none; background: var(--warm); cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 18px rgba(222,169,122,0.45); transition: transform 0.15s, background 0.2s; }
 #session-rec-btn:hover { transform: scale(1.05); }
@@ -931,6 +930,7 @@ body {
 #session-rec-btn.recording { background: var(--rose); box-shadow: 0 4px 18px rgba(196,120,120,0.5); animation: srecPulse 1.6s ease-in-out infinite; }
 #session-rec-btn.recording .srec-shape { width: 22px; height: 22px; border-radius: 5px; }
 @keyframes srecPulse { 0%,100% { box-shadow: 0 4px 18px rgba(196,120,120,0.5); } 50% { box-shadow: 0 4px 26px rgba(196,120,120,0.8); } }
+@keyframes capRecBreath { 0%,100% { box-shadow: 0 4px 20px rgba(196,120,120,0.45); transform: scale(1); } 50% { box-shadow: 0 6px 34px rgba(196,120,120,0.75); transform: scale(1.06); } }
 #session-timer { font-family: var(--sans); font-size: 26px; font-weight: 300; color: var(--ink); font-variant-numeric: tabular-nums; }
 #session-rec-hint { font-size: 11px; color: var(--ink3); letter-spacing: 0.04em; }
 .modal-add-take { display: flex; align-items: center; justify-content: center; gap: 7px; width: 100%; padding: 9px; border-radius: 10px; border: 1px dashed var(--paper4); background: none; color: var(--ink3); font-family: var(--sans); font-size: 12px; cursor: pointer; transition: all 0.15s; }
@@ -1855,9 +1855,9 @@ audio { display: none; }
     <div id="cap-rec-area">
       <div id="cap-timer" style="display:none">0:00</div>
       <div id="cap-rec-row">
-        <button class="cap-arrow" id="cap-cancel" onclick="cancelCapRec()" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>Discard</button>
+        <button class="cap-arrow" id="cap-cancel" onclick="cancelCapRec()" disabled>Cancel</button>
         <button id="cap-rec-btn" onclick="toggleCapRec()" aria-label="Record"><span class="srec-shape"></span></button>
-        <button class="cap-arrow" id="cap-newnote" onclick="newCapNote()" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>New note</button>
+        <button class="cap-arrow" id="cap-close" onclick="closeCapture()">Close</button>
       </div>
     </div>
   </div>
@@ -3762,7 +3762,6 @@ function updateCapSub(){
 function _updateCapControls(){
   const hasTakes=!!(capEntry&&capEntry.media&&capEntry.media.some(m=>m.type==='audio'));
   const cx=document.getElementById('cap-cancel'); if(cx) cx.disabled = !capRecording;
-  const nn=document.getElementById('cap-newnote'); if(nn) nn.disabled = capRecording || !hasTakes;
 }
 async function toggleCapRec(){
   if(capRecording){ stopCapRec(); return; }
