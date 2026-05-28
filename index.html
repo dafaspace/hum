@@ -130,7 +130,10 @@ body {
 }
 .sidebar-top { padding: 22px 20px 16px; }
 .brand-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.brand-wrap { display: flex; align-items: baseline; gap: 5px; }
+.brand-wrap { display: flex; align-items: baseline; gap: 5px; cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; transition: opacity 0.15s; }
+.brand-wrap:hover { opacity: 0.75; }
+.brand-wrap:active { opacity: 0.55; }
+.brand-wrap:focus-visible { outline: 2px solid var(--warm); outline-offset: 4px; border-radius: 4px; }
 .brand {
   font-family: var(--serif);
   font-size: 28px;
@@ -1562,7 +1565,7 @@ audio { display: none; }
 <div id="sidebar">
   <div class="sidebar-top">
     <div class="brand-row">
-      <div class="brand-wrap">
+      <div class="brand-wrap" onclick="toggleTheme()" title="Switch theme" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleTheme()}">
         <div class="brand">hum</div>
         <span class="brand-dot"></span>
       </div>
@@ -1594,7 +1597,7 @@ audio { display: none; }
     </button>
     <div id="view-title">All captures</div>
     <div id="mob-header">
-      <div class="brand-wrap">
+      <div class="brand-wrap" onclick="toggleTheme()" title="Switch theme" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleTheme()}">
         <span class="brand">hum</span>
         <span class="brand-dot"></span>
       </div>
