@@ -50,9 +50,9 @@ document.head.appendChild(appleIcon);
   --ink2: #6a635a;
   --ink3: #a8a195;
   --ink4: #d2ccbf;
-  --warm:      #e8a87c;
-  --warm2:     #d68f5e;
-  --warm-soft: rgba(232,168,124,0.16);
+  --warm:      #c47878;
+  --warm2:     #a85e5e;
+  --warm-soft: rgba(196,120,120,0.14);
   --rose:      #c47878;
   --rose-soft: rgba(196,120,120,0.10);
   --sage:      #88a896;
@@ -85,9 +85,9 @@ document.head.appendChild(appleIcon);
   --ink2: #DAC8BD;
   --ink3: #AC9285;
   --ink4: #755C52;
-  --warm:      #e8a87c;
-  --warm2:     #f3bc8c;
-  --warm-soft: rgba(232,168,124,0.18);
+  --warm:      #D97765;
+  --warm2:     #E68A78;
+  --warm-soft: rgba(217,119,101,0.18);
   --rose:      #D97765;
   --rose-soft: rgba(217,119,101,0.18);
   --sage:      #8FB09D;
@@ -4333,15 +4333,16 @@ function renderNoteAnalysis(){
       <div class="note-analysis-text">${escHtml(e.transcript)}</div>
     </div>`;
   } else if(hasAudio){
-    const apiKey=localStorage.getItem('hum_openai_key')||'';
-    if(apiKey){
-      h+=`<div class="note-analysis-block">
-        <div class="note-analysis-head">
-          <span class="note-analysis-label">Transcript</span>
-          <button class="note-analysis-action" onclick="noteTranscribe()">Transcribe</button>
-        </div>
-      </div>`;
-    }
+    const apiKey=(settings&&settings.openaiKey)||'';
+    h+=`<div class="note-analysis-block">
+      <div class="note-analysis-head">
+        <span class="note-analysis-label">Transcript</span>
+        ${apiKey
+          ?`<button class="note-analysis-action" onclick="noteTranscribe()">Transcribe</button>`
+          :`<button class="note-analysis-action" onclick="closeNote();openSettings()">Add API key</button>`}
+      </div>
+      ${apiKey?'':`<div class="note-analysis-hint">Add an OpenAI API key in Settings to enable transcription.</div>`}
+    </div>`;
   }
   // Chord section
   if(hasAudio){
@@ -4373,8 +4374,7 @@ function renderNoteAnalysis(){
         <div class="midi-info-cell"><div class="midi-info-k">Length</div><div class="midi-info-v">${fmtDur(Math.ceil(lastEnd))}</div></div>
       </div><div id="note-midi-status"></div>`;
     } else {
-      midiBody=`<div class="note-analysis-hint" id="note-midi-status">Press Generate to extract notes from audio</div>
-        <div class="midi-warn">First run downloads ~10 MB model — subsequent runs are instant.</div>`;
+      midiBody=`<div class="note-analysis-hint" id="note-midi-status">Press Generate to extract notes from audio</div>`;
     }
     h+=`<div class="note-analysis-block">
       <div class="note-analysis-head">
@@ -4394,7 +4394,7 @@ function renderNoteAnalysis(){
 async function noteTranscribe(){
   if(!capEntry) return;
   const e=capEntry;
-  const apiKey=localStorage.getItem('hum_openai_key')||(settings&&settings.openaiKey)||'';
+  const apiKey=(settings&&settings.openaiKey)||'';
   if(!apiKey){ toast('Add OpenAI key in Settings'); return; }
   const allMedia=e.media||((e.hasMedia||e.data)?[{id:e.id,type:'audio',mimeType:e.mimeType||''}]:[]);
   const audioItem=allMedia.find(m=>m.type==='audio');
