@@ -50,9 +50,9 @@ document.head.appendChild(appleIcon);
   --ink2: #6a635a;
   --ink3: #a8a195;
   --ink4: #d2ccbf;
-  --warm:      #c47878;
-  --warm2:     #a85e5e;
-  --warm-soft: rgba(196,120,120,0.14);
+  --warm:      #e8a87c;
+  --warm2:     #d68f5e;
+  --warm-soft: rgba(232,168,124,0.16);
   --rose:      #c47878;
   --rose-soft: rgba(196,120,120,0.10);
   --sage:      #88a896;
@@ -85,9 +85,9 @@ document.head.appendChild(appleIcon);
   --ink2: #DAC8BD;
   --ink3: #AC9285;
   --ink4: #755C52;
-  --warm:      #D97765;
-  --warm2:     #E68A78;
-  --warm-soft: rgba(217,119,101,0.18);
+  --warm:      #e8a87c;
+  --warm2:     #f3bc8c;
+  --warm-soft: rgba(232,168,124,0.18);
   --rose:      #D97765;
   --rose-soft: rgba(217,119,101,0.18);
   --sage:      #8FB09D;
@@ -1042,10 +1042,20 @@ body {
 .note-take-dur { font-family: var(--sans); font-size: 11px; color: var(--ink3); margin-right: 6px; }
 .note-take-del { width: 22px; height: 22px; border: none; background: none; cursor: pointer; color: var(--ink3); display: flex; align-items: center; justify-content: center; border-radius: 5px; padding: 0; flex-shrink: 0; transition: all 0.12s; }
 .note-take-del:hover { color: var(--rose); background: var(--rose-soft); }
+.note-take-transcript { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--paper4); }
+.note-take-transcript-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.note-take-transcript-label { font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink3); font-weight: 500; font-family: var(--sans); }
+.note-take-transcript-action { width: 22px; height: 22px; border: none; background: none; cursor: pointer; color: var(--ink3); display: flex; align-items: center; justify-content: center; border-radius: 5px; padding: 0; flex-shrink: 0; transition: all 0.12s; }
+.note-take-transcript-action:hover { color: var(--ink); background: var(--paper3); }
+.note-take-transcript-text { font-size: 12.5px; color: var(--ink2); line-height: 1.6; white-space: pre-wrap; }
+.note-take-transcript-actions { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--paper4); display: flex; justify-content: flex-end; }
+.note-take-mini-btn { font-size: 11px; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--paper4); background: var(--surface); color: var(--ink2); cursor: pointer; font-family: var(--sans); transition: all 0.12s; white-space: nowrap; }
+.note-take-mini-btn:hover { border-color: var(--warm); color: var(--warm2); }
 
 
 /* ── PROJECT MODAL ── */
-#proj-overlay { position: fixed; inset: 0; z-index: 110; background: var(--backdrop); backdrop-filter: blur(14px); display: none; align-items: center; justify-content: center; padding: 20px; }
+#proj-overlay { position: fixed; inset: 0; z-index: 110; background: var(--backdrop); backdrop-filter: blur(14px); display: none; align-items: flex-start; justify-content: center; padding: calc(20px + env(safe-area-inset-top)) 20px calc(20px + env(safe-area-inset-bottom)); overflow-y: auto; }
+#proj-overlay .proj-card { margin: auto; }
 #proj-overlay.show { display: flex; }
 .proj-card { background: var(--surface); border: 1px solid var(--paper4); border-radius: 22px; padding: 26px 28px; width: 100%; max-width: 360px; box-shadow: 0 12px 48px rgba(var(--shadow-rgb),0.16); }
 .proj-card h3 { font-family: var(--serif); font-size: 20px; font-weight: 500; margin-bottom: 18px; letter-spacing: -0.01em; }
@@ -1137,9 +1147,9 @@ body {
 .settings-btn.active { border-color: var(--sage); color: var(--sage); background: var(--sage-soft); }
 .settings-btn svg { width: 15px; height: 15px; }
 
-#settings-overlay { position: fixed; inset: 0; z-index: 110; background: var(--backdrop); backdrop-filter: blur(14px); display: none; align-items: center; justify-content: center; padding: 20px; }
+#settings-overlay { position: fixed; inset: 0; z-index: 110; background: var(--backdrop); backdrop-filter: blur(14px); display: none; align-items: flex-start; justify-content: center; padding: calc(20px + env(safe-area-inset-top)) 20px calc(20px + env(safe-area-inset-bottom)); overflow-y: auto; }
 #settings-overlay.show { display: flex; }
-.settings-card { background: var(--surface); border: 1px solid var(--paper4); border-radius: 22px; padding: 26px 28px; width: 100%; max-width: 380px; max-height: 88vh; overflow-y: auto; box-shadow: 0 12px 48px rgba(var(--shadow-rgb),0.16); }
+.settings-card { background: var(--surface); border: 1px solid var(--paper4); border-radius: 22px; padding: 26px 28px; width: 100%; max-width: 380px; box-shadow: 0 12px 48px rgba(var(--shadow-rgb),0.16); margin: auto; }
 .settings-card::-webkit-scrollbar { width: 0; }
 .settings-card h3 { font-family: var(--serif); font-size: 20px; font-weight: 500; margin-bottom: 18px; letter-spacing: -0.01em; }
 .theme-toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 4px 0; }
@@ -1602,11 +1612,7 @@ audio { display: none; }
 
   <!-- CAPTURE -->
   <div id="capture-area-new">
-    <button id="capture-btn" title="Tap to capture · hold for a session">
-      <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
-        <path d="M12 5v14M5 12h14"/>
-      </svg>
-    </button>
+    <button id="capture-btn" title="Tap to capture · hold for a session" aria-label="Capture"></button>
     <span class="capture-hint"><strong>Tap</strong> to capture · <strong>hold</strong> for a session</span>
     <button id="session-btn" onclick="openCapture()" style="display:none" title="Capture">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.4"/></svg>
@@ -1975,11 +1981,7 @@ audio { display: none; }
   </div>
 </div>
 
-<button id="mob-fab" aria-label="New capture (hold for session)">
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-    <path d="M12 5v14M5 12h14"/>
-  </svg>
-</button>
+<button id="mob-fab" aria-label="New capture (hold for session)"></button>
 
 <!-- CAMERA -->
 <div id="cam-overlay">
@@ -4184,6 +4186,16 @@ function closeNote(){
   document.querySelectorAll('#note-takes audio').forEach(a=>a.pause());
   ov.style.display='none';
   const fab=document.getElementById('mob-fab'); if(fab) fab.style.display='';
+  // Auto-delete empty entries (no media, no text, no tags, no transcript)
+  if(capEntry){
+    const e=capEntry;
+    const hasMedia=(e.media&&e.media.length)||e.hasMedia;
+    const hasContent=(e.note&&e.note.trim())||(e.name&&e.name.trim())||(e.tags&&e.tags.length)||e.transcript;
+    if(!hasMedia&&!hasContent){
+      entries=entries.filter(x=>x.id!==e.id);
+      try{persist();}catch(_){}
+    }
+  }
   render(); renderProjects(); renderHeatmap();
   capEntry=null; curEntry=null;
 }
@@ -4259,6 +4271,15 @@ function closeNoteTagDrop(){
   const drop=document.getElementById('note-tag-drop'); if(drop) drop.style.display='none'; noteTagDropIdx=-1;
 }
 // ── Takes ──
+function _getTakeTranscript(m, e){
+  if(m && m.transcript) return m.transcript;
+  // Legacy: if entry has a single transcript, show it under the first audio take
+  if(e && e.transcript){
+    const firstAudio=(e.media||[]).find(x=>x.type==='audio');
+    if(firstAudio && firstAudio.id===m.id) return e.transcript;
+  }
+  return null;
+}
 function renderNoteTakes(){
   const wrap=document.getElementById('note-takes'); if(!wrap) return;
   _updateCapControls();
@@ -4268,20 +4289,43 @@ function renderNoteTakes(){
   const audio=allMedia.filter(m=>m.type==='audio');
   if(!audio.length){ wrap.innerHTML=''; renderNoteAnalysis(); return; }
   const isLegacy=!capEntry.media;
-  wrap.innerHTML=audio.map((m,i)=>`<div class="note-take">
-    <div class="note-take-head">
-      <span class="note-take-label">Take ${i+1}</span>
-      <span class="note-take-dur">${m.duration?fmtDur(m.duration):''}</span>
-      ${!isLegacy?`<button class="note-take-del" onclick="deleteCapTake('${m.id}')" title="Delete take"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>`:''}
-    </div>
-    <div class="player-row">
-      <button class="play-btn2" id="play-${m.id}" onclick="togglePlay('${m.id}')"><svg viewBox="0 0 12 12"><polygon points="2,1 11,6 2,11"/></svg></button>
-      <div class="player-prog" onclick="seekA(event,'${m.id}')"><div class="player-fill" id="pfill-${m.id}"></div></div>
-      <span class="player-t" id="ptim-${m.id}">${m.duration?fmtDur(m.duration):'—'}</span>
-      <button id="spd-${m.id}" class="spd-btn" onclick="cycleSpeed('${m.id}')">1×</button>
-    </div>
-    <audio id="da-${m.id}" data-mid="${m.id}"></audio>
-  </div>`).join('');
+  const apiKey=(settings&&settings.openaiKey)||'';
+  wrap.innerHTML=audio.map((m,i)=>{
+    const tr=_getTakeTranscript(m, capEntry);
+    let trBlock='';
+    if(tr){
+      trBlock=`<div class="note-take-transcript">
+        <div class="note-take-transcript-head">
+          <span class="note-take-transcript-label">Transcript</span>
+          <button class="note-take-transcript-action" onclick="copyTakeTranscript('${m.id}')" title="Copy">
+            <svg viewBox="0 0 14 14" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="8" height="9" rx="1.5"/><path d="M9 4V2.5A1 1 0 0 0 8 1.5H3a1 1 0 0 0-1 1V9"/></svg>
+          </button>
+        </div>
+        <div class="note-take-transcript-text">${escHtml(tr)}</div>
+      </div>`;
+    } else if(!isLegacy){
+      trBlock=`<div class="note-take-transcript-actions">
+        ${apiKey
+          ?`<button class="note-take-mini-btn" onclick="noteTranscribe('${m.id}')">Transcribe</button>`
+          :`<button class="note-take-mini-btn" onclick="closeNote();openSettings()">Add API key to transcribe</button>`}
+      </div>`;
+    }
+    return `<div class="note-take">
+      <div class="note-take-head">
+        <span class="note-take-label">Take ${i+1}</span>
+        <span class="note-take-dur">${m.duration?fmtDur(m.duration):''}</span>
+        ${!isLegacy?`<button class="note-take-del" onclick="deleteCapTake('${m.id}')" title="Delete take"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>`:''}
+      </div>
+      <div class="player-row">
+        <button class="play-btn2" id="play-${m.id}" onclick="togglePlay('${m.id}')"><svg viewBox="0 0 12 12"><polygon points="2,1 11,6 2,11"/></svg></button>
+        <div class="player-prog" onclick="seekA(event,'${m.id}')"><div class="player-fill" id="pfill-${m.id}"></div></div>
+        <span class="player-t" id="ptim-${m.id}">${m.duration?fmtDur(m.duration):'—'}</span>
+        <button id="spd-${m.id}" class="spd-btn" onclick="cycleSpeed('${m.id}')">1×</button>
+      </div>
+      <audio id="da-${m.id}" data-mid="${m.id}"></audio>
+      ${trBlock}
+    </div>`;
+  }).join('');
   (async()=>{
     for(const m of audio){
       let url=(typeof capEntry.data==='string'&&capEntry.data.startsWith('data:')&&m.id===capEntry.id)?capEntry.data:await getMediaUrl(m.id);
@@ -4290,6 +4334,13 @@ function renderNoteTakes(){
     }
   })();
   renderNoteAnalysis();
+}
+function copyTakeTranscript(mid){
+  if(!capEntry) return;
+  const m=(capEntry.media||[]).find(x=>x.id===mid);
+  const text=_getTakeTranscript(m, capEntry);
+  if(!text) return;
+  navigator.clipboard.writeText(text).then(()=>toast('Copied')).catch(()=>toast('Copy failed'));
 }
 // ── Visuals ──
 function renderNoteVisuals(){
@@ -4323,27 +4374,7 @@ function renderNoteAnalysis(){
   const allMedia=e.media||((e.hasMedia||e.data)?[{id:e.id,type:e.type==='photo'?'photo':e.type==='video'?'video':'audio',mimeType:e.mimeType||''}]:[]);
   const hasAudio=allMedia.some(m=>m.type==='audio');
   let h='';
-  // Transcript section
-  if(e.transcript){
-    h+=`<div class="note-analysis-block">
-      <div class="note-analysis-head">
-        <span class="note-analysis-label">Transcript</span>
-        <button class="note-analysis-action" onclick="navigator.clipboard.writeText(${JSON.stringify(e.transcript)}).then(()=>toast('Copied'))">Copy</button>
-      </div>
-      <div class="note-analysis-text">${escHtml(e.transcript)}</div>
-    </div>`;
-  } else if(hasAudio){
-    const apiKey=(settings&&settings.openaiKey)||'';
-    h+=`<div class="note-analysis-block">
-      <div class="note-analysis-head">
-        <span class="note-analysis-label">Transcript</span>
-        ${apiKey
-          ?`<button class="note-analysis-action" onclick="noteTranscribe()">Transcribe</button>`
-          :`<button class="note-analysis-action" onclick="closeNote();openSettings()">Add API key</button>`}
-      </div>
-      ${apiKey?'':`<div class="note-analysis-hint">Add an OpenAI API key in Settings to enable transcription.</div>`}
-    </div>`;
-  }
+  // Transcript moved to per-take (shown directly under each take in renderNoteTakes)
   // Chord section
   if(hasAudio){
     const hasChords=Array.isArray(e.chords)&&e.chords.length>0;
@@ -4391,16 +4422,19 @@ function renderNoteAnalysis(){
   else { section.style.display='none'; section.innerHTML=''; }
 }
 // ── Transcribe from note window ──
-async function noteTranscribe(){
+async function noteTranscribe(mid){
   if(!capEntry) return;
   const e=capEntry;
   const apiKey=(settings&&settings.openaiKey)||'';
   if(!apiKey){ toast('Add OpenAI key in Settings'); return; }
   const allMedia=e.media||((e.hasMedia||e.data)?[{id:e.id,type:'audio',mimeType:e.mimeType||''}]:[]);
-  const audioItem=allMedia.find(m=>m.type==='audio');
+  const audioItem = mid
+    ? allMedia.find(m=>m.id===mid && m.type==='audio')
+    : allMedia.find(m=>m.type==='audio');
   if(!audioItem){ toast('No audio to transcribe'); return; }
-  // Update button
-  const btn=document.querySelector('#note-analysis-section .note-analysis-action');
+  // Update button — find by mid on the take, fall back to first found
+  const btn=document.querySelector(`.note-take-mini-btn[onclick*="'${audioItem.id}'"]`)
+        || document.querySelector('.note-take-mini-btn');
   if(btn){ btn.textContent='Transcribing…'; btn.disabled=true; }
   try{
     let blob;
@@ -4412,9 +4446,12 @@ async function noteTranscribe(){
       const res=await fetch(url); blob=await res.blob();
     }
     const transcript=await whisperTranscribe(blob);
-    e.transcript=transcript;
+    // Per-take transcript (new model)
+    audioItem.transcript = transcript;
+    // Also mirror onto entry.transcript so search still finds it
+    e.transcript = transcript;
     try{persist();}catch(_){}
-    renderNoteAnalysis();
+    renderNoteTakes();
     toast('Transcript ready');
   } catch(err){
     toast('Transcription failed: '+err.message);
@@ -4433,7 +4470,18 @@ async function noteDelete(){
 }
 function noteAttach(){
   if(!capEntry){
-    toast('Record a take first, then attach files'); return;
+    // Create an empty entry on the fly so attach has a target.
+    // If user cancels the file picker, closeNote() will clean it up.
+    capEntry={ id:uid(), ts:Date.now(), type:'idea', name:capPendingName||null, project:capProject||null,
+      note:capPendingFields.note||'', tags:capPendingFields.tags||[], bpm:capPendingFields.bpm||null,
+      key:capPendingFields.key||'', status:capPendingFields.status||'raw',
+      mood:null, genre:null, duration:null, transcript:null, media:[], hasMedia:false };
+    capPendingFields={};
+    entries.unshift(capEntry);
+    curEntry=capEntry;
+    const expBtn=document.getElementById('note-exp-btn'); if(expBtn) expBtn.style.display='';
+    const delBtn=document.getElementById('note-del-btn'); if(delBtn) delBtn.style.display='';
+    try{persist();}catch(_){}
   }
   attachTargetId=capEntry.id;
   document.getElementById('attach-in').click();
