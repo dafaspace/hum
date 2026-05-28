@@ -1557,6 +1557,8 @@ audio { display: none; }
 </style>
 <!-- lamejs: pure-JS MP3 encoder (~50KB, MIT) — used for MP3 320 / 128 export -->
 <script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js"></script>
+<!-- JSZip: ZIP archive read/write (~95KB, MIT) — used for Export/Import all -->
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 </head>
 <body>
 <div id="app">
@@ -1971,6 +1973,15 @@ audio { display: none; }
       <div class="settings-hint">For Whisper audio transcription. Stored locally only.</div>
     </div>
     <hr class="settings-sep">
+    <div class="settings-section-title">Backup</div>
+    <div class="settings-hint" style="margin-top:0;margin-bottom:10px">Save all notes, projects and media into a single ZIP file. Restore on any device without an account.</div>
+    <div class="gd-btn-row">
+      <button class="gd-small-btn primary" onclick="exportAllZip()" id="backup-export-btn">Export all to ZIP</button>
+      <button class="gd-small-btn" onclick="document.getElementById('backup-import-in').click()" id="backup-import-btn">Import from ZIP</button>
+    </div>
+    <div id="backup-status" style="font-size:11px;color:var(--ink3);margin-top:6px"></div>
+    <input type="file" id="backup-import-in" accept=".zip" style="display:none" onchange="importAllZip(this)">
+    <hr class="settings-sep">
     <div class="settings-section-title">Google Drive</div>
     <div class="fg">
       <label class="flabel">OAuth Client ID</label>
@@ -2234,6 +2245,225 @@ function idbDelete(id){
     tx.oncomplete=()=>res();
     tx.onerror=()=>res();
   })).catch(()=>{});
+}
+
+// ── BACKUP: Export / Import all to ZIP ──
+const BACKUP_VERSION = 1;
+function _mimeToExt(mime){
+  if(!mime) return 'bin';
+  const m = mime.toLowerCase();
+  if(m.includes('mpeg')||m.includes('mp3')) return 'mp3';
+  if(m.includes('webm')) return 'webm';
+  if(m.includes('wav')||m.includes('wave')) return 'wav';
+  if(m.includes('ogg')) return 'ogg';
+  if(m.includes('audio/mp4')||m.includes('m4a')) return 'm4a';
+  if(m.includes('mp4')) return 'mp4';
+  if(m.includes('jpeg')||m.includes('jpg')) return 'jpg';
+  if(m.includes('png')) return 'png';
+  if(m.includes('gif')) return 'gif';
+  if(m.includes('webp')) return 'webp';
+  if(m.includes('quicktime')||m.includes('mov')) return 'mov';
+  return 'bin';
+}
+function _extToMime(ext){
+  return ({mp3:'audio/mpeg', webm:'audio/webm', wav:'audio/wav', ogg:'audio/ogg',
+    m4a:'audio/mp4', mp4:'video/mp4', jpg:'image/jpeg', jpeg:'image/jpeg',
+    png:'image/png', gif:'image/gif', webp:'image/webp', mov:'video/quicktime'})[ext.toLowerCase()]||'application/octet-stream';
+}
+function _dataUrlToBlob(dataUrl){
+  const m = /^data:([^;]+);base64,(.+)$/.exec(dataUrl);
+  if(!m) return null;
+  const mime = m[1];
+  const bin = atob(m[2]);
+  const buf = new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) buf[i] = bin.charCodeAt(i);
+  return new Blob([buf], {type: mime});
+}
+
+async function exportAllZip(){
+  if(typeof JSZip === 'undefined'){ toast('ZIP library not loaded'); return; }
+  const btn = document.getElementById('backup-export-btn');
+  const status = document.getElementById('backup-status');
+  if(btn){ btn.disabled = true; btn.textContent = 'Preparing…'; }
+  try{
+    const zip = new JSZip();
+    // Sort entries by timestamp descending (newest first) for readable order
+    const sortedEntries = [...entries].sort((a,b)=>(b.ts||0)-(a.ts||0));
+    const sortedProjects = [...projects].sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+
+    // Collect every media id we'll save, and clean entries of base64 `data` blobs
+    const mediaFiles = []; // {id, blob, ext}
+    const cleanedEntries = [];
+    for(const e of sortedEntries){
+      const ce = {...e};
+      // Per-entry media list (new model)
+      if(Array.isArray(e.media)){
+        ce.media = e.media.map(m=>({...m}));
+        for(const m of e.media){
+          const rec = await idbGet(m.id);
+          if(rec && rec.blob){
+            mediaFiles.push({id:m.id, blob:rec.blob, ext:_mimeToExt(rec.mimeType||rec.blob.type||m.mimeType)});
+          }
+        }
+      }
+      // Legacy: entry-level media (hasMedia + e.id as IDB key, or e.data base64)
+      if((e.hasMedia || e.data) && !(Array.isArray(e.media) && e.media.length)){
+        if(typeof e.data === 'string' && e.data.startsWith('data:')){
+          const blob = _dataUrlToBlob(e.data);
+          if(blob){
+            mediaFiles.push({id:e.id, blob, ext:_mimeToExt(blob.type)});
+            delete ce.data; // strip base64 from JSON — saved as file
+          }
+        } else {
+          const rec = await idbGet(e.id);
+          if(rec && rec.blob){
+            mediaFiles.push({id:e.id, blob:rec.blob, ext:_mimeToExt(rec.mimeType||rec.blob.type||e.mimeType)});
+          }
+        }
+      }
+      cleanedEntries.push(ce);
+    }
+
+    // Add JSON files (pretty-printed for human readability)
+    const manifest = {
+      version: BACKUP_VERSION,
+      app: 'Hum',
+      exported_at: new Date().toISOString(),
+      counts: {
+        entries: cleanedEntries.length,
+        projects: sortedProjects.length,
+        media_files: mediaFiles.length
+      }
+    };
+    zip.file('manifest.json', JSON.stringify(manifest, null, 2));
+    zip.file('entries.json', JSON.stringify(cleanedEntries, null, 2));
+    zip.file('projects.json', JSON.stringify(sortedProjects, null, 2));
+    zip.file('README.txt',
+      'Hum backup archive\n' +
+      '==================\n\n' +
+      'Exported: ' + new Date().toLocaleString() + '\n' +
+      'Entries:  ' + cleanedEntries.length + '\n' +
+      'Projects: ' + sortedProjects.length + '\n' +
+      'Media:    ' + mediaFiles.length + ' files\n\n' +
+      'Structure:\n' +
+      '  manifest.json   archive metadata\n' +
+      '  entries.json    notes / captures (newest first)\n' +
+      '  projects.json   projects (alphabetical)\n' +
+      '  media/          audio, photos, videos — filename is the media id\n\n' +
+      'To restore: open Hum → Settings → Backup → Import from ZIP.\n'
+    );
+    // Add media files (sorted by id for deterministic order)
+    mediaFiles.sort((a,b)=>a.id.localeCompare(b.id));
+    const mediaFolder = zip.folder('media');
+    for(const m of mediaFiles){
+      mediaFolder.file(`${m.id}.${m.ext}`, m.blob);
+    }
+
+    if(status) status.textContent = 'Compressing…';
+    const out = await zip.generateAsync({type:'blob', compression:'DEFLATE', compressionOptions:{level:6}});
+    const stamp = new Date().toISOString().slice(0,10);
+    dl(out, `hum-backup-${stamp}.zip`);
+    if(status) status.textContent = `Exported ${cleanedEntries.length} entries, ${sortedProjects.length} projects, ${mediaFiles.length} media files.`;
+    toast('Backup ready');
+  }catch(err){
+    console.error(err);
+    toast('Export failed: '+(err.message||'error'));
+    if(status) status.textContent = 'Export failed.';
+  }finally{
+    if(btn){ btn.disabled = false; btn.textContent = 'Export all to ZIP'; }
+  }
+}
+
+async function importAllZip(input){
+  const file = input.files && input.files[0];
+  input.value = '';
+  if(!file) return;
+  if(typeof JSZip === 'undefined'){ toast('ZIP library not loaded'); return; }
+  const ok = await showConfirm({
+    title: 'Import backup',
+    msg: 'Add notes, projects and media from this ZIP. Existing items with the same id are kept (no overwrite). Continue?',
+    okLabel: 'Import',
+    okStyle: 'neutral'
+  });
+  if(!ok) return;
+  const btn = document.getElementById('backup-import-btn');
+  const status = document.getElementById('backup-status');
+  if(btn){ btn.disabled = true; btn.textContent = 'Reading…'; }
+  try{
+    const zip = await JSZip.loadAsync(file);
+    const manifestFile = zip.file('manifest.json');
+    const entriesFile = zip.file('entries.json');
+    const projectsFile = zip.file('projects.json');
+    if(!entriesFile || !projectsFile){
+      throw new Error('Not a Hum backup (entries.json or projects.json missing)');
+    }
+    let manifest = null;
+    if(manifestFile) manifest = JSON.parse(await manifestFile.async('string'));
+    if(manifest && manifest.version > BACKUP_VERSION){
+      throw new Error('Backup version '+manifest.version+' is newer than this app supports');
+    }
+    const importedEntries = JSON.parse(await entriesFile.async('string'));
+    const importedProjects = JSON.parse(await projectsFile.async('string'));
+
+    // Merge projects (skip duplicates by id; rename collision name if same name different id)
+    const existingProjIds = new Set(projects.map(p=>p.id));
+    let projAdded = 0;
+    for(const p of importedProjects){
+      if(existingProjIds.has(p.id)) continue;
+      projects.push(p);
+      existingProjIds.add(p.id);
+      projAdded++;
+    }
+
+    // Restore media files into IDB
+    const mediaFolder = zip.folder('media');
+    let mediaRestored = 0;
+    if(mediaFolder){
+      const mediaFileObjs = [];
+      zip.forEach((relativePath, fileObj)=>{
+        if(relativePath.startsWith('media/') && !fileObj.dir){
+          mediaFileObjs.push({path: relativePath, obj: fileObj});
+        }
+      });
+      mediaFileObjs.sort((a,b)=>a.path.localeCompare(b.path));
+      for(const {path, obj} of mediaFileObjs){
+        const name = path.slice('media/'.length); // <mid>.<ext>
+        const dot = name.lastIndexOf('.');
+        const mid = dot>0 ? name.slice(0,dot) : name;
+        const ext = dot>0 ? name.slice(dot+1) : '';
+        const blob = await obj.async('blob');
+        const typedBlob = new Blob([blob], {type: _extToMime(ext)});
+        try{
+          await idbPut(mid, typedBlob, typedBlob.type);
+          mediaRestored++;
+        }catch(_){}
+      }
+    }
+
+    // Merge entries (skip duplicates by id)
+    const existingEntryIds = new Set(entries.map(e=>e.id));
+    let entriesAdded = 0;
+    for(const e of importedEntries){
+      if(existingEntryIds.has(e.id)) continue;
+      entries.push(e);
+      existingEntryIds.add(e.id);
+      entriesAdded++;
+    }
+    // Keep newest first
+    entries.sort((a,b)=>(b.ts||0)-(a.ts||0));
+
+    persist();
+    render(); renderProjects(); renderHeatmap();
+    const summary = `Imported ${entriesAdded} new entries, ${projAdded} projects, ${mediaRestored} media files.`;
+    if(status) status.textContent = summary;
+    toast('Backup restored');
+  }catch(err){
+    console.error(err);
+    toast('Import failed: '+(err.message||'error'));
+    if(status) status.textContent = 'Import failed.';
+  }finally{
+    if(btn){ btn.disabled = false; btn.textContent = 'Import from ZIP'; }
+  }
 }
 
 // ObjectURL cache — avoid creating new URLs for every render
