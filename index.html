@@ -1059,6 +1059,21 @@ body {
 .note-analysis-action:hover { border-color: var(--ink4); color: var(--ink); }
 .note-analysis-text { font-size: 12.5px; color: var(--ink2); line-height: 1.7; white-space: pre-wrap; margin-top: 6px; }
 .note-analysis-hint { font-size: 12px; color: var(--ink3); margin-top: 4px; }
+/* Melody view */
+.note-mel-roll { margin-top: 8px; }
+.note-mel-names { margin-top: 7px; display: flex; flex-wrap: wrap; gap: 3px 5px; font-variant-numeric: tabular-nums; }
+.note-mel-name { font-size: 11px; color: var(--ink2); font-family: var(--sans); cursor: pointer; padding: 1px 4px; border-radius: 5px; transition: background 0.12s; }
+.note-mel-name:hover { background: var(--paper3); }
+.note-mel-name.sel { background: var(--warm); color: #fff; font-weight: 500; }
+.note-mel-edit { display: flex; align-items: center; gap: 6px; margin-top: 8px; padding: 7px 9px; background: var(--warm-soft); border: 1px solid var(--warm); border-radius: 9px; }
+.note-mel-edit-lbl { font-size: 13px; font-weight: 600; color: var(--warm2); font-family: var(--sans); min-width: 34px; }
+.note-mel-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 9px; }
+.note-mel-btn { font-size: 11px; padding: 5px 11px; border-radius: 7px; border: 1px solid var(--paper4); background: var(--surface); color: var(--ink2); cursor: pointer; font-family: var(--sans); transition: all 0.12s; white-space: nowrap; }
+.note-mel-btn:hover { border-color: var(--ink4); color: var(--ink); }
+.note-mel-btn.play { background: var(--plum); border-color: var(--plum); color: #fff; font-weight: 500; }
+.note-mel-btn.play:hover { opacity: 0.88; color: #fff; }
+.note-mel-sel { font-size: 11px; padding: 4px 6px; border-radius: 7px; border: 1px solid var(--paper4); background: var(--surface); color: var(--ink2); font-family: var(--sans); cursor: pointer; }
+.note-mel-meta { margin-top: 8px; font-size: 10.5px; color: var(--ink3); line-height: 1.5; }
 
 .note-take { background: var(--paper2); border-radius: 10px; padding: 8px 10px; }
 .note-take + .note-take { margin-top: 6px; }
@@ -4536,7 +4551,7 @@ function openNote(id){
     capEntry=null;
     capProject=projects.find(p=>p.id===view)?view:null;
   }
-  capRecording=false; capSec=0; capCountingIn=false;
+  capRecording=false; capSec=0; capCountingIn=false; _melSelIdx=-1;
   _refreshCapTitle();
   _resetCapRecUI();
   _syncMetroUI();
@@ -4771,35 +4786,92 @@ function renderNoteAnalysis(){
         :`<div class="note-analysis-hint">Press Analyse to detect chords</div>`}
     </div>`;
   }
-  // MIDI section
+  // Melody section — piano roll, note names, playback, key snap, per-note edit
   if(hasAudio){
     const hasMidi=Array.isArray(e.midi)&&e.midi.length>0;
-    let midiBody;
+    let body;
     if(hasMidi){
-      const lo=Math.min(...e.midi.map(n=>n.p));
-      const hi=Math.max(...e.midi.map(n=>n.p));
-      const lastEnd=Math.max(...e.midi.map(n=>n.t+n.d));
-      midiBody=`<div class="midi-info" style="margin-top:6px">
-        <div class="midi-info-cell"><div class="midi-info-k">Notes</div><div class="midi-info-v">${e.midi.length}</div></div>
-        <div class="midi-info-cell"><div class="midi-info-k">Range</div><div class="midi-info-v">${midiToNoteName(lo)}–${midiToNoteName(hi)}</div></div>
-        <div class="midi-info-cell"><div class="midi-info-k">Length</div><div class="midi-info-v">${fmtDur(Math.ceil(lastEnd))}</div></div>
-      </div><div id="note-midi-status"></div>`;
+      const rollNotes=e.midi.map(n=>({t:n.t,dur:n.d,pitch:n.p}));
+      const totalDur=Math.max(...rollNotes.map(n=>n.t+n.dur))||1;
+      const lo=Math.min(...e.midi.map(n=>n.p)), hi=Math.max(...e.midi.map(n=>n.p));
+      const names=rollNotes.map((n,i)=>`<span class="note-mel-name${_melSelIdx===i?' sel':''}" onclick="noteMelodySelect(${i})">${midiToNoteName(n.pitch)}</span>`).join('');
+      const parsed=_parseKeyField(e.key||'');
+      const NAMES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+      const rootOpts=NAMES.map((nm,i)=>`<option value="${i}"${parsed&&parsed.root===i?' selected':''}>${nm}</option>`).join('');
+      const modeOpts=Object.keys(_SCALES).map(m=>`<option value="${m}"${parsed&&parsed.mode===m?' selected':''}>${m}</option>`).join('');
+      const isModified=e.midiOriginal&&JSON.stringify(e.midi.map(n=>n.p))!==JSON.stringify(e.midiOriginal.map(n=>n.p));
+      const selName=(_melSelIdx>=0&&e.midi[_melSelIdx])?midiToNoteName(e.midi[_melSelIdx].p):'';
+      body=`
+        <div class="note-mel-roll">${renderHumPianoRoll(rollNotes, totalDur, {interactive:true, selected:_melSelIdx})}</div>
+        <div class="note-mel-names">${names}</div>
+        ${_melSelIdx>=0?`<div class="note-mel-edit"><span class="note-mel-edit-lbl">${selName}</span>
+            <button class="note-mel-btn" onclick="noteMelodyNudge(-1)" title="Down a semitone">♭ −</button>
+            <button class="note-mel-btn" onclick="noteMelodyNudge(1)" title="Up a semitone">♯ +</button>
+            <button class="note-mel-btn" onclick="noteMelodySelect(${_melSelIdx})">Done</button></div>`:''}
+        <div class="note-mel-controls">
+          <button class="note-mel-btn play" id="note-mel-play" onclick="noteMelodyPlay()">▶ Play</button>
+          <select class="note-mel-sel" id="note-mel-root" title="Root">${rootOpts}</select>
+          <select class="note-mel-sel" id="note-mel-mode" title="Scale">${modeOpts}</select>
+          <button class="note-mel-btn" onclick="noteMelodySnap()">Snap</button>
+          ${isModified?`<button class="note-mel-btn" onclick="noteMelodyReset()">↺ Reset</button>`:''}
+        </div>
+        <div class="note-mel-meta">${e.midi.length} notes · ${midiToNoteName(lo)}–${midiToNoteName(hi)}${e.bpm?` · ${e.bpm} BPM`:''} · tap a note to edit its pitch</div>
+        <div id="note-midi-status"></div>`;
     } else {
-      midiBody=`<div class="note-analysis-hint" id="note-midi-status">Press Generate to extract notes from audio</div>`;
+      body=`<div class="note-analysis-hint" id="note-midi-status">Hum a melody, then press Analyse to see the notes</div>`;
     }
     h+=`<div class="note-analysis-block">
       <div class="note-analysis-head">
-        <span class="note-analysis-label">MIDI</span>
+        <span class="note-analysis-label">Melody</span>
         <div style="display:flex;gap:5px">
-          ${hasMidi?`<button class="note-analysis-action" onclick="downloadMidi('${e.id}')">Download</button>`:''}
-          <button class="note-analysis-action" id="note-midi-btn" onclick="runMidiGeneration('${e.id}').then(()=>renderNoteAnalysis())">${hasMidi?'Re-generate':'Generate'}</button>
+          ${hasMidi?`<button class="note-analysis-action" onclick="downloadMidi('${e.id}')" title="Download .mid — drag into your DAW">.mid</button>`:''}
+          <button class="note-analysis-action" id="note-midi-btn" onclick="runMidiGeneration('${e.id}').then(()=>renderNoteAnalysis())">${hasMidi?'Re-analyse':'Analyse'}</button>
         </div>
       </div>
-      ${midiBody}
+      ${body}
     </div>`;
   }
   if(h){ section.innerHTML=h; section.style.display=''; }
   else { section.style.display='none'; section.innerHTML=''; }
+}
+// ── Melody view interactions (note window) ──
+let _melSelIdx=-1;
+function _entryMelody(e){ return (e&&Array.isArray(e.midi)?e.midi:[]).map(n=>({t:n.t,dur:n.d,pitch:n.p})); }
+function noteMelodyPlay(){
+  if(!capEntry) return;
+  playMelodyNotes(_entryMelody(capEntry), document.getElementById('note-mel-play'));
+}
+function noteMelodySelect(i){ _melSelIdx=(_melSelIdx===i?-1:i); renderNoteAnalysis(); }
+function noteMelodyNudge(d){
+  if(!capEntry||_melSelIdx<0||!capEntry.midi||!capEntry.midi[_melSelIdx]) return;
+  const n=capEntry.midi[_melSelIdx];
+  n.p=Math.max(0,Math.min(127,n.p+d));
+  try{persist();}catch(_){}
+  renderNoteAnalysis();
+}
+function noteMelodySnap(){
+  if(!capEntry||!capEntry.midi||!capEntry.midi.length) return;
+  const root=parseInt(document.getElementById('note-mel-root')?.value)||0;
+  const mode=document.getElementById('note-mel-mode')?.value||'maj';
+  const src=(capEntry.midiOriginal&&capEntry.midiOriginal.length)?capEntry.midiOriginal:capEntry.midi;
+  const rollNotes=src.map(n=>({t:n.t,dur:n.d,pitch:n.p}));
+  const snapped=quantizeToScale(rollNotes, root, _SCALES[mode]||_SCALES['maj']);
+  capEntry.midi=snapped.map((n,i)=>({t:n.t,d:n.dur,p:n.pitch,v:src[i]?.v??96}));
+  if(mode==='maj'||mode==='min'){
+    const NAMES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+    capEntry.key=NAMES[root]+' '+mode;
+    const kf=document.getElementById('note-key'); if(kf) kf.value=capEntry.key;
+  }
+  try{persist();}catch(_){}
+  renderNoteAnalysis();
+  toast('Snapped to scale');
+}
+function noteMelodyReset(){
+  if(!capEntry||!capEntry.midiOriginal||!capEntry.midiOriginal.length) return;
+  capEntry.midi=JSON.parse(JSON.stringify(capEntry.midiOriginal));
+  try{persist();}catch(_){}
+  renderNoteAnalysis();
+  toast('Restored original');
 }
 // ── Transcribe from note window ──
 async function noteTranscribe(mid){
@@ -5500,7 +5572,8 @@ function quantizeToScale(notes, rootPc, intervals){
 }
 
 // ── Piano roll with keyboard pane ─────────────────────────────────────────────
-function renderHumPianoRoll(notes, totalDur){
+function renderHumPianoRoll(notes, totalDur, opts){
+  opts=opts||{};
   if(!notes.length) return '';
   const H=130, KW=24;        // taller for label readability
 
@@ -5536,12 +5609,14 @@ function renderHumPianoRoll(notes, totalDur){
     }
   }
   // Note rects + labels (with stroke outline so they read on any contrast)
-  notes.forEach(n=>{
+  notes.forEach((n,ni)=>{
     const x=n.t/totalDur*RW;
     const w=Math.max(3, n.dur/totalDur*RW - 1);
     const y=(hi-n.pitch)*rowH;
     const h=Math.max(rowH-1, 3);
-    roll+=`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="2" fill="var(--plum)" opacity="0.92"/>`;
+    const sel=opts.selected===ni;
+    const click=opts.interactive?` onclick="noteMelodySelect(${ni})" style="cursor:pointer"`:'';
+    roll+=`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="2" fill="${sel?'var(--warm2)':'var(--plum)'}" opacity="${sel?1:0.92}"${click}/>`;
     // Label: full name if room, else short pitch class. Hidden on tiny rects.
     if(w >= 11 && h >= 7){
       const full=midiToNoteName(n.pitch);                  // "C4", "C#5"
@@ -5887,6 +5962,8 @@ async function runMidiGeneration(entryId){
     if(!notes.length){ toast('No notes detected — try humming "da-da-da"'); return; }
     const idx=entries.findIndex(x=>x.id===entryId); if(idx<0) return;
     entries[idx].midi=notes;
+    entries[idx].midiOriginal=JSON.parse(JSON.stringify(notes)); // snapshot for Reset
+    _melSelIdx=-1;
     try{ persist(); }catch(_){}
     if(typeof renderNoteAnalysis==='function'&&capEntry&&capEntry.id===entryId) renderNoteAnalysis(); else openDetail(entryId);
     toast(`Generated ${notes.length} note${notes.length===1?'':'s'}`);
