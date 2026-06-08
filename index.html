@@ -987,8 +987,9 @@ body {
 .cap-arrow:not([disabled]):hover { border-color: var(--ink4); color: var(--ink2); opacity: 1; }
 .cap-arrow[disabled] { opacity: 0.25; cursor: default; pointer-events: none; }
 /* Count-in metronome controls */
-.cap-metro-btn { gap: 6px; padding: 0 14px; }
-.cap-metro-btn #cap-metro-bpm { font-variant-numeric: tabular-nums; font-weight: 500; display: none; }
+.cap-metro-btn { gap: 5px; padding: 0 12px; }
+.cap-metro-btn .cap-metro-txt { font-size: 11px; }
+.cap-metro-btn #cap-metro-bpm { font-variant-numeric: tabular-nums; font-weight: 600; display: none; }
 .cap-metro-btn.on { border-color: var(--warm); color: var(--warm2); opacity: 1; background: var(--warm-soft); }
 .cap-metro-btn.on #cap-metro-bpm { display: inline; }
 #cap-metro-hint { font-size: 10.5px; color: var(--ink3); line-height: 1.4; text-align: center; max-width: 280px; }
@@ -2139,8 +2140,9 @@ audio { display: none; }
       <div id="cap-timer" style="visibility:hidden">0:00</div>
       <div id="cap-metro-hint" style="display:none">Use headphones so the click isn't recorded — especially on longer takes.</div>
       <div id="cap-rec-row">
-        <button class="cap-arrow cap-metro-btn" id="cap-metro-btn" onclick="toggleCapMetro()" title="Count-in metronome — locks an exact tempo for cleaner note timing">
-          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8l1.2-4M6.8 17h10.4"/><path d="M9 17 12 3l3 14"/><path d="M12 3 16.5 12"/></svg>
+        <button class="cap-arrow cap-metro-btn" id="cap-metro-btn" onclick="toggleCapMetro()" title="Count-in metronome — hum in time to lock an exact tempo for accurate notes">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8l1.2-4M6.8 17h10.4"/><path d="M9 17 12 3l3 14"/><path d="M12 3 16.5 12"/></svg>
+          <span class="cap-metro-txt">Count-in</span>
           <span id="cap-metro-bpm">90</span>
         </button>
         <button id="cap-rec-btn" onclick="toggleCapRec()" aria-label="Record"><span class="srec-shape"></span></button>
@@ -4382,13 +4384,20 @@ function _pulseBtn(btn){
   if(!btn) return;
   btn.classList.remove('beat'); void btn.offsetWidth; btn.classList.add('beat');
 }
+// Shared AudioContext — created/resumed inside a user gesture so iOS lets it
+// play. Reused for count-in (never closed mid-session, which would re-lock it).
+function _getAudioCtx(){
+  try{
+    if(!_metroCtx) _metroCtx=new (window.AudioContext||window.webkitAudioContext)();
+    if(_metroCtx.state==='suspended') _metroCtx.resume();
+  }catch(_){ return null; }
+  return _metroCtx;
+}
 function _runCountIn(){
   return new Promise(resolve=>{
     _countInCancelled=false;
-    let ctx;
-    try{ ctx=new (window.AudioContext||window.webkitAudioContext)(); }catch(_){ resolve(true); return; }
-    _metroCtx=ctx;
-    if(ctx.state==='suspended'){ try{ ctx.resume(); }catch(_){} }
+    const ctx=_getAudioCtx();
+    if(!ctx){ resolve(true); return; }
     const beats=4, spb=60/capBpmSel, t0=ctx.currentTime+0.18;
     const btn=document.getElementById('cap-rec-btn');
     const tm=document.getElementById('cap-timer');
@@ -4404,8 +4413,6 @@ function _runCountIn(){
       }, Math.max(0,(t-ctx.currentTime)*1000)));
     }
     _metroTimers.push(setTimeout(()=>{
-      try{ ctx.close(); }catch(_){}
-      _metroCtx=null;
       if(tm) tm.classList.remove('countin');
       resolve(!_countInCancelled);
     }, Math.max(0,(t0+beats*spb-ctx.currentTime)*1000)));
@@ -4419,7 +4426,7 @@ function _startSilentPulse(){
 function _stopMetro(){
   _countInCancelled=true;
   _metroTimers.forEach(id=>clearTimeout(id)); _metroTimers=[];
-  if(_metroCtx){ try{ _metroCtx.close(); }catch(_){} _metroCtx=null; }
+  // Keep _metroCtx alive (shared, gesture-unlocked) — closing re-locks iOS audio
   if(_pulseInterval){ clearInterval(_pulseInterval); _pulseInterval=null; }
   const tm=document.getElementById('cap-timer'); if(tm) tm.classList.remove('countin');
 }
@@ -4428,6 +4435,8 @@ async function toggleCapRec(){
   if(capCountingIn){ _stopMetro(); capCountingIn=false; _resetCapRecUI(); return; } // tap during count-in cancels
   if(capRecording){ stopCapRec(); return; }
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ toast('Audio requires HTTPS or local install'); return; }
+  // Unlock audio synchronously inside this tap so the count-in click plays on iOS
+  if(capCountIn) _getAudioCtx();
   document.querySelectorAll('#note-takes audio').forEach(a=>a.pause());
   try{
     const stream=await navigator.mediaDevices.getUserMedia({audio:{noiseSuppression:false,echoCancellation:false,autoGainControl:false}});
