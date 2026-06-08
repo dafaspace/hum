@@ -5761,10 +5761,105 @@ function midiToNoteName(midi){
   return names[midi%12]+oct;
 }
 
+// ── SPICE: monophonic pitch from voice/humming (Google, TF.js) ───────────────
+// Purpose-built for singing/humming → far fewer octave errors than YIN.
+// Model: tfhub spice/2. Output [uncertainty, pitch]; pitch∈[0,1] per 32ms frame.
+let _spiceLibs=null;
+async function loadSpice(onStatus){
+  if(_spiceLibs) return _spiceLibs;
+  onStatus?.('Loading pitch model…');
+  const tf=await import('https://esm.sh/@tensorflow/tfjs@4.22.0');
+  onStatus?.('Loading pitch model (first run only)…');
+  const model=await tf.loadGraphModel('https://tfhub.dev/google/tfjs-model/spice/2/default/1',{fromTFHub:true});
+  _spiceLibs={tf, model};
+  return _spiceLibs;
+}
+// Decode + resample a blob to 16 kHz mono Float32Array (SPICE requirement)
+async function _decodeTo16kMono(blob){
+  const ab=await blob.arrayBuffer();
+  const ctx=new (window.AudioContext||window.webkitAudioContext)();
+  let buf; try{ buf=await ctx.decodeAudioData(ab); } finally{ ctx.close(); }
+  const targetSr=16000;
+  if(buf.sampleRate===targetSr&&buf.numberOfChannels===1) return buf.getChannelData(0).slice();
+  const length=Math.max(1,Math.floor(buf.duration*targetSr));
+  const offline=new OfflineAudioContext(1,length,targetSr);
+  const src=offline.createBufferSource(); src.buffer=buf;
+  src.connect(offline.destination); src.start();
+  const rendered=await offline.startRendering();
+  return rendered.getChannelData(0).slice();
+}
+const _spiceHz=p=>10*Math.pow(2,(p*63.07+25.58)/12);
+// SPICE → per-frame [{t, freq, midi, conf, rms}] (same shape humSegmentNotes expects)
+async function spicePitchTrack(blob, onProgress){
+  const {tf, model}=await loadSpice();
+  const sig=await _decodeTo16kMono(blob);
+  const SR=16000, HOP=512;
+  const input=tf.tensor(sig);
+  let pitchRaw, uncertainty;
+  try{
+    const out=model.execute({'input_audio_samples':input});
+    const arr=Array.isArray(out)?out:[out];
+    uncertainty=await arr[0].data();
+    pitchRaw=await arr[1].data();
+    arr.forEach(o=>o.dispose());
+  } finally { input.dispose(); }
+  const N=pitchRaw.length, frames=[];
+  for(let i=0;i<N;i++){
+    const off=i*HOP;
+    let s=0,c=0;
+    for(let k=off;k<Math.min(off+HOP,sig.length);k++){ s+=sig[k]*sig[k]; c++; }
+    const rms=c?Math.sqrt(s/c):0;
+    const conf=1-uncertainty[i];
+    const f=_spiceHz(pitchRaw[i]);
+    const t=Math.round((off/SR)*1000)/1000;
+    if(conf>=0.5 && f>=50 && f<=1500){
+      frames.push({t, freq:Math.round(f*10)/10, midi:Math.round(69+12*Math.log2(f/440)), conf:Math.round(conf*100)/100, rms});
+    } else {
+      frames.push({t, freq:0, midi:-1, conf:0, rms});
+    }
+    if(i%64===0){ onProgress?.(i/N); await new Promise(r=>setTimeout(r,0)); }
+  }
+  onProgress?.(1);
+  return frames;
+}
+// Snap note onsets/durations to a 16th-note grid at a known tempo.
+// Anchored to the first onset (trims leading silence). Only call with a tempo
+// you trust — i.e. the exact BPM from a count-in, not an estimate.
+function _quantizeRhythm(notes, bpm){
+  if(!bpm||!notes.length) return notes;
+  const grid=(60/bpm)/4; // 16th-note
+  const t0=notes[0].t;
+  const snap=x=>Math.round(x/grid)*grid;
+  return notes.map(n=>{
+    const relS=snap(n.t-t0);
+    let relE=snap(n.t+n.dur-t0);
+    if(relE-relS<grid) relE=relS+grid;
+    return {...n, t:Math.round(relS*1000)/1000, dur:Math.round((relE-relS)*1000)/1000};
+  });
+}
+// Full monophonic transcription: SPICE f0 → notes [{t,d,p,v}]
+// opts: { bpm, tempoLocked, key }. Snaps to key when known; snaps rhythm only
+// when tempoLocked (count-in gives an exact grid).
+async function spiceTranscribe(blob, opts, onStatus){
+  opts=opts||{};
+  const frames=await spicePitchTrack(blob, p=>onStatus?.(`Analysing pitch ${Math.round(p*100)}%…`));
+  onStatus?.('Extracting notes…');
+  let segs=humSegmentNotes(frames); // [{t,dur,pitch}]
+  if(!segs.length) return [];
+  // Snap pitches into the detected key (kills stray accidentals)
+  if(opts.key){
+    const k=_parseKeyField(opts.key);
+    if(k){ segs=quantizeToScale(segs.map(s=>({...s})), k.root, _SCALES[k.mode==='min'?'min':'maj']); }
+  }
+  // Snap rhythm to the exact count-in tempo
+  if(opts.tempoLocked && opts.bpm) segs=_quantizeRhythm(segs, opts.bpm);
+  return segs.map(s=>({t:Math.round(s.t*1000)/1000, d:Math.round(s.dur*1000)/1000, p:s.pitch, v:96}));
+}
+
 async function runMidiGeneration(entryId){
   const e=entries.find(x=>x.id===entryId); if(!e) return;
-  const btn=document.getElementById(`midi-btn-${entryId}`);
-  const status=document.getElementById(`midi-status-${entryId}`);
+  const btn=document.getElementById(`note-midi-btn`)||document.getElementById(`midi-btn-${entryId}`);
+  const status=document.getElementById(`note-midi-status`)||document.getElementById(`midi-status-${entryId}`);
   const setStatus=msg=>{ if(status) status.innerHTML=`<div class="midi-progress">${msg}</div>`; };
   if(btn){ btn.disabled=true; btn.textContent='Working…'; }
   try{
@@ -5778,19 +5873,29 @@ async function runMidiGeneration(entryId){
       const rec=await idbGet(audioItem.id); blob=rec?.blob||null;
     }
     if(!blob){ toast('Audio not available'); return; }
-    const notes=await generateMidi(blob, setStatus);
-    if(!notes.length){ toast('No notes detected'); return; }
+    // Primary: SPICE monophonic (best for humming). Fallback: basic-pitch.
+    const bpm=audioItem.tempoBpm||e.bpm||null;
+    const tempoLocked=!!audioItem.tempoLocked;
+    let notes;
+    try{
+      notes=await spiceTranscribe(blob, {bpm, tempoLocked, key:e.key}, setStatus);
+    }catch(spiceErr){
+      console.warn('SPICE transcription failed, falling back to basic-pitch:', spiceErr);
+      setStatus('Falling back to basic-pitch…');
+      notes=await generateMidi(blob, setStatus);
+    }
+    if(!notes.length){ toast('No notes detected — try humming "da-da-da"'); return; }
     const idx=entries.findIndex(x=>x.id===entryId); if(idx<0) return;
     entries[idx].midi=notes;
     try{ persist(); }catch(_){}
-    openDetail(entryId);
+    if(typeof renderNoteAnalysis==='function'&&capEntry&&capEntry.id===entryId) renderNoteAnalysis(); else openDetail(entryId);
     toast(`Generated ${notes.length} note${notes.length===1?'':'s'}`);
   }catch(err){
     console.error('MIDI generation failed', err);
     if(status) status.innerHTML=`<div class="midi-progress" style="color:var(--rose)">Failed: ${escHtml(err.message||'unknown error')}</div>`;
     toast('MIDI generation failed');
   }finally{
-    if(btn){ btn.disabled=false; btn.textContent=e.midi?.length?'Re-analyse':'Generate MIDI'; }
+    if(btn){ btn.disabled=false; btn.textContent=e.midi?.length?'Re-generate':'Generate'; }
   }
 }
 
