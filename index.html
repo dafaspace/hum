@@ -986,6 +986,20 @@ body {
 .cap-arrow { height: 40px; min-width: 90px; border-radius: 20px; border: 1px solid var(--paper4); background: var(--paper2); color: var(--ink3); cursor: pointer; display: flex; align-items: center; justify-content: center; font-family: var(--sans); font-size: 12px; font-weight: 400; letter-spacing: 0.01em; padding: 0 18px; transition: all 0.15s; flex-shrink: 0; opacity: 0.7; }
 .cap-arrow:not([disabled]):hover { border-color: var(--ink4); color: var(--ink2); opacity: 1; }
 .cap-arrow[disabled] { opacity: 0.25; cursor: default; pointer-events: none; }
+/* Count-in metronome controls */
+.cap-metro-btn { gap: 6px; padding: 0 14px; }
+.cap-metro-btn #cap-metro-bpm { font-variant-numeric: tabular-nums; font-weight: 500; display: none; }
+.cap-metro-btn.on { border-color: var(--warm); color: var(--warm2); opacity: 1; background: var(--warm-soft); }
+.cap-metro-btn.on #cap-metro-bpm { display: inline; }
+#cap-metro-hint { font-size: 10.5px; color: var(--ink3); line-height: 1.4; text-align: center; max-width: 280px; }
+#cap-metro-tempo { display: flex; align-items: center; gap: 8px; font-family: var(--sans); }
+#cap-metro-tempo #cap-bpm-val { font-size: 13px; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; min-width: 26px; text-align: center; }
+.cap-bpm-unit { font-size: 10px; color: var(--ink3); letter-spacing: 0.08em; }
+.cap-bpm-adj { width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--paper4); background: var(--paper2); color: var(--ink2); font-size: 15px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; flex-shrink: 0; }
+.cap-bpm-adj:hover { border-color: var(--warm); color: var(--warm2); }
+#cap-rec-btn.beat { animation: capBeatPop 0.18s ease-out; }
+@keyframes capBeatPop { 0% { transform: scale(1); } 40% { transform: scale(1.12); } 100% { transform: scale(1); } }
+#cap-timer.countin { color: var(--warm2); font-weight: 400; }
 #session-rec-area { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 18px 22px calc(24px + env(safe-area-inset-bottom)); border-top: 1px solid var(--paper4); }
 #session-rec-btn { width: 68px; height: 68px; border-radius: 50%; border: none; background: var(--warm); cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 18px rgba(222,169,122,0.45); transition: transform 0.15s, background 0.2s; }
 #session-rec-btn:hover { transform: scale(1.05); }
@@ -2108,10 +2122,19 @@ audio { display: none; }
     <!-- ── FIXED FOOTER ── -->
     <div id="cap-rec-area">
       <div id="cap-timer" style="visibility:hidden">0:00</div>
+      <div id="cap-metro-hint" style="display:none">Use headphones so the click isn't recorded — especially on longer takes.</div>
       <div id="cap-rec-row">
-        <button class="cap-arrow" id="cap-cancel" onclick="cancelCapRec()" disabled>Cancel</button>
+        <button class="cap-arrow cap-metro-btn" id="cap-metro-btn" onclick="toggleCapMetro()" title="Count-in metronome — locks an exact tempo for cleaner note timing">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8l1.2-4M6.8 17h10.4"/><path d="M9 17 12 3l3 14"/><path d="M12 3 16.5 12"/></svg>
+          <span id="cap-metro-bpm">90</span>
+        </button>
         <button id="cap-rec-btn" onclick="toggleCapRec()" aria-label="Record"><span class="srec-shape"></span></button>
-        <span class="cap-arrow-spacer"></span>
+        <button class="cap-arrow" id="cap-cancel" onclick="cancelCapRec()" disabled>Cancel</button>
+      </div>
+      <div id="cap-metro-tempo" style="display:none">
+        <button class="cap-bpm-adj" onclick="adjCapBpm(-5)" aria-label="Slower">−</button>
+        <span id="cap-bpm-val">90</span><span class="cap-bpm-unit">BPM</span>
+        <button class="cap-bpm-adj" onclick="adjCapBpm(5)" aria-label="Faster">+</button>
       </div>
     </div>
   </div>
@@ -4227,6 +4250,14 @@ let capEntry=null, capProject=null, capPendingFields={};
 let noteTags=[], noteTagDropIdx=-1;
 let capRec=null, capChunks=[], capStream=null, capSec=0, capTimer=null, capRecording=false;
 let capAutoName='', capPendingName=null; // editable title state
+// ── Count-in metronome state ──
+let capCountIn=false;          // metronome count-in enabled (persisted in settings)
+let capBpmSel=90;              // selected tempo for count-in
+let capCountingIn=false;       // currently playing the audible count-in
+let _metroCtx=null;            // AudioContext for count-in clicks
+let _metroTimers=[];           // pending setTimeout ids (count-in + visual pulse)
+let _pulseInterval=null;       // silent visual-pulse interval during recording
+let capRecBpm=null;            // exact tempo locked for the current take (null = free time)
 
 function openCapture(){ openNote(null); }
 // Show the auto-generated name; only persist a name once the user edits it.
@@ -4299,34 +4330,128 @@ function _updateCapControls(){
   const hasTakes=!!(capEntry&&capEntry.media&&capEntry.media.some(m=>m.type==='audio'));
   const cx=document.getElementById('cap-cancel'); if(cx) cx.disabled = !capRecording;
 }
+// ── Count-in metronome ──
+let _countInCancelled=false;
+function toggleCapMetro(){
+  if(capRecording||capCountingIn) return;
+  capCountIn=!capCountIn;
+  settings.metronome=capCountIn;
+  try{ localStorage.setItem(ST, JSON.stringify(settings)); }catch(_){}
+  _syncMetroUI();
+}
+function adjCapBpm(d){
+  capBpmSel=Math.max(40,Math.min(240,capBpmSel+d));
+  settings.metroBpm=capBpmSel;
+  try{ localStorage.setItem(ST, JSON.stringify(settings)); }catch(_){}
+  _syncMetroUI();
+}
+function _syncMetroUI(){
+  const btn=document.getElementById('cap-metro-btn');
+  if(btn) btn.classList.toggle('on',capCountIn);
+  const bpmL=document.getElementById('cap-metro-bpm'); if(bpmL) bpmL.textContent=capBpmSel;
+  const bpmV=document.getElementById('cap-bpm-val'); if(bpmV) bpmV.textContent=capBpmSel;
+  const tempo=document.getElementById('cap-metro-tempo'); if(tempo) tempo.style.display=capCountIn?'flex':'none';
+  const hint=document.getElementById('cap-metro-hint'); if(hint) hint.style.display=capCountIn?'block':'none';
+}
+function _playClick(ctx, time, accent){
+  const osc=ctx.createOscillator(), g=ctx.createGain();
+  osc.type='sine';
+  osc.frequency.setValueAtTime(accent?1600:1100, time);
+  g.gain.setValueAtTime(0.0001, time);
+  g.gain.exponentialRampToValueAtTime(accent?0.55:0.34, time+0.001);
+  g.gain.exponentialRampToValueAtTime(0.0001, time+0.045);
+  osc.connect(g); g.connect(ctx.destination);
+  osc.start(time); osc.stop(time+0.06);
+}
+function _pulseBtn(btn){
+  if(!btn) return;
+  btn.classList.remove('beat'); void btn.offsetWidth; btn.classList.add('beat');
+}
+function _runCountIn(){
+  return new Promise(resolve=>{
+    _countInCancelled=false;
+    let ctx;
+    try{ ctx=new (window.AudioContext||window.webkitAudioContext)(); }catch(_){ resolve(true); return; }
+    _metroCtx=ctx;
+    if(ctx.state==='suspended'){ try{ ctx.resume(); }catch(_){} }
+    const beats=4, spb=60/capBpmSel, t0=ctx.currentTime+0.18;
+    const btn=document.getElementById('cap-rec-btn');
+    const tm=document.getElementById('cap-timer');
+    if(tm){ tm.style.visibility='visible'; tm.classList.add('countin'); }
+    for(let i=0;i<beats;i++){
+      const t=t0+i*spb;
+      _playClick(ctx,t,i===0);
+      _metroTimers.push(setTimeout(()=>{
+        if(_countInCancelled) return;
+        _pulseBtn(btn);
+        if(tm) tm.textContent=String(beats-i);
+        if(navigator.vibrate) navigator.vibrate(8);
+      }, Math.max(0,(t-ctx.currentTime)*1000)));
+    }
+    _metroTimers.push(setTimeout(()=>{
+      try{ ctx.close(); }catch(_){}
+      _metroCtx=null;
+      if(tm) tm.classList.remove('countin');
+      resolve(!_countInCancelled);
+    }, Math.max(0,(t0+beats*spb-ctx.currentTime)*1000)));
+  });
+}
+function _startSilentPulse(){
+  const btn=document.getElementById('cap-rec-btn');
+  _pulseBtn(btn);
+  _pulseInterval=setInterval(()=>_pulseBtn(btn), (60/capBpmSel)*1000);
+}
+function _stopMetro(){
+  _countInCancelled=true;
+  _metroTimers.forEach(id=>clearTimeout(id)); _metroTimers=[];
+  if(_metroCtx){ try{ _metroCtx.close(); }catch(_){} _metroCtx=null; }
+  if(_pulseInterval){ clearInterval(_pulseInterval); _pulseInterval=null; }
+  const tm=document.getElementById('cap-timer'); if(tm) tm.classList.remove('countin');
+}
+
 async function toggleCapRec(){
+  if(capCountingIn){ _stopMetro(); capCountingIn=false; _resetCapRecUI(); return; } // tap during count-in cancels
   if(capRecording){ stopCapRec(); return; }
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ toast('Audio requires HTTPS or local install'); return; }
-  document.querySelectorAll('#cap-takes audio').forEach(a=>a.pause());
+  document.querySelectorAll('#note-takes audio').forEach(a=>a.pause());
   try{
     const stream=await navigator.mediaDevices.getUserMedia({audio:{noiseSuppression:false,echoCancellation:false,autoGainControl:false}});
     capStream=stream; capChunks=[]; capSec=0;
+    // Audible count-in before recording (locks an exact tempo)
+    if(capCountIn){
+      capCountingIn=true;
+      const completed=await _runCountIn();
+      capCountingIn=false;
+      if(!completed){ stream.getTracks().forEach(t=>t.stop()); capStream=null; _resetCapRecUI(); return; }
+      capRecBpm=capBpmSel;
+    } else {
+      capRecBpm=null;
+    }
     capRec=new MediaRecorder(stream);
     capRec.ondataavailable=e=>capChunks.push(e.data);
     capRec.onstop=onCapRecStop;
     capRec.start(); capRecording=true;
     const btn=document.getElementById('cap-rec-btn'); if(btn) btn.classList.add('recording');
-    const tm=document.getElementById('cap-timer'); tm.style.visibility='visible'; tm.textContent='0:00';
+    const tm=document.getElementById('cap-timer'); tm.classList.remove('countin'); tm.style.visibility='visible'; tm.textContent='0:00';
     _updateCapControls();
     if(navigator.vibrate) navigator.vibrate(12);
     capTimer=setInterval(()=>{ capSec++; document.getElementById('cap-timer').textContent=fmtDur(capSec); },1000);
+    if(capCountIn) _startSilentPulse(); // visual pulse guide during recording — no sound
   }catch(_){ toast('Mic access denied'); _updateCapControls(); }
 }
 function stopCapRec(){ if(capRec&&capRecording){ try{ capRec.stop(); }catch(_){} } clearInterval(capTimer); }
 function cancelCapRec(){
+  if(capCountingIn){ _stopMetro(); capCountingIn=false; capStream?.getTracks().forEach(t=>t.stop()); capStream=null; _resetCapRecUI(); return; }
   if(capRec&&capRecording){ capRec.onstop=null; try{ capRec.stop(); }catch(_){} }
   capStream?.getTracks().forEach(t=>t.stop());
   capStream=null; capRecording=false; clearInterval(capTimer);
+  _stopMetro();
   _resetCapRecUI();
 }
 function _resetCapRecUI(){
-  const btn=document.getElementById('cap-rec-btn'); if(btn) btn.classList.remove('recording');
-  const tm=document.getElementById('cap-timer'); if(tm) tm.style.visibility='hidden';
+  const btn=document.getElementById('cap-rec-btn'); if(btn){ btn.classList.remove('recording'); btn.classList.remove('beat'); }
+  const tm=document.getElementById('cap-timer'); if(tm){ tm.style.visibility='hidden'; tm.classList.remove('countin'); }
+  if(_pulseInterval){ clearInterval(_pulseInterval); _pulseInterval=null; }
   _updateCapControls();
 }
 async function onCapRecStop(){
@@ -4357,16 +4482,24 @@ async function onCapRecStop(){
     const delBtn=document.getElementById('note-del-btn'); if(delBtn) delBtn.style.display='';
   }
   const mid=uid();
+  const lockedBpm=capRecBpm; capRecBpm=null; // tempo from count-in for THIS take (null = free time)
   try{ await idbPut(mid, blob, mime); }catch(err){ toast('Could not store take: '+(err.message||'error')); return; }
-  capEntry.media.push({id:mid, type:'audio', mimeType:mime, duration:dur||null});
+  const mediaItem={id:mid, type:'audio', mimeType:mime, duration:dur||null};
+  if(lockedBpm){ mediaItem.tempoBpm=lockedBpm; mediaItem.tempoLocked=true; } // exact tempo, not estimated
+  capEntry.media.push(mediaItem);
   capEntry.hasMedia=true; capEntry.mimeType=capEntry.media[0].mimeType;
   if(!capEntry.duration) capEntry.duration=dur||null;
+  // Count-in gives an exact tempo — lock it onto the entry, skip BPM estimation
+  if(lockedBpm && capEntry.bpm==null){
+    capEntry.bpm=lockedBpm;
+    const el=document.getElementById('note-bpm'); if(el&&!el.value) el.value=lockedBpm;
+  }
   try{ persist(); }catch(_){ toast('Storage full'); return; }
   scheduleGdPush();
   renderNoteTakes(); updateCapSub();
-  // Background BPM/key detection
+  // Background BPM/key detection (BPM only when tempo wasn't locked by count-in)
   const target=capEntry;
-  if(target&&target.bpm==null) detectBpm(blob).then(bpm=>{ if(bpm!=null&&target.bpm==null){ target.bpm=bpm; if(capEntry===target){ const el=document.getElementById('note-bpm'); if(el&&!el.value) el.value=bpm; } try{persist();}catch(_){} } }).catch(()=>{});
+  if(target&&target.bpm==null&&!lockedBpm) detectBpm(blob).then(bpm=>{ if(bpm!=null&&target.bpm==null){ target.bpm=bpm; if(capEntry===target){ const el=document.getElementById('note-bpm'); if(el&&!el.value) el.value=bpm; } try{persist();}catch(_){} } }).catch(()=>{});
   if(target&&!target.key) detectKey(blob).then(key=>{ if(key&&!target.key){ target.key=key; if(capEntry===target){ const el=document.getElementById('note-key'); if(el&&!el.value) el.value=key; } try{persist();}catch(_){} } }).catch(()=>{});
 }
 function closeCapture(){ closeNote(); }
@@ -4403,9 +4536,10 @@ function openNote(id){
     capEntry=null;
     capProject=projects.find(p=>p.id===view)?view:null;
   }
-  capRecording=false; capSec=0;
+  capRecording=false; capSec=0; capCountingIn=false;
   _refreshCapTitle();
   _resetCapRecUI();
+  _syncMetroUI();
   updateCapSub();
   _refreshNoteFields();
   renderNoteTags();
@@ -4424,7 +4558,9 @@ function openNote(id){
 function closeNote(){
   const ov=document.getElementById('capture-overlay');
   if(!ov||ov.style.display==='none') return;
+  if(capCountingIn){ _stopMetro(); capCountingIn=false; }
   if(capRecording) stopCapRec();
+  _stopMetro();
   closeCapProjMenu();
   closeNoteTagDrop();
   document.querySelectorAll('#note-takes audio').forEach(a=>a.pause());
@@ -6152,6 +6288,10 @@ function transcriptToNote(){
 
 if(window.innerWidth <= 680 && layout === 'grid') layout = 'stream';
 setLayout(layout);
+// Restore count-in metronome preference
+capCountIn=!!settings.metronome;
+capBpmSel=settings.metroBpm||90;
+_syncMetroUI();
 renderProjects();
 renderHeatmap();
 // Migrate old base64 media to IndexedDB on app load (frees localStorage)
