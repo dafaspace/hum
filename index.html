@@ -901,8 +901,10 @@ body {
 }
 .play-btn2:hover { transform: scale(1.06); }
 .play-btn2 svg { width: 12px; height: 12px; fill: var(--paper); margin-left: 1px; }
-.player-prog { flex: 1; height: 3px; background: var(--paper4); border-radius: 2px; cursor: pointer; }
-.player-fill { height: 100%; background: var(--ink); border-radius: 2px; width: 0%; }
+.player-prog { flex: 1; height: 20px; display: flex; align-items: center; cursor: pointer; position: relative; touch-action: none; }
+.player-prog::before { content: ''; position: absolute; left: 0; right: 0; height: 3px; background: var(--paper4); border-radius: 2px; }
+.player-fill { position: relative; height: 3px; background: var(--ink); border-radius: 2px; width: 0%; pointer-events: none; }
+.player-fill::after { content: ''; position: absolute; right: -5px; top: 50%; transform: translateY(-50%); width: 11px; height: 11px; border-radius: 50%; background: var(--ink); box-shadow: 0 1px 3px rgba(var(--shadow-rgb),0.3); }
 .player-t { font-size: 11px; color: var(--ink3); font-variant-numeric: tabular-nums; }
 
 .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -1061,7 +1063,8 @@ body {
 .note-analysis-text { font-size: 12.5px; color: var(--ink2); line-height: 1.7; white-space: pre-wrap; margin-top: 6px; }
 .note-analysis-hint { font-size: 12px; color: var(--ink3); margin-top: 4px; }
 /* Melody view */
-.note-mel-roll { margin-top: 8px; }
+.note-mel-roll { margin-top: 8px; position: relative; }
+.mel-playhead { position: absolute; top: 0; width: 2px; height: 130px; background: var(--warm2); opacity: 0.9; left: 24px; pointer-events: none; box-shadow: 0 0 5px var(--warm2); border-radius: 1px; }
 .note-mel-names { margin-top: 7px; display: flex; flex-wrap: wrap; gap: 3px 5px; font-variant-numeric: tabular-nums; }
 .note-mel-name { font-size: 11px; color: var(--ink2); font-family: var(--sans); cursor: pointer; padding: 1px 4px; border-radius: 5px; transition: background 0.12s; }
 .note-mel-name:hover { background: var(--paper3); }
@@ -3939,6 +3942,24 @@ function wireAudioPlayer(mid){
     const t=document.getElementById(`ptim-${mid}`); if(t) t.textContent=fmtDur(Math.floor(a.currentTime));
   };
   a.onended=()=>{ const b=document.getElementById(`play-${mid}`); if(b) b.innerHTML='<svg viewBox="0 0 12 12"><polygon points="2,1 11,6 2,11"/></svg>'; };
+  // Tap / drag anywhere on the bar to scrub (standard player behaviour)
+  const prog=document.getElementById(`pprog-${mid}`);
+  if(prog&&!prog._wired){
+    prog._wired=true;
+    let dragging=false;
+    const seekTo=clientX=>{
+      if(!a.duration) return;
+      const r=prog.getBoundingClientRect();
+      const x=Math.max(0,Math.min(1,(clientX-r.left)/r.width));
+      a.currentTime=x*a.duration;
+      const f=document.getElementById(`pfill-${mid}`); if(f) f.style.width=(x*100).toFixed(1)+'%';
+    };
+    prog.addEventListener('pointerdown',e=>{ dragging=true; try{prog.setPointerCapture(e.pointerId);}catch(_){} seekTo(e.clientX); e.preventDefault(); });
+    prog.addEventListener('pointermove',e=>{ if(dragging) seekTo(e.clientX); });
+    const end=e=>{ dragging=false; try{prog.releasePointerCapture(e.pointerId);}catch(_){} };
+    prog.addEventListener('pointerup',end);
+    prog.addEventListener('pointercancel',end);
+  }
 }
 function togglePlay(mid){
   const a=document.getElementById(`da-${mid}`),b=document.getElementById(`play-${mid}`); if(!a) return;
@@ -4585,6 +4606,7 @@ function closeNote(){
   if(capCountingIn){ _stopMetro(); capCountingIn=false; }
   if(capRecording) stopCapRec();
   _stopMetro();
+  if(_humPlayNodes) _stopMelodyPlayback();
   closeCapProjMenu();
   closeNoteTagDrop();
   document.querySelectorAll('#note-takes audio').forEach(a=>a.pause());
@@ -4722,7 +4744,7 @@ function renderNoteTakes(){
       </div>
       <div class="player-row">
         <button class="play-btn2" id="play-${m.id}" onclick="togglePlay('${m.id}')"><svg viewBox="0 0 12 12"><polygon points="2,1 11,6 2,11"/></svg></button>
-        <div class="player-prog" onclick="seekA(event,'${m.id}')"><div class="player-fill" id="pfill-${m.id}"></div></div>
+        <div class="player-prog" id="pprog-${m.id}"><div class="player-fill" id="pfill-${m.id}"></div></div>
         <span class="player-t" id="ptim-${m.id}">${m.duration?fmtDur(m.duration):'—'}</span>
         <button id="spd-${m.id}" class="spd-btn" onclick="cycleSpeed('${m.id}')">1×</button>
       </div>
@@ -4773,6 +4795,7 @@ function renderNoteVisuals(){
 function renderNoteAnalysis(){
   const section=document.getElementById('note-analysis-section');
   if(!section) return;
+  if(_humPlayNodes) _stopMelodyPlayback(); // re-render destroys the playhead node
   if(!capEntry){ section.style.display='none'; section.innerHTML=''; return; }
   const e=capEntry;
   const allMedia=e.media||((e.hasMedia||e.data)?[{id:e.id,type:e.type==='photo'?'photo':e.type==='video'?'video':'audio',mimeType:e.mimeType||''}]:[]);
@@ -4811,7 +4834,7 @@ function renderNoteAnalysis(){
       const isModified=e.midiOriginal&&JSON.stringify(e.midi.map(n=>n.p))!==JSON.stringify(e.midiOriginal.map(n=>n.p));
       const selName=(_melSelIdx>=0&&e.midi[_melSelIdx])?midiToNoteName(e.midi[_melSelIdx].p):'';
       body=`
-        <div class="note-mel-roll">${renderHumPianoRoll(rollNotes, totalDur, {interactive:true, selected:_melSelIdx})}</div>
+        <div class="note-mel-roll">${renderHumPianoRoll(rollNotes, totalDur, {interactive:true, selected:_melSelIdx})}<div class="mel-playhead" id="mel-playhead" style="display:none"></div></div>
         <div class="note-mel-names">${names}</div>
         ${_melSelIdx>=0?`<div class="note-mel-edit"><span class="note-mel-edit-lbl">${selName}</span>
             <button class="note-mel-btn" onclick="noteMelodyNudge(-1)" title="Down a semitone">♭ −</button>
@@ -5707,43 +5730,60 @@ function humResetMelody(){
   toast('Restored original');
 }
 
-// Play detected melody notes via Web Audio (triangle osc, preserves rhythm)
-let _humPlayCtx=null;
+// Play detected melody notes via Web Audio (triangle osc, preserves rhythm),
+// with a moving playhead over the piano roll. Uses the shared, gesture-unlocked
+// AudioContext so sound actually plays on iOS.
+let _humPlayNodes=null, _humPlayRAF=null, _humPlayBtn=null, _humPlayTimeout=null;
+function _stopMelodyPlayback(){
+  if(_humPlayRAF){ cancelAnimationFrame(_humPlayRAF); _humPlayRAF=null; }
+  if(_humPlayTimeout){ clearTimeout(_humPlayTimeout); _humPlayTimeout=null; }
+  if(_humPlayNodes){ _humPlayNodes.forEach(n=>{ try{ n.stop&&n.stop(); }catch(_){} try{ n.disconnect(); }catch(_){} }); _humPlayNodes=null; }
+  const ph=document.getElementById('mel-playhead'); if(ph) ph.style.display='none';
+  if(_humPlayBtn){ try{ _humPlayBtn.textContent='▶ Play'; }catch(_){} _humPlayBtn=null; }
+}
 function playMelodyNotes(notes, btn){
-  // Toggle: stop if already playing
-  if(_humPlayCtx){ _humPlayCtx.close(); _humPlayCtx=null; if(btn) btn.textContent='▶ Play'; return; }
-  if(!notes?.length) return;
-
-  const ctx=new (window.AudioContext||window.webkitAudioContext)();
-  _humPlayCtx=ctx;
-  if(btn) btn.textContent='■ Stop';
-
-  const master=ctx.createGain(); master.gain.value=0.35; master.connect(ctx.destination);
-  const offset=notes[0].t; // normalise so first note starts at t=0
+  if(_humPlayNodes){ _stopMelodyPlayback(); return; } // toggle off
+  if(!notes||!notes.length) return;
+  const ctx=_getAudioCtx(); if(!ctx) return;
+  _humPlayBtn=btn||null; if(btn) btn.textContent='■ Stop';
+  const master=ctx.createGain(); master.gain.value=0.32; master.connect(ctx.destination);
+  const offset=notes[0].t; // first note at t=0
   const totalDur=Math.max(...notes.map(n=>(n.t-offset)+n.dur));
-
+  const startAt=ctx.currentTime+0.06;
+  const nodes=[master];
   notes.forEach(n=>{
     const freq=440*Math.pow(2,(n.pitch-69)/12);
-    const osc=ctx.createOscillator();
-    const gain=ctx.createGain();
+    const osc=ctx.createOscillator(), gain=ctx.createGain();
     osc.connect(gain); gain.connect(master);
-    osc.type='triangle'; // warmer than sine, vaguely voice-like
+    osc.type='triangle';
     osc.frequency.value=freq;
-    const t0=ctx.currentTime+0.05+(n.t-offset);
-    const t1=t0+n.dur;
-    const atk=Math.min(0.03,n.dur*0.15);
-    const rel=Math.min(0.06,n.dur*0.25);
-    gain.gain.setValueAtTime(0,t0);
+    const t0=startAt+(n.t-offset), t1=t0+n.dur;
+    const atk=Math.min(0.03,n.dur*0.15), rel=Math.min(0.06,n.dur*0.25);
+    gain.gain.setValueAtTime(0.0001,t0);
     gain.gain.linearRampToValueAtTime(0.9,t0+atk);
-    gain.gain.setValueAtTime(0.9,t1-rel);
-    gain.gain.linearRampToValueAtTime(0,t1);
-    osc.start(t0); osc.stop(t1);
+    gain.gain.setValueAtTime(0.9,Math.max(t0+atk,t1-rel));
+    gain.gain.linearRampToValueAtTime(0.0001,t1);
+    osc.start(t0); osc.stop(t1+0.02);
+    nodes.push(osc,gain);
   });
-
-  // Auto-reset button when done
-  setTimeout(()=>{
-    if(_humPlayCtx===ctx){ ctx.close(); _humPlayCtx=null; if(btn) btn.textContent='▶ Play'; }
-  },(totalDur+0.6)*1000);
+  _humPlayNodes=nodes;
+  // Playhead animation over the roll (roll starts after the 24px keyboard pane)
+  const ph=document.getElementById('mel-playhead');
+  const roll=document.querySelector('.note-mel-roll');
+  const KW=24;
+  const tick=()=>{
+    const elapsed=ctx.currentTime-startAt;
+    if(elapsed>=totalDur+0.04){ _stopMelodyPlayback(); return; }
+    if(ph&&roll){
+      const w=roll.clientWidth;
+      ph.style.left=(KW+Math.max(0,Math.min(1,elapsed/Math.max(totalDur,0.01)))*(w-KW)).toFixed(1)+'px';
+      ph.style.display='block';
+    }
+    _humPlayRAF=requestAnimationFrame(tick);
+  };
+  _humPlayRAF=requestAnimationFrame(tick);
+  // Safety net: stop even if rAF is throttled (app backgrounded)
+  _humPlayTimeout=setTimeout(_stopMelodyPlayback,(totalDur+0.4)*1000);
 }
 
 // ── AUDIO → MIDI (basic-pitch by Spotify, ICASSP 2022) ─────────────────────
