@@ -6378,7 +6378,7 @@ document.addEventListener('click',e=>{ const pop=document.getElementById('exp-po
 // ── PWA SERVICE WORKER (inline via blob) ──
 if ('serviceWorker' in navigator) {
   const swCode = `
-const CACHE = 'hum-v4';
+const CACHE = 'hum-v5';
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', e => {
   e.waitUntil(
