@@ -1041,6 +1041,9 @@ body {
 .note-mel-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 9px; }
 .note-mel-btn { font-size: 11px; padding: 5px 11px; border-radius: 7px; border: 1px solid var(--paper4); background: var(--surface); color: var(--ink2); cursor: pointer; font-family: var(--sans); transition: all 0.12s; white-space: nowrap; }
 .note-mel-btn:hover { border-color: var(--ink4); color: var(--ink); }
+.note-mel-btn.icon { padding: 5px 9px; display:inline-flex; align-items:center; justify-content:center; }
+.note-mel-btn.del { padding: 5px 9px; display:inline-flex; align-items:center; justify-content:center; color: var(--rose); border-color: var(--rose); }
+.note-mel-btn.del:hover { background: var(--rose); color: #fff; }
 .note-mel-btn.play { background: var(--plum); border-color: var(--plum); color: #fff; font-weight: 500; }
 .note-mel-btn.play:hover { opacity: 0.88; color: #fff; }
 .note-mel-sel { font-size: 11px; padding: 4px 6px; border-radius: 7px; border: 1px solid var(--paper4); background: var(--surface); color: var(--ink2); font-family: var(--sans); cursor: pointer; }
@@ -4664,11 +4667,12 @@ function _takeMelodyHtml(m){
         <button class="note-take-mini-btn" id="melbtn-${m.id}" onclick="runTakeMidi('${m.id}')">Re-analyse</button>
       </div>
     </div>
-    <div class="note-mel-roll">${renderHumPianoRoll(rollNotes, totalDur, {interactive:true, selected:sel})}<div class="mel-playhead" id="melph-${m.id}" style="display:none"></div></div>
+    <div class="note-mel-roll">${renderHumPianoRoll(rollNotes, totalDur, {interactive:true, selected:sel, mid:m.id})}<div class="mel-playhead" id="melph-${m.id}" style="display:none"></div></div>
     <div class="note-mel-names">${names}</div>
     ${sel>=0?`<div class="note-mel-edit"><span class="note-mel-edit-lbl">${selName}</span>
-        <button class="note-mel-btn" onclick="noteMelodyNudge('${m.id}',-1)" title="Down a semitone">♭ −</button>
-        <button class="note-mel-btn" onclick="noteMelodyNudge('${m.id}',1)" title="Up a semitone">♯ +</button>
+        <button class="note-mel-btn icon" onclick="noteMelodyNudge('${m.id}',1)" title="Up a semitone"><svg viewBox="0 0 10 7" width="10" height="7"><path d="M5 1l4 5H1z" fill="currentColor"/></svg></button>
+        <button class="note-mel-btn icon" onclick="noteMelodyNudge('${m.id}',-1)" title="Down a semitone"><svg viewBox="0 0 10 7" width="10" height="7"><path d="M5 6L1 1h8z" fill="currentColor"/></svg></button>
+        <button class="note-mel-btn del" onclick="noteMelodyDelete('${m.id}')" title="Delete note"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>
         <button class="note-mel-btn" onclick="noteMelodySelect('${m.id}',${sel})">Done</button></div>`:''}
     <div class="note-mel-controls">
       <button class="note-mel-btn play" id="melplay-${m.id}" onclick="noteMelodyPlay('${m.id}')">▶ Play</button>
@@ -4677,7 +4681,7 @@ function _takeMelodyHtml(m){
       <button class="note-mel-btn" onclick="noteMelodySnap('${m.id}')">Snap</button>
       ${isModified?`<button class="note-mel-btn" onclick="noteMelodyReset('${m.id}')">↺ Reset</button>`:''}
     </div>
-    <div class="note-mel-meta">${m.midi.length} notes · ${midiToNoteName(lo)}–${midiToNoteName(hi)}${capEntry.bpm?` · ${capEntry.bpm} BPM`:''}${diag} · tap a note to edit</div>
+    <div class="note-mel-meta">${m.midi.length} notes · ${midiToNoteName(lo)}–${midiToNoteName(hi)}${capEntry.bpm?` · ${capEntry.bpm} BPM`:''}${diag} · tap note to edit</div>
   </div>`;
 }
 function _takeMelody(m){ return (m&&Array.isArray(m.midi)?m.midi:[]).map(n=>({t:n.t,dur:n.d,pitch:n.p})); }
@@ -4713,6 +4717,14 @@ function noteMelodySnap(mid){
   try{persist();}catch(_){}
   renderNoteTakes();
   toast('Snapped to scale');
+}
+function noteMelodyDelete(mid){
+  const m=_findTakeMedia(mid); if(!m||!m.midi||_melSel.mid!==mid||_melSel.idx<0) return;
+  m.midi.splice(_melSel.idx,1);
+  if(!m.midi.length){ _melSel={mid:null,idx:-1}; }
+  else { _melSel={mid, idx:Math.min(_melSel.idx, m.midi.length-1)}; }
+  try{persist();}catch(_){}
+  renderNoteTakes();
 }
 function noteMelodyReset(mid){
   const m=_findTakeMedia(mid); if(!m||!m.midiOriginal||!m.midiOriginal.length) return;
@@ -5467,7 +5479,8 @@ function renderHumPianoRoll(notes, totalDur, opts){
     const y=(hi-n.pitch)*rowH;
     const h=Math.max(rowH-1, 3);
     const sel=opts.selected===ni;
-    const click=opts.interactive?` onclick="noteMelodySelect(${ni})" style="cursor:pointer"`:'';
+    const midArg=opts.mid?`'${opts.mid}',`:'';
+    const click=opts.interactive?` onclick="noteMelodySelect(${midArg}${ni})" style="cursor:pointer"`:'';
     roll+=`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="2" fill="${sel?'var(--warm2)':'var(--plum)'}" opacity="${sel?1:0.92}"${click}/>`;
     // Label: full name if room, else short pitch class. Hidden on tiny rects.
     if(w >= 11 && h >= 7){
