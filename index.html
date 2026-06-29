@@ -1612,7 +1612,7 @@ audio { display: none; }
       </div>
       <div class="brand-heatmap" id="brand-heatmap" title="Your activity"></div>
     </div>
-    <div class="brand-sub">capture before it fades <span class="brand-ver">v0.5</span></div>
+    <div class="brand-sub">capture before it fades <span class="brand-ver">v0.6</span></div>
     <button class="sidebar-close-btn" onclick="closeSidebar()" aria-label="Close">
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg>
     </button>
@@ -2030,6 +2030,20 @@ audio { display: none; }
     <div id="backup-status" style="font-size:11px;color:var(--ink3);margin-top:6px"></div>
     <input type="file" id="backup-import-in" accept=".zip" style="display:none" onchange="importAllZip(this)">
     <hr class="settings-sep">
+    <div class="settings-section-title">Local Vault <span class="settings-badge-free">auto-sync</span></div>
+    <div class="settings-hint" style="margin-top:0;margin-bottom:10px">Choose a folder on your Mac/PC — Hum writes all your notes and audio there automatically. Put that folder in iCloud / Dropbox / Google Drive for cloud backup without any account.</div>
+    <div class="gd-btn-row">
+      <button class="gd-small-btn primary" id="vault-connect-btn" onclick="vaultConnect()">Choose folder</button>
+      <button class="gd-small-btn" id="vault-sync-btn" onclick="vaultSyncAll()" style="display:none">Sync now</button>
+      <button class="gd-small-btn danger" onclick="vaultDisconnect()" id="vault-disconnect-btn" style="display:none">Disconnect</button>
+    </div>
+    <div id="vault-connected-row" style="display:none;margin-top:8px;font-size:11px;color:var(--ink2)">
+      <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="var(--sage)" stroke-width="1.5" stroke-linecap="round" style="vertical-align:-1px;margin-right:3px"><path d="M3 8l3 3 7-7"/></svg>
+      Syncing to: <strong id="vault-folder-name"></strong>
+      &nbsp;·&nbsp;<span id="vault-status" style="color:var(--ink3)"></span>
+      &nbsp;·&nbsp;<span class="about-link" onclick="vaultReconnect()">Reconnect</span>
+    </div>
+    <hr class="settings-sep">
     <div class="settings-section-title">Google Drive</div>
     <div class="fg">
       <label class="flabel">OAuth Client ID</label>
@@ -2058,7 +2072,7 @@ audio { display: none; }
 <div id="about-overlay">
   <div class="about-card">
     <div class="about-header">
-      <div class="about-title">Hum <span class="brand-ver" style="font-size:12px;opacity:0.5">v0.5</span></div>
+      <div class="about-title">Hum <span class="brand-ver" style="font-size:12px;opacity:0.5">v0.6</span></div>
       <div class="about-sub">Capture creative moments before they fade.</div>
     </div>
 
@@ -2288,12 +2302,13 @@ function persist(){
     }
     throw e;
   }
+  if(_vaultHandle) _vaultScheduleSync();
 }
 
 // ── INDEXEDDB MEDIA STORE ──
 // Stores audio/photo/video blobs by entry.id. Frees us from the 5MB
 // localStorage limit and avoids base64 bloat.
-const IDB_DB='hum-media', IDB_VER=1, IDB_STORE='media';
+const IDB_DB='hum-media', IDB_VER=2, IDB_STORE='media', KV_STORE='kv';
 let _idbConn=null;
 function idbOpen(){
   if(_idbConn) return Promise.resolve(_idbConn);
@@ -2303,11 +2318,130 @@ function idbOpen(){
     r.onupgradeneeded=e=>{
       const db=e.target.result;
       if(!db.objectStoreNames.contains(IDB_STORE)) db.createObjectStore(IDB_STORE);
+      if(!db.objectStoreNames.contains(KV_STORE)) db.createObjectStore(KV_STORE);
     };
     r.onsuccess=e=>{ _idbConn=e.target.result; resolve(_idbConn); };
     r.onerror=e=>reject(e.target.error||new Error('IDB open failed'));
   });
 }
+function kvPut(key,val){
+  return idbOpen().then(db=>new Promise((res,rej)=>{
+    const tx=db.transaction(KV_STORE,'readwrite');
+    tx.objectStore(KV_STORE).put(val,key);
+    tx.oncomplete=()=>res();
+    tx.onerror=e=>rej(e.target.error);
+  }));
+}
+function kvGet(key){
+  return idbOpen().then(db=>new Promise((res,rej)=>{
+    const tx=db.transaction(KV_STORE,'readonly');
+    const r=tx.objectStore(KV_STORE).get(key);
+    r.onsuccess=()=>res(r.result??null);
+    r.onerror=e=>rej(e.target.error);
+  })).catch(()=>null);
+}
+// ── LOCAL VAULT (File System Access API) ──
+let _vaultHandle=null;
+async function vaultResume(){
+  if(!('showDirectoryPicker' in window)) return;
+  try{
+    const h=await kvGet('vault_handle');
+    if(!h) return;
+    const perm=await h.queryPermission({mode:'readwrite'});
+    if(perm==='granted'){ _vaultHandle=h; updateVaultUi(); }
+    // Don't auto-prompt — user must click "Reconnect" for that
+  }catch(_){}
+}
+async function vaultConnect(){
+  if(!('showDirectoryPicker' in window)){ toast('File System API not supported in this browser'); return; }
+  try{
+    const h=await window.showDirectoryPicker({id:'hum-vault',mode:'readwrite'});
+    await kvPut('vault_handle',h);
+    _vaultHandle=h;
+    settings.vaultName=h.name;
+    localStorage.setItem(ST,JSON.stringify(settings));
+    updateVaultUi();
+    toast('Vault connected: '+h.name);
+    vaultSyncAll();
+  }catch(e){ if(e.name!=='AbortError') toast('Could not open folder: '+e.message); }
+}
+async function vaultReconnect(){
+  if(!('showDirectoryPicker' in window)) return;
+  try{
+    const h=await kvGet('vault_handle');
+    if(!h){ vaultConnect(); return; }
+    const perm=await h.requestPermission({mode:'readwrite'});
+    if(perm==='granted'){ _vaultHandle=h; updateVaultUi(); toast('Vault reconnected'); vaultSyncAll(); }
+    else toast('Permission denied');
+  }catch(e){ if(e.name!=='AbortError') toast('Error: '+e.message); }
+}
+async function vaultDisconnect(){
+  await kvPut('vault_handle',null);
+  _vaultHandle=null;
+  settings.vaultName='';
+  localStorage.setItem(ST,JSON.stringify(settings));
+  updateVaultUi();
+  toast('Vault disconnected');
+}
+async function vaultSyncAll(){
+  if(!_vaultHandle) return;
+  const btn=document.getElementById('vault-sync-btn');
+  if(btn){ btn.textContent='Syncing…'; btn.disabled=true; }
+  try{
+    // _index.json — metadata only (no base64 blobs)
+    const clean=entries.map(e=>{ const c={...e}; delete c.data; return c; });
+    await _vaultWriteJson('_index.json', clean);
+    await _vaultWriteJson('_projects.json', projects);
+    // media files
+    let mediaDir;
+    try{ mediaDir=await _vaultHandle.getDirectoryHandle('media',{create:true}); }catch(_){}
+    if(mediaDir){
+      for(const e of entries){
+        const items=e.media||((e.hasMedia||e.data)?[{id:e.id,mimeType:e.mimeType||'audio/webm'}]:[]);
+        for(const m of items){
+          try{
+            const rec=await idbGet(m.id);
+            if(!rec?.blob) continue;
+            const ext=_mimeToExt(m.mimeType||rec.mimeType||'');
+            const fh=await mediaDir.getFileHandle(m.id+'.'+ext,{create:true});
+            const w=await fh.createWritable();
+            await w.write(rec.blob); await w.close();
+          }catch(_){}
+        }
+      }
+    }
+    const ts=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+    const st=document.getElementById('vault-status');
+    if(st) st.textContent='Last sync: '+ts;
+  }catch(e){ toast('Vault sync error: '+e.message); }
+  finally{ if(btn){ btn.textContent='Sync now'; btn.disabled=false; } }
+}
+async function _vaultWriteJson(name, data){
+  const fh=await _vaultHandle.getFileHandle(name,{create:true});
+  const w=await fh.createWritable();
+  await w.write(JSON.stringify(data,null,2));
+  await w.close();
+}
+function updateVaultUi(){
+  const connected=!!_vaultHandle;
+  const row=document.getElementById('vault-connected-row');
+  const connectBtn=document.getElementById('vault-connect-btn');
+  const syncBtn=document.getElementById('vault-sync-btn');
+  const discBtn=document.getElementById('vault-disconnect-btn');
+  const nameEl=document.getElementById('vault-folder-name');
+  if(!connectBtn) return;
+  if(row) row.style.display=connected?'':'none';
+  if(syncBtn) syncBtn.style.display=connected?'':'none';
+  if(discBtn) discBtn.style.display=connected?'':'none';
+  connectBtn.textContent=connected?'Change folder':'Choose folder';
+  if(nameEl) nameEl.textContent=connected?(_vaultHandle.name||settings.vaultName||''):'';
+}
+function _vaultScheduleSync(){
+  clearTimeout(_vaultSyncTimer);
+  _vaultSyncTimer=setTimeout(()=>vaultSyncAll(),2000);
+}
+let _vaultSyncTimer=null;
+
 function idbPut(id, blob, mimeType){
   return idbOpen().then(db=>new Promise((res,rej)=>{
     const tx=db.transaction(IDB_STORE,'readwrite');
@@ -5240,6 +5374,7 @@ function openSettings(){
   document.getElementById('groq-key').value=settings.groqKey||'';
   document.getElementById('openai-key').value=settings.openaiKey||'';
   document.getElementById('rec-format').value=settings.recFormat||'mp3-320';
+  updateVaultUi();
   document.getElementById('gd-client-id').value=settings.gdClientId||'';
   const tt=document.getElementById('theme-toggle-input'); if(tt) tt.checked=settings.theme==='dark';
   updateGdUi();
@@ -6475,6 +6610,7 @@ renderHeatmap();
 // Migrate old base64 media to IndexedDB on app load (frees localStorage)
 migrateLegacyMedia().then(()=>{ migrateMediaArray(); render(); }).catch(err=>console.warn('Media migration failed:',err));
 if(settings.gdClientId) loadGsi();
+vaultResume();
 wireCaptureButton(document.getElementById('capture-btn'));
 wireCaptureButton(document.getElementById('mob-fab'));
 document.addEventListener('keydown',e=>{ if(e.key==='Escape'){closeNote();closeSave();closeProjModal();closeSettings();closeAbout();cancelRecording();} });
@@ -6483,7 +6619,7 @@ document.addEventListener('click',e=>{ const pop=document.getElementById('exp-po
 // ── PWA SERVICE WORKER (inline via blob) ──
 if ('serviceWorker' in navigator) {
   const swCode = `
-const CACHE = 'hum-v5';
+const CACHE = 'hum-v6';
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', e => {
   e.waitUntil(
