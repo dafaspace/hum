@@ -4320,7 +4320,8 @@ async function onCapRecStop(){
   const mid=uid();
   const lockedBpm=capRecBpm; capRecBpm=null; // tempo from count-in for THIS take (null = free time)
   try{ await idbPut(mid, blob, mime); }catch(err){ toast('Could not store take: '+(err.message||'error')); return; }
-  const mediaItem={id:mid, type:'audio', mimeType:mime, duration:dur||null};
+  const nextTake=Math.max(0,...(capEntry.media||[]).map(x=>x.take||0))+1;
+  const mediaItem={id:mid, type:'audio', mimeType:mime, duration:dur||null, take:nextTake};
   if(lockedBpm){ mediaItem.tempoBpm=lockedBpm; mediaItem.tempoLocked=true; } // exact tempo, not estimated
   capEntry.media.push(mediaItem);
   capEntry.hasMedia=true; capEntry.mimeType=capEntry.media[0].mimeType;
@@ -4345,7 +4346,7 @@ async function deleteCapTake(mid){
   const audio=(capEntry.media||[]).filter(m=>m.type==='audio');
   const idx=audio.findIndex(m=>m.id===mid);
   const m=(capEntry.media||[]).find(x=>x.id===mid);
-  const label=idx>=0?`Take ${idx+1}`:'this take';
+  const label=m&&m.take?`Take ${m.take}`:idx>=0?`Take ${idx+1}`:'this take';
   const dur=m&&m.duration?` (${fmtDur(m.duration)})`:'';
   const ok=await showConfirm({msg:`Delete ${label}${dur}? Its audio and melody will be removed.`, okLabel:'Delete'});
   if(!ok) return;
@@ -4542,7 +4543,7 @@ function renderNoteTakes(){
     }
     return `<div class="note-take">
       <div class="note-take-head">
-        <span class="note-take-label">Take ${i+1}</span>
+        <span class="note-take-label">Take ${m.take||i+1}</span>
         <span class="note-take-dur">${m.duration?fmtDur(m.duration):''}</span>
         ${!isLegacy?`<button class="note-take-del" onclick="deleteCapTake('${m.id}')" title="Delete take"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>`:''}
       </div>
