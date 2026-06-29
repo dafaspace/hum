@@ -1179,6 +1179,10 @@ body {
 .theme-switch input:checked + .theme-switch-slider { background: var(--warm); border-color: var(--warm); }
 .theme-switch input:checked + .theme-switch-slider::before { left: 20px; background: #fff; }
 .settings-hint { font-size: 11px; color: var(--ink3); margin-top: 6px; line-height: 1.6; }
+.settings-badge-free { font-size: 9px; font-weight: 500; letter-spacing: 0.05em; text-transform: uppercase; background: var(--sage); color: #fff; border-radius: 4px; padding: 1px 5px; margin-left: 5px; vertical-align: middle; }
+.settings-badge-paid { font-size: 9px; font-weight: 500; letter-spacing: 0.05em; text-transform: uppercase; background: var(--ink3); color: #fff; border-radius: 4px; padding: 1px 5px; margin-left: 5px; vertical-align: middle; }
+.settings-ext-link { font-size: 11px; color: var(--warm2); white-space: nowrap; text-decoration: none; font-family: var(--sans); padding: 6px 10px; border: 1px solid var(--warm); border-radius: 7px; background: var(--warm-soft); }
+.settings-ext-link:hover { background: var(--warm); color: #fff; }
 .settings-sep { border: none; border-top: 1px solid var(--paper4); margin: 18px 0 14px; }
 .settings-section-title { font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink3); font-weight: 500; margin-bottom: 12px; }
 .gd-btn-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
@@ -1969,10 +1973,19 @@ audio { display: none; }
       </select>
       <div class="settings-hint">MP3 and WAV are encoded after recording stops — takes 1-3s per minute. All three open in any DAW.</div>
     </div>
+    <div class="settings-section-title">Transcription</div>
     <div class="fg">
-      <label class="flabel">OpenAI API Key</label>
+      <label class="flabel">Groq API Key <span class="settings-badge-free">free</span></label>
+      <div style="display:flex;gap:6px;align-items:center">
+        <input class="finput" id="groq-key" type="password" placeholder="gsk_…" autocomplete="off" style="flex:1">
+        <a href="https://console.groq.com/keys" target="_blank" rel="noopener" class="settings-ext-link">Get key →</a>
+      </div>
+      <div class="settings-hint">Free &amp; fast Whisper via Groq. Sign up at console.groq.com → API Keys → Create → paste here. Used first if set.</div>
+    </div>
+    <div class="fg">
+      <label class="flabel">OpenAI API Key <span class="settings-badge-paid">paid</span></label>
       <input class="finput" id="openai-key" type="password" placeholder="sk-…" autocomplete="off">
-      <div class="settings-hint">For Whisper audio transcription. Stored locally only.</div>
+      <div class="settings-hint">Alternative to Groq. Used only if no Groq key. Stored locally only.</div>
     </div>
     <hr class="settings-sep">
     <div class="settings-section-title">Backup</div>
@@ -3157,7 +3170,7 @@ async function toggleModalAudio(){
         document.getElementById('s-name').value=autoTitle({ts:Date.now(),type:'audio',project:viewProj});
       }
       updateTranscribePill();
-      if(settings.openaiKey&&blob.size>1000&&(settings.autoTranscribe!==false)){
+      if(_txKey()&&blob.size>1000&&(settings.autoTranscribe!==false)){
         pendingTranscript='';
         updateTranscriptUI('loading');
         try{ pendingTranscript=await whisperTranscribe(blob); updateTranscriptUI('done'); }
@@ -3296,13 +3309,14 @@ function updateTranscribePill(){
   const pill=document.getElementById('transcribe-pill');
   const lbl=document.getElementById('transcribe-label');
   if(!pill) return;
-  const on=(settings.autoTranscribe!==false)&&!!settings.openaiKey;
+  const on=(settings.autoTranscribe!==false)&&!!_txKey();
   pill.classList.toggle('on',on);
-  lbl.textContent=settings.openaiKey?(on?'Transcribe ON':'Transcribe OFF'):'No API key';
-  if(!settings.openaiKey) pill.title='Add OpenAI key in Settings to enable';
+  const provider=settings.groqKey?'Groq':settings.openaiKey?'OpenAI':'';
+  lbl.textContent=_txKey()?(on?`Transcribe ON (${provider})`:'Transcribe OFF'):'No API key';
+  if(!_txKey()) pill.title='Add Groq or OpenAI key in Settings to enable';
 }
 function toggleAutoTranscribe(){
-  if(!settings.openaiKey){ openSettings(); return; }
+  if(!_txKey()){ openSettings(); return; }
   settings.autoTranscribe=(settings.autoTranscribe===false)?true:false;
   localStorage.setItem(ST,JSON.stringify(settings));
   updateTranscribePill();
@@ -4523,7 +4537,7 @@ function renderNoteTakes(){
   const audio=allMedia.filter(m=>m.type==='audio');
   if(!audio.length){ wrap.innerHTML=''; renderNoteAnalysis(); return; }
   const isLegacy=!capEntry.media;
-  const apiKey=(settings&&settings.openaiKey)||'';
+  const apiKey=_txKey();
   wrap.innerHTML=audio.map((m,i)=>{
     const tr=_getTakeTranscript(m, capEntry);
     let trBlock='';
@@ -4541,7 +4555,7 @@ function renderNoteTakes(){
       trBlock=`<div class="note-take-transcript-actions">
         ${apiKey
           ?`<button class="note-take-mini-btn" onclick="noteTranscribe('${m.id}')">Transcribe</button>`
-          :`<button class="note-take-mini-btn" onclick="closeNote();openSettings()">Add API key to transcribe</button>`}
+          :`<button class="note-take-mini-btn" onclick="closeNote();openSettings()">Add Groq key to transcribe (free)</button>`}
       </div>`;
     }
     return `<div class="note-take">
@@ -4741,8 +4755,8 @@ function downloadTakeMidi(mid){
 async function noteTranscribe(mid){
   if(!capEntry) return;
   const e=capEntry;
-  const apiKey=(settings&&settings.openaiKey)||'';
-  if(!apiKey){ toast('Add OpenAI key in Settings'); return; }
+  const apiKey=_txKey();
+  if(!apiKey){ toast('Add Groq or OpenAI key in Settings'); return; }
   const allMedia=e.media||((e.hasMedia||e.data)?[{id:e.id,type:'audio',mimeType:e.mimeType||''}]:[]);
   const audioItem = mid
     ? allMedia.find(m=>m.id===mid && m.type==='audio')
@@ -5135,8 +5149,10 @@ function seed(){
 }
 
 // ── SETTINGS ──
+function _txKey(){ return settings.groqKey||settings.openaiKey||''; }
 function openSettings(){
   document.getElementById('username').value=settings.username||'';
+  document.getElementById('groq-key').value=settings.groqKey||'';
   document.getElementById('openai-key').value=settings.openaiKey||'';
   document.getElementById('rec-format').value=settings.recFormat||'mp3-320';
   document.getElementById('gd-client-id').value=settings.gdClientId||'';
@@ -5147,6 +5163,7 @@ function openSettings(){
 function closeSettings(){ document.getElementById('settings-overlay').classList.remove('show'); }
 function saveSettings(){
   settings.username=document.getElementById('username').value.trim();
+  settings.groqKey=document.getElementById('groq-key').value.trim();
   settings.openaiKey=document.getElementById('openai-key').value.trim();
   settings.recFormat=document.getElementById('rec-format').value;
   const newCid=document.getElementById('gd-client-id').value.trim();
@@ -6314,16 +6331,19 @@ async function encodeMp3(blob, bitrate){
 
 // ── WHISPER ──
 async function whisperTranscribe(blob){
-  const fd=new FormData();
+  const useGroq=!!settings.groqKey;
+  const key=useGroq?settings.groqKey:settings.openaiKey;
+  if(!key) throw new Error('No API key');
+  const url=useGroq
+    ?'https://api.groq.com/openai/v1/audio/transcriptions'
+    :'https://api.openai.com/v1/audio/transcriptions';
+  const model=useGroq?'whisper-large-v3-turbo':'whisper-1';
   const mt=blob.type||'audio/webm';
   const ext=mt.includes('mpeg')||mt.includes('mp3')?'mp3':mt.includes('wav')?'wav':mt.includes('ogg')?'ogg':mt.includes('mp4')||mt.includes('m4a')?'mp4':'webm';
+  const fd=new FormData();
   fd.append('file',blob,`recording.${ext}`);
-  fd.append('model','whisper-1');
-  const resp=await fetch('https://api.openai.com/v1/audio/transcriptions',{
-    method:'POST',
-    headers:{'Authorization':'Bearer '+settings.openaiKey},
-    body:fd
-  });
+  fd.append('model',model);
+  const resp=await fetch(url,{method:'POST',headers:{'Authorization':'Bearer '+key},body:fd});
   if(!resp.ok){
     const errText=await resp.text();
     let errMsg='API error';
