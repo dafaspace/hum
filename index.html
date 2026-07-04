@@ -3355,6 +3355,7 @@ async function toggleModalAudio(){
     mr.onstop=async()=>{
       stream.getTracks().forEach(t=>t.stop());
       modalRecStream=null; modalRecording=false;
+      const recSec=modalRecSec; modalRecSec=0; // snapshot before reset (interval already cleared)
       document.getElementById('modal-rec-bar').style.display='none';
       const btn=document.getElementById('mbtn-audio');
       if(btn){ btn.classList.remove('recording'); document.getElementById('mbtn-audio-label').textContent='Audio'; }
@@ -3378,7 +3379,7 @@ async function toggleModalAudio(){
         if(status) status.textContent='';
       }
       pendingBlob=blob; // legacy alias
-      addPendingMedia('audio', blob, blob.type, modalRecSec||null, null);
+      addPendingMedia('audio', blob, blob.type, recSec||null, null);
       // Auto-detect BPM + Key in background (non-blocking)
       _autoBpmKey(blob);
       // update title if first media
@@ -3412,11 +3413,14 @@ async function toggleModalAudio(){
 }
 
 function stopModalAudio(){
-  if(mr&&mr.state==='recording'){ mr.stop(); clearInterval(modalRecInterval); modalRecSec=0; }
+  // Don't zero modalRecSec here — onstop runs async and reads it for the take duration
+  if(mr&&mr.state==='recording'){ mr.stop(); clearInterval(modalRecInterval); }
 }
 
 function cancelModalAudio(){
-  if(mr&&mr.state==='recording'){ mr.stop(); recChunks=[]; }
+  // Detach onstop so the cancelled recording is NOT saved as a take
+  if(mr&&mr.state==='recording'){ mr.onstop=null; mr.stop(); }
+  recChunks=[];
   clearInterval(modalRecInterval); modalRecSec=0; modalRecording=false;
   if(modalRecStream){ modalRecStream.getTracks().forEach(t=>t.stop()); modalRecStream=null; }
   document.getElementById('modal-rec-bar').style.display='none';
@@ -3924,7 +3928,8 @@ async function confirmSave(){
   if(proj==='__new__') proj='';
   const note=document.getElementById('s-note').value.trim();
   const ta=document.getElementById('s-transcript');
-  const transcript=(ta.style.display!=='none'?ta.value.trim():'')||null;
+  // Edit mode shows the textarea; new-capture mode keeps the auto-transcript in pendingTranscript
+  const transcript=(ta.style.display!=='none'?ta.value.trim():'')||pendingTranscript||null;
   const bpm=document.getElementById('s-bpm').value?parseInt(document.getElementById('s-bpm').value):null;
   const key=document.getElementById('s-key').value.trim()||null;
   // mood/genre now live as tags — derive from currentTags for back-compat search
@@ -3968,6 +3973,11 @@ async function confirmSave(){
       }catch(err){ toast('Could not store media: '+(err.message||'error')); }
     }
     if(entry.media.length>0) entry.mimeType=entry.media[0].mimeType;
+    // Attach the auto-transcript to the audio take (per-take model reads m.transcript first)
+    if(transcript){ const a=entry.media.find(m=>m.type==='audio'); if(a) a.transcript=transcript; }
+    // Entry-level duration = first audio take's duration
+    const firstAudio=entry.media.find(m=>m.type==='audio');
+    if(firstAudio&&firstAudio.duration) entry.duration=firstAudio.duration;
   }
   const savedId=entry.id;
   entries.unshift(entry);
@@ -5273,7 +5283,12 @@ function expJson(){
 async function expAudio(){
   if(!curEntry){ toast('No entry'); return; }
   let blob=null, mime=curEntry.mimeType||'';
-  if(curEntry.hasMedia){
+  // New media[] model: audio blobs are keyed by the media item id, not the entry id
+  const audioItem=(curEntry.media||[]).find(m=>m.type==='audio');
+  if(audioItem){
+    const rec=await idbGet(audioItem.id);
+    if(rec&&rec.blob){ blob=rec.blob; mime=rec.mimeType||audioItem.mimeType||mime; }
+  } else if(curEntry.hasMedia){
     const rec=await idbGet(curEntry.id);
     if(rec&&rec.blob){ blob=rec.blob; mime=rec.mimeType||mime; }
   } else if(typeof curEntry.data==='string' && curEntry.data.startsWith('data:')){
