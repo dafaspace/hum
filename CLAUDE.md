@@ -8,9 +8,13 @@ One app to capture any creative moment — hummed melody, lyric, dream, idea, fi
 
 ## Architecture
 
-### Current state: single-file PWA prototype
+### Current state: single-file PWA prototype (+ sw.js)
 
-The app is a single `hum.html` file. No framework, no build step, no backend. This is intentional — it keeps deployment trivial (one file on GitHub Pages = done) and removes all friction.
+The app is essentially one `index.html` file — HTML, CSS, and JS all inline. No framework, no build step, no backend. This is intentional — it keeps deployment trivial (drop the files on GitHub Pages = done) and removes all friction.
+
+The one exception is **`sw.js`** (service worker), which must live as a separate same-origin file: browsers reject `blob:`/`data:` service-worker script URLs, so offline caching is impossible while inlined. So "single file" means "everything inline in index.html except the service worker." `sw.js` is still plain static JS, no build step — deployment stays trivial.
+
+**Long-term goal:** a full app published in the app stores (iOS / Google Play), not just a GitHub Pages PWA. Favor decisions that ease an eventual store wrap (Capacitor/PWABuilder), clean file separation, and standard PWA setup. The single-file constraint is a prototype-phase convenience, not permanent — the target structure below already anticipates the split.
 
 ### Data model
 
@@ -125,7 +129,9 @@ Don't split yet. Keep single file until explicitly told to split.
 
 ## Features — next (build in this order)
 
-### Phase 1: Audio transcription
+> **Status (v0.7):** Phase 1 ✅ (Whisper via OpenAI **and** free Groq), Phase 2 ✅ mostly (SPICE replaced basic-pitch as the pitch model; per-take piano roll with edit/snap/delete + .mid export), Phase 3 partial (ZIP export/import done; MusicXML/PDF pending), Phase 4 ✅ (Local Vault via File System Access API + Google Drive sync), Phase 6 partial (dark mode done). Remaining focus: melody accuracy on live mic, MusicXML/PDF export, AI layer, store release.
+
+### Phase 1: Audio transcription — ✅ DONE (OpenAI + free Groq)
 - Add Whisper API integration (OpenAI API).
 - After recording stops, send audio to Whisper, get transcript.
 - Save transcript in entry as `entry.transcript`.
@@ -183,12 +189,12 @@ Don't split yet. Keep single file until explicitly told to split.
 
 ## Rules for Claude Code
 
-1. **Keep it a single HTML file** until I say otherwise.
+1. **Keep everything inline in `index.html`** (HTML + CSS + JS) until I say otherwise. The only allowed separate file is **`sw.js`** (service worker — cannot be inlined). Don't split out app.js/styles.css without asking.
 2. **No frameworks.** No React, no Vue, no Svelte. Vanilla JS.
 3. **No build tools.** No npm, no webpack, no vite.
-4. **External libraries** are OK via CDN only (e.g., midi-writer-js, basic-pitch WASM).
+4. **External libraries** are OK via CDN only (e.g., lamejs, JSZip, TF.js/SPICE). `defer` any that aren't needed at startup — the capture button must be usable immediately.
 5. **Don't break existing features** when adding new ones.
-6. **localStorage is the database.** Don't add IndexedDB, SQLite, or any other storage without asking.
+6. **Storage:** `localStorage` holds metadata (`hum_entries`, `hum_projects`); **IndexedDB** (`hum-media` DB) holds media blobs and a `kv` store (vault handle). This split is intentional and in use — don't add SQLite or other storage without asking.
 7. **Mobile-first.** Always test that new features work on narrow viewports (380px).
 8. **Design consistency.** Use the CSS variables above. Don't introduce new colors without asking.
 9. **Fonts: Newsreader + Geist.** Don't change or add fonts.
@@ -197,11 +203,13 @@ Don't split yet. Keep single file until explicitly told to split.
 12. **Test audio recording** after any change to capture flow.
 13. **Preserve user data.** Never clear localStorage or change key names without migration.
 14. **English UI.** All strings in English.
+15. **Escape all rendered data.** Any user- or import-supplied string put into HTML must go through `escHtml` (escapes quotes too); colors through `safeColor`; and ids that reach `onclick=""` must be uid-shaped — regenerate unsafe ids on import (`_safeId`).
+16. **Release ritual** lives in `DEV.md` (gitignored): snapshot to `Archive/` → bump version in 3 places (`.brand-ver`, About title, `sw.js` CACHE) → changelog → commit + tag.
 
 ## How to work
 
 1. Read this file first.
-2. Read `hum.html` to understand current implementation.
+2. Read `index.html` to understand current implementation.
 3. Make changes incrementally — one feature at a time.
 4. After each change, verify:
    - App loads without errors

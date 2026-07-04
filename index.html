@@ -1613,7 +1613,7 @@ audio { display: none; }
       </div>
       <div class="brand-heatmap" id="brand-heatmap" title="Your activity"></div>
     </div>
-    <div class="brand-sub">capture before it fades <span class="brand-ver">v0.6</span></div>
+    <div class="brand-sub">capture before it fades <span class="brand-ver">v0.7</span></div>
     <button class="sidebar-close-btn" onclick="closeSidebar()" aria-label="Close">
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg>
     </button>
@@ -2073,7 +2073,7 @@ audio { display: none; }
 <div id="about-overlay">
   <div class="about-card">
     <div class="about-header">
-      <div class="about-title">Hum <span class="brand-ver" style="font-size:12px;opacity:0.5">v0.6</span></div>
+      <div class="about-title">Hum <span class="brand-ver" style="font-size:12px;opacity:0.5">v0.7</span></div>
       <div class="about-sub">Capture creative moments before they fade.</div>
     </div>
 
@@ -6742,68 +6742,18 @@ document.addEventListener('click',e=>{ const pop=document.getElementById('exp-po
 window.addEventListener('pagehide', persistFlush);
 document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') persistFlush(); });
 
-// ── PWA SERVICE WORKER (inline via blob) ──
+// ── PWA SERVICE WORKER ──
+// Registered from ./sw.js (a real same-origin file — browsers reject blob:/data: SW URLs,
+// which is why the old inline approach silently never installed).
 if ('serviceWorker' in navigator) {
-  const swCode = `
-const CACHE = 'hum-v6';
-self.addEventListener('install', () => self.skipWaiting());
-self.addEventListener('activate', e => {
-  e.waitUntil(
-    caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
-      .then(() => self.clients.claim())
-  );
-});
-self.addEventListener('fetch', e => {
-  if (e.request.method !== 'GET') return;
-  const u = e.request.url;
-  // Fonts: cache-first (they never change)
-  if (u.includes('fonts.g')) {
-    e.respondWith(
-      caches.match(e.request).then(hit => hit || fetch(e.request).then(r => {
-        if (r.ok) caches.open(CACHE).then(c => c.put(e.request, r.clone()));
-        return r;
-      }))
-    );
-    return;
-  }
-  // App shell (HTML): stale-while-revalidate with bypass of browser HTTP cache
-  if (u.endsWith('.html') || u.endsWith('/') || !u.includes('.')) {
-    e.respondWith(
-      caches.open(CACHE).then(async cache => {
-        const cached = await cache.match(e.request);
-        // Background fetch — always bypass browser HTTP cache so GH Pages CDN is skipped
-        const refresh = fetch(new Request(u, {cache: 'no-cache'}))
-          .then(async r => {
-            if (!r || !r.ok) return r;
-            const newTag = r.headers.get('etag') || r.headers.get('last-modified');
-            const oldTag = cached && (cached.headers.get('etag') || cached.headers.get('last-modified'));
-            await cache.put(e.request, r.clone());
-            // Notify page only when content actually changed (new deploy)
-            if (cached && newTag && oldTag && newTag !== oldTag) {
-              const clients = await self.clients.matchAll({type: 'window', includeUncontrolled: true});
-              clients.forEach(c => c.postMessage({type: 'SW_UPDATE'}));
-            }
-            return r;
-          }).catch(() => null);
-        // Serve cache instantly if available, else wait for network
-        return cached || refresh.then(r => r || new Response('App offline — check your connection', {status: 503, headers: {'Content-Type': 'text/plain'}}));
-      })
-    );
-    return;
-  }
-  // Everything else: network pass-through
-  e.respondWith(fetch(e.request).catch(() => new Response('', {status: 408})));
-});
-`;
   const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
   if (isLocal) {
+    // Keep local dev clean — no stale caching across edits
     navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(r => r.unregister()));
   } else {
-    const swBlob = new Blob([swCode], {type: 'application/javascript'});
-    const swUrl  = URL.createObjectURL(swBlob);
-    navigator.serviceWorker.register(swUrl, {type: 'classic'}).catch(() => {});
-    // Listen for update notifications from SW
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').catch(() => {});
+    });
     navigator.serviceWorker.addEventListener('message', e => {
       if (e.data && e.data.type === 'SW_UPDATE') _showSwUpdateBar();
     });
