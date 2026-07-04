@@ -1594,10 +1594,11 @@ button, .nav-item, .card, .stream-entry, .hm-cell {
 }
 audio { display: none; }
 </style>
-<!-- lamejs: pure-JS MP3 encoder (~50KB, MIT) — used for MP3 320 / 128 export -->
-<script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js"></script>
-<!-- JSZip: ZIP archive read/write (~95KB, MIT) — used for Export/Import all -->
-<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<!-- lamejs: pure-JS MP3 encoder (~50KB, MIT) — used for MP3 320 / 128 export.
+     defer: never needed at startup (only after a recording stops), so it must not block the capture button. -->
+<script defer src="https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js"></script>
+<!-- JSZip: ZIP archive read/write (~95KB, MIT) — used for Export/Import all. defer: export-only, not startup. -->
+<script defer src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 </head>
 <body>
 <div id="app">
@@ -2633,17 +2634,50 @@ async function importAllZip(input){
     const importedEntries = JSON.parse(await entriesFile.async('string'));
     const importedProjects = JSON.parse(await projectsFile.async('string'));
 
-    // Merge projects (skip duplicates by id; rename collision name if same name different id)
+    // Merge projects — regenerate any unsafe id (ids flow into onclick=""), remap references
     const existingProjIds = new Set(projects.map(p=>p.id));
+    const projIdMap = new Map();
     let projAdded = 0;
     for(const p of importedProjects){
-      if(existingProjIds.has(p.id)) continue;
+      const oldId = p.id;
+      const safe = _safeId(oldId);
+      if(safe && existingProjIds.has(safe)){ projIdMap.set(oldId, safe); continue; } // already have it
+      const nid = safe || uid();
+      projIdMap.set(oldId, nid);
+      p.id = nid;
       projects.push(p);
-      existingProjIds.add(p.id);
+      existingProjIds.add(nid);
       projAdded++;
     }
 
-    // Restore media files into IDB
+    // Prepare entries first so we know how media storage keys must be remapped
+    const existingEntryIds = new Set(entries.map(e=>e.id));
+    const mediaKeyMap = new Map(); // old IDB key -> new IDB key (only for regenerated ids)
+    const entriesToAdd = [];
+    for(const e of importedEntries){
+      const safe = _safeId(e.id);
+      if(safe && existingEntryIds.has(safe)) continue; // duplicate — skip
+      const newId = safe || uid();
+      // Remap project reference through the project id map (or drop if unsafe/unknown)
+      if(e.project) e.project = projIdMap.get(e.project) || _safeId(e.project) || null;
+      // Remap per-take media item ids + their IDB storage keys
+      if(Array.isArray(e.media)){
+        for(const m of e.media){
+          const sMid = _safeId(m.id);
+          const nMid = sMid || uid();
+          if(nMid !== m.id) mediaKeyMap.set(m.id, nMid);
+          m.id = nMid;
+        }
+      } else if(e.hasMedia && newId !== e.id){
+        // Legacy single-media entry: its blob is stored under the entry id
+        mediaKeyMap.set(e.id, newId);
+      }
+      e.id = newId;
+      existingEntryIds.add(newId);
+      entriesToAdd.push(e);
+    }
+
+    // Restore media files into IDB, honoring the key remap
     const mediaFolder = zip.folder('media');
     let mediaRestored = 0;
     if(mediaFolder){
@@ -2659,24 +2693,20 @@ async function importAllZip(input){
         const dot = name.lastIndexOf('.');
         const mid = dot>0 ? name.slice(0,dot) : name;
         const ext = dot>0 ? name.slice(dot+1) : '';
+        const key = mediaKeyMap.get(mid) || (_safeId(mid) ? mid : null);
+        if(!key) continue; // orphan file with an unsafe name and no referencing entry
         const blob = await obj.async('blob');
         const typedBlob = new Blob([blob], {type: _extToMime(ext)});
         try{
-          await idbPut(mid, typedBlob, typedBlob.type);
+          await idbPut(key, typedBlob, typedBlob.type);
           mediaRestored++;
         }catch(_){}
       }
     }
 
-    // Merge entries (skip duplicates by id)
-    const existingEntryIds = new Set(entries.map(e=>e.id));
+    // Commit entries
     let entriesAdded = 0;
-    for(const e of importedEntries){
-      if(existingEntryIds.has(e.id)) continue;
-      entries.push(e);
-      existingEntryIds.add(e.id);
-      entriesAdded++;
-    }
+    for(const e of entriesToAdd){ entries.push(e); entriesAdded++; }
     // Keep newest first
     entries.sort((a,b)=>(b.ts||0)-(a.ts||0));
 
@@ -3002,7 +3032,11 @@ function scheduleGdPush(){
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,5); }
 function fmtDate(ts){ const d=new Date(ts); return d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})+' · '+d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}); }
 function fmtDur(s){ return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
-function escHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function escHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+// Validate a user/import-supplied CSS color before it lands in a style="" attribute
+function safeColor(c){ return (typeof c==='string'&&/^#[0-9a-fA-F]{3,8}$/.test(c.trim()))?c.trim():'var(--paper4)'; }
+// Ids flow raw into onclick="..." handlers — only allow uid-shaped strings, else caller regenerates
+function _safeId(id){ return (typeof id==='string'&&/^[A-Za-z0-9_-]{1,40}$/.test(id))?id:null; }
 function autoTitle(e){
   const d=new Date(e.ts);
   const proj=projects.find(p=>p.id===e.project);
@@ -3241,12 +3275,12 @@ function statusDot(e){
 // Consistent project chip (color dot + name) used by both card & stream
 function projChip(proj){
   if(!proj) return '';
-  return `<span class="proj-chip"><span class="proj-chip-dot" style="background:${proj.color}"></span>${escHtml(proj.name)}</span>`;
+  return `<span class="proj-chip"><span class="proj-chip-dot" style="background:${safeColor(proj.color)}"></span>${escHtml(proj.name)}</span>`;
 }
 
 function cardHtml(e){
   const proj=projects.find(p=>p.id===e.project);
-  const acc=proj?`<div class="card-accent" style="background:${proj.color}"></div>`:'';
+  const acc=proj?`<div class="card-accent" style="background:${safeColor(proj.color)}"></div>`:'';
   const tlabel={audio:'audio',text:'text',idea:'idea',dream:'dream',photo:'photo',video:'video',midi:'midi'}[e.type]||e.type;
   const ticon=typeIconSvg(e.type);
   const tpill=`<span class="type-pill tp-${e.type}">${ticon}${tlabel}</span>`;
@@ -3303,7 +3337,7 @@ function streamItemHtml(e){
   const tlabel=e.type;
   const tpill=`<span class="type-pill tp-${e.type}">${typeIconSvg(e.type)}${tlabel}</span>`;
   const proj=projects.find(p=>p.id===e.project);
-  const acc=proj?`<div class="card-accent" style="background:${proj.color}"></div>`:'';
+  const acc=proj?`<div class="card-accent" style="background:${safeColor(proj.color)}"></div>`:'';
   let body='';
   const cover=entryCoverMedia(e);
   if(cover){
@@ -3326,7 +3360,7 @@ function streamItemHtml(e){
     contentBadges(e)
   ].filter(Boolean).join('');
   return `<div class="stream-entry" onclick="openDetail('${e.id}')">${acc}
-    <div class="stream-time">${time}${proj?` · <span style="color:${proj.color}">●</span> ${escHtml(proj.name)}`:''} ${tpill}</div>
+    <div class="stream-time">${time}${proj?` · <span style="color:${safeColor(proj.color)}">●</span> ${escHtml(proj.name)}`:''} ${tpill}</div>
     <div class="stream-entry-title">${escHtml(e.name||autoTitle(e))}</div>
     ${body}
     ${txt?`<div class="stream-entry-body">${escHtml(txt)}</div>`:''}
@@ -4396,7 +4430,7 @@ function renderCapProjMenu(){
   const menu=document.getElementById('cap-proj-menu'); if(!menu) return;
   let html=`<div class="cap-proj-item ${!capProject?'sel':''}" onclick="selectCapProj(null)"><span class="cap-proj-item-dot" style="background:var(--ink4)"></span>Drafts</div>`;
   html+=`<div class="cap-proj-item cap-proj-new" onclick="startCapNewProject(event)"><span class="cap-proj-new-plus">+</span>New project</div>`;
-  html+=projects.map(p=>`<div class="cap-proj-item ${capProject===p.id?'sel':''}" onclick="selectCapProj('${p.id}')"><span class="cap-proj-item-dot" style="background:${p.color}"></span>${escHtml(p.name)}</div>`).join('');
+  html+=projects.map(p=>`<div class="cap-proj-item ${capProject===p.id?'sel':''}" onclick="selectCapProj('${p.id}')"><span class="cap-proj-item-dot" style="background:${safeColor(p.color)}"></span>${escHtml(p.name)}</div>`).join('');
   menu.innerHTML=html;
 }
 function selectCapProj(id){
@@ -5289,7 +5323,7 @@ function editEntry(id){
 function renderProjects(){
   document.getElementById('proj-list').innerHTML=projects.map(p=>{
     const cnt=entries.filter(e=>e.project===p.id).length;
-    return `<div class="nav-item" onclick="setView('${p.id}',this)"><div class="proj-dot" style="background:${p.color}"></div>${escHtml(p.name)}<span class="ni-count">${cnt}</span></div>`;
+    return `<div class="nav-item" onclick="setView('${p.id}',this)"><div class="proj-dot" style="background:${safeColor(p.color)}"></div>${escHtml(p.name)}<span class="ni-count">${cnt}</span></div>`;
   }).join('');
 }
 
