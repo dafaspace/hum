@@ -2393,37 +2393,55 @@ async function vaultDisconnect(){
 }
 async function vaultSyncAll(){
   if(!_vaultHandle) return;
+  if(_vaultSyncing){ _vaultSyncPending=true; return; } // coalesce overlapping syncs
+  _vaultSyncing=true;
   const btn=document.getElementById('vault-sync-btn');
   if(btn){ btn.textContent='Syncing…'; btn.disabled=true; }
   try{
-    // _index.json — metadata only (no base64 blobs)
+    // Indexes are small and change often — always rewrite (no base64 blobs inside)
     const clean=entries.map(e=>{ const c={...e}; delete c.data; return c; });
     await _vaultWriteJson('_index.json', clean);
     await _vaultWriteJson('_projects.json', projects);
-    // media files
+    // Media files: blobs are immutable (keyed by id), so only write ones not already there,
+    // and delete files for takes/entries that no longer exist.
     let mediaDir;
     try{ mediaDir=await _vaultHandle.getDirectoryHandle('media',{create:true}); }catch(_){}
     if(mediaDir){
+      const wanted=new Map(); // filename -> {id, mimeType}
       for(const e of entries){
         const items=e.media||((e.hasMedia||e.data)?[{id:e.id,mimeType:e.mimeType||'audio/webm'}]:[]);
-        for(const m of items){
-          try{
-            const rec=await idbGet(m.id);
-            if(!rec?.blob) continue;
-            const ext=_mimeToExt(m.mimeType||rec.mimeType||'');
-            const fh=await mediaDir.getFileHandle(m.id+'.'+ext,{create:true});
-            const w=await fh.createWritable();
-            await w.write(rec.blob); await w.close();
-          }catch(_){}
-        }
+        for(const m of items){ wanted.set(m.id+'.'+_mimeToExt(m.mimeType||'audio/webm'), m); }
+      }
+      // Existing files in the vault
+      const present=new Set();
+      try{ for await(const name of mediaDir.keys()) present.add(name); }catch(_){}
+      // Write only missing blobs
+      for(const [fname, m] of wanted){
+        if(present.has(fname)) continue;
+        try{
+          const rec=await idbGet(m.id);
+          if(!rec?.blob) continue;
+          const fh=await mediaDir.getFileHandle(fname,{create:true});
+          const w=await fh.createWritable();
+          await w.write(rec.blob); await w.close();
+        }catch(_){}
+      }
+      // Remove orphans (deleted entries/takes)
+      for(const name of present){
+        if(!wanted.has(name)){ try{ await mediaDir.removeEntry(name); }catch(_){} }
       }
     }
     const ts=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
     const st=document.getElementById('vault-status');
     if(st) st.textContent='Last sync: '+ts;
   }catch(e){ toast('Vault sync error: '+e.message); }
-  finally{ if(btn){ btn.textContent='Sync now'; btn.disabled=false; } }
+  finally{
+    if(btn){ btn.textContent='Sync now'; btn.disabled=false; }
+    _vaultSyncing=false;
+    if(_vaultSyncPending){ _vaultSyncPending=false; _vaultScheduleSync(); } // run once more for changes that arrived mid-sync
+  }
 }
+let _vaultSyncing=false, _vaultSyncPending=false;
 async function _vaultWriteJson(name, data){
   const fh=await _vaultHandle.getFileHandle(name,{create:true});
   const w=await fh.createWritable();
@@ -2844,7 +2862,8 @@ async function gdUpsertJson(name,data,parentId){
 }
 async function gdUpsertBlob(name,blob,mimeType,parentId){
   const existId=await gdFindFile(name,parentId);
-  return gdUpload(name,blob,mimeType,parentId,existId);
+  if(existId) return existId; // media blobs are immutable — already uploaded, don't re-send the bytes
+  return gdUpload(name,blob,mimeType,parentId,null);
 }
 async function gdEnsureFolders(){
   if(!_gdVaultId)       _gdVaultId=await gdFindOrCreateFolder('HumVault',null);
