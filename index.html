@@ -2320,7 +2320,14 @@ function idbOpen(){
       if(!db.objectStoreNames.contains(IDB_STORE)) db.createObjectStore(IDB_STORE);
       if(!db.objectStoreNames.contains(KV_STORE)) db.createObjectStore(KV_STORE);
     };
-    r.onsuccess=e=>{ _idbConn=e.target.result; resolve(_idbConn); };
+    // Another tab on the old version is holding the DB open — don't hang forever
+    r.onblocked=()=>{ toast('Close other Hum tabs to finish updating storage'); reject(new Error('IDB upgrade blocked by another tab')); };
+    r.onsuccess=e=>{
+      _idbConn=e.target.result;
+      // If a newer version wants to upgrade in another tab, release our connection
+      _idbConn.onversionchange=()=>{ try{ _idbConn.close(); }catch(_){} _idbConn=null; };
+      resolve(_idbConn);
+    };
     r.onerror=e=>reject(e.target.error||new Error('IDB open failed'));
   });
 }
@@ -2922,7 +2929,20 @@ async function gdPull(){
     const map=new Map(entries.map(e=>[e.id,e]));
     for(const re of remote){ const le=map.get(re.id); if(!le||re.ts>le.ts) map.set(re.id,re); }
     entries=[...map.values()].sort((a,b)=>b.ts-a.ts);
-    persist(); render(); renderHeatmap();
+    // Also pull projects, or entry.project references point at missing projects
+    try{
+      const pid=await gdFindFile('projects.json',_gdVaultId);
+      if(pid){
+        const pr=await gdFetch(`https://www.googleapis.com/drive/v3/files/${pid}?alt=media`);
+        const remoteProjects=await pr.json();
+        if(Array.isArray(remoteProjects)){
+          const pmap=new Map(projects.map(p=>[p.id,p]));
+          for(const rp of remoteProjects){ if(!pmap.has(rp.id)) pmap.set(rp.id,rp); }
+          projects=[...pmap.values()];
+        }
+      }
+    }catch(_){}
+    persist(); render(); renderHeatmap(); renderProjects();
     settings.gdLastSync=Date.now(); localStorage.setItem(ST,JSON.stringify(settings));
     updateGdStatus(); toast('Pulled from Google Drive ✓');
   }catch(e){
@@ -3680,6 +3700,10 @@ function openSaveModal(type, isNew){
   document.getElementById('transcript-status').innerHTML='';
   document.getElementById('s-transcript').value='';
   document.getElementById('s-transcript').style.display='none';
+  // also clear the auto-transcription box so a prior capture's transcript doesn't linger
+  const _tb=document.getElementById('transcript-box'); if(_tb) _tb.style.display='none';
+  const _tt=document.getElementById('transcript-text'); if(_tt) _tt.textContent='';
+  pendingTranscript=null;
   // media row: show only for new captures
   document.getElementById('modal-media-row').style.display=isNew?'':'none';
   document.getElementById('modal-rec-bar').style.display='none';
@@ -3975,6 +3999,8 @@ async function confirmSave(){
     if(entry.media.length>0) entry.mimeType=entry.media[0].mimeType;
     // Attach the auto-transcript to the audio take (per-take model reads m.transcript first)
     if(transcript){ const a=entry.media.find(m=>m.type==='audio'); if(a) a.transcript=transcript; }
+    // Attach any melody analysed in the modal so the note window's take shows it (reads m.midi)
+    if(pendingMidi&&pendingMidi.length){ const a=entry.media.find(m=>m.type==='audio'); if(a){ a.midi=pendingMidi; a.midiOriginal=JSON.parse(JSON.stringify(pendingMidi)); } }
     // Entry-level duration = first audio take's duration
     const firstAudio=entry.media.find(m=>m.type==='audio');
     if(firstAudio&&firstAudio.duration) entry.duration=firstAudio.duration;
@@ -4405,6 +4431,7 @@ function _updateCapControls(){
 }
 // ── Count-in metronome ──
 let _countInCancelled=false;
+let _countInResolve=null;      // settles the in-flight count-in promise on cancel
 function toggleCapMetro(){
   if(capRecording||capCountingIn) return;
   capCountIn=!capCountIn;
@@ -4451,9 +4478,10 @@ function _getAudioCtx(){
 }
 function _runCountIn(){
   return new Promise(resolve=>{
+    _countInResolve=resolve;
     _countInCancelled=false;
     const ctx=_getAudioCtx();
-    if(!ctx){ resolve(true); return; }
+    if(!ctx){ _countInResolve=null; resolve(true); return; }
     const beats=4, spb=60/capBpmSel, t0=ctx.currentTime+0.18;
     const btn=document.getElementById('cap-rec-btn');
     const tm=document.getElementById('cap-timer');
@@ -4470,6 +4498,7 @@ function _runCountIn(){
     }
     _metroTimers.push(setTimeout(()=>{
       if(tm) tm.classList.remove('countin');
+      _countInResolve=null;
       resolve(!_countInCancelled);
     }, Math.max(0,(t0+beats*spb-ctx.currentTime)*1000)));
   });
@@ -4485,6 +4514,8 @@ function _stopMetro(){
   // Keep _metroCtx alive (shared, gesture-unlocked) — closing re-locks iOS audio
   if(_pulseInterval){ clearInterval(_pulseInterval); _pulseInterval=null; }
   const tm=document.getElementById('cap-timer'); if(tm) tm.classList.remove('countin');
+  // Settle the awaiting count-in so toggleCapRec resumes and stops the mic stream
+  if(_countInResolve){ const r=_countInResolve; _countInResolve=null; r(false); }
 }
 
 async function toggleCapRec(){
@@ -4564,7 +4595,9 @@ async function onCapRecStop(){
   const mid=uid();
   const lockedBpm=capRecBpm; capRecBpm=null; // tempo from count-in for THIS take (null = free time)
   try{ await idbPut(mid, blob, mime); }catch(err){ toast('Could not store take: '+(err.message||'error')); return; }
-  const nextTake=Math.max(0,...(capEntry.media||[]).map(x=>x.take||0))+1;
+  // Legacy takes have no .take field but render positionally (i+1); count them so numbers don't collide
+  const audioTakes=(capEntry.media||[]).filter(x=>x.type==='audio');
+  const nextTake=Math.max(0, audioTakes.length, ...audioTakes.map(x=>x.take||0))+1;
   const mediaItem={id:mid, type:'audio', mimeType:mime, duration:dur||null, take:nextTake};
   if(lockedBpm){ mediaItem.tempoBpm=lockedBpm; mediaItem.tempoLocked=true; } // exact tempo, not estimated
   capEntry.media.push(mediaItem);
@@ -4577,9 +4610,13 @@ async function onCapRecStop(){
   }
   try{ persist(); }catch(_){ toast('Storage full'); return; }
   scheduleGdPush();
-  renderNoteTakes(); updateCapSub();
-  // Background BPM/key detection (BPM only when tempo wasn't locked by count-in)
   const target=capEntry;
+  // If the note was closed while encoding finished, surface the entry in the grid instead
+  const noteOpen=document.getElementById('capture-overlay')?.style.display!=='none';
+  if(noteOpen){ renderNoteTakes(); updateCapSub(); }
+  else { capEntry=null; curEntry=null; render(); renderProjects(); renderHeatmap(); toast('Take saved'); }
+  // Background BPM/key detection (BPM only when tempo wasn't locked by count-in).
+  // DOM writes are guarded by capEntry===target, so they no-op when the note is closed.
   if(target&&target.bpm==null&&!lockedBpm) detectBpm(blob).then(bpm=>{ if(bpm!=null&&target.bpm==null){ target.bpm=bpm; if(capEntry===target){ const el=document.getElementById('note-bpm'); if(el&&!el.value) el.value=bpm; } try{persist();}catch(_){} } }).catch(()=>{});
   if(target&&!target.key) detectKey(blob).then(key=>{ if(key&&!target.key){ target.key=key; if(capEntry===target){ const el=document.getElementById('note-key'); if(el&&!el.value) el.value=key; } try{persist();}catch(_){} } }).catch(()=>{});
 }
@@ -4962,6 +4999,8 @@ function noteMelodySnap(mid){
 function noteMelodyDelete(mid){
   const m=_findTakeMedia(mid); if(!m||!m.midi||_melSel.mid!==mid||_melSel.idx<0) return;
   m.midi.splice(_melSel.idx,1);
+  // Keep the pristine array parallel so Snap doesn't resurrect the deleted note
+  if(Array.isArray(m.midiOriginal)&&m.midiOriginal.length>_melSel.idx) m.midiOriginal.splice(_melSel.idx,1);
   if(!m.midi.length){ _melSel={mid:null,idx:-1}; }
   else { _melSel={mid, idx:Math.min(_melSel.idx, m.midi.length-1)}; }
   try{persist();}catch(_){}
@@ -5302,7 +5341,7 @@ async function expAudio(){
 }
 function dl(blob,name){ const u=URL.createObjectURL(blob),a=document.createElement('a'); a.href=u; a.download=name; a.click(); URL.revokeObjectURL(u); }
 
-function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); if(_undoTimer) clearTimeout(_undoTimer); setTimeout(()=>t.classList.remove('show'),2200); }
+function toast(msg){ const t=document.getElementById('toast'); if(_undoTimer){ clearTimeout(_undoTimer); _purgeUndo(); } /* undo UI is being replaced — commit the delete + free its media */ t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2200); }
 
 // ── Custom confirm dialog ──
 let _confirmResolve=null;
