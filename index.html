@@ -1096,6 +1096,9 @@ body {
 .note-text-area::placeholder { color: var(--ink4); font-size: 12px; }
 .note-visuals-inner { display: flex; gap: 7px; overflow-x: auto; }
 .note-visual-thumb { height: 80px; width: auto; border-radius: 8px; object-fit: cover; flex-shrink: 0; }
+.note-file-chip { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border: 1px solid var(--paper4); border-radius: 9px; background: var(--paper2); color: var(--ink2); font-family: var(--sans); font-size: 12px; text-decoration: none; max-width: 100%; }
+.note-file-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.note-file-chip:hover { border-color: var(--warm); color: var(--warm2); background: var(--warm-soft); }
 .note-attach-btn { display: flex; align-items: center; gap: 7px; width: 100%; padding: 9px 12px; border-radius: 10px; border: 1px dashed var(--paper4); background: none; color: var(--ink3); font-family: var(--sans); font-size: 12px; cursor: pointer; transition: all 0.15s; }
 .note-attach-btn:hover { border-color: var(--ink4); color: var(--ink2); }
 /* ── Note analysis blocks (transcript / chords / MIDI) ── */
@@ -1400,46 +1403,71 @@ body {
   position: absolute; top: 0; left: 0; right: 0; z-index: 2;
 }
 .cam-label { font-family: var(--sans); font-size: 14px; font-weight: 500; color: white; }
-.cam-close {
-  width: 32px; height: 32px; border-radius: 50%;
+/* 44px top buttons (close + brightness) — the close button is the only exit
+   from a fullscreen camera, it must not be an undersized target */
+.cam-top-btn {
+  width: 44px; height: 44px; border-radius: 50%;
   background: rgba(255,255,255,0.15); border: none;
   cursor: pointer; color: white;
   display: flex; align-items: center; justify-content: center;
 }
+.cam-top-btn:hover { background: rgba(255,255,255,0.25); }
 .cam-video-wrap { flex: 1; position: relative; overflow: hidden; }
 #cam-video { width: 100%; height: 100%; object-fit: cover; }
+/* exposure slider — floats over the bottom of the viewfinder */
+.cam-exp-row {
+  position: absolute; left: 18px; right: 18px; bottom: 14px;
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 14px; border-radius: 100px;
+  background: rgba(0,0,0,0.45); backdrop-filter: blur(6px);
+}
+.cam-exp-row input[type=range] { flex: 1; accent-color: var(--warm); height: 22px; }
+/* Photo | Video mode switch */
+.cam-mode-row {
+  display: flex; justify-content: center; gap: 6px;
+  padding: 10px 0 2px; background: #000;
+}
+.cam-mode-btn {
+  font-family: var(--sans); font-size: 12px; font-weight: 500; letter-spacing: 0.04em;
+  padding: 6px 16px; border-radius: 100px; border: none; cursor: pointer;
+  background: none; color: rgba(255,255,255,0.55);
+  transition: color 0.15s, background 0.15s;
+}
+.cam-mode-btn.active { color: #fff; background: rgba(255,255,255,0.16); }
 .cam-controls {
-  display: flex; align-items: center; justify-content: space-around;
-  padding: 24px 40px; padding-bottom: calc(24px + env(safe-area-inset-bottom));
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 40px; padding-bottom: calc(22px + env(safe-area-inset-bottom));
   background: #000;
 }
-.cam-controls.video-mode { justify-content: center; }
-.cam-controls.video-mode .cam-flip { display: none; }
-.cam-controls.video-mode .cam-shutter { display: none; }
+.cam-ctl-spacer { width: 44px; height: 44px; flex-shrink: 0; }
 .cam-shutter {
   width: 68px; height: 68px; border-radius: 50%;
   border: 4px solid white; background: white;
-  cursor: pointer; transition: transform 0.12s;
+  cursor: pointer; transition: transform 0.12s, background 0.2s;
   box-shadow: 0 0 0 3px rgba(255,255,255,0.3);
+  display: flex; align-items: center; justify-content: center; padding: 0;
 }
 .cam-shutter:active { transform: scale(0.92); }
-.cam-shutter.recording { background: var(--rose); border-color: var(--rose); animation: rec-pulse 1.4s ease-in-out infinite; }
-/* restored: shared by the camera shutter's recording state (was accidentally
-   dropped when #capture-btn was redesigned — that button now uses its own
-   cap-rec-ring keyframe, but cam-shutter still needs this one) */
+/* video mode: white ring with a rose core; recording: core morphs to a stop square */
+.cam-shutter-core { width: 0; height: 0; border-radius: 50%; background: var(--rose); transition: all 0.2s; }
+.cam-shutter.video-mode { background: transparent; }
+.cam-shutter.video-mode .cam-shutter-core { width: 30px; height: 30px; }
+.cam-shutter.recording { background: transparent; border-color: var(--rose); animation: rec-pulse 1.4s ease-in-out infinite; }
+.cam-shutter.recording .cam-shutter-core { width: 26px; height: 26px; border-radius: 7px; }
+/* while recording, lock the mode switch + flip out of the way */
+.cam-controls.recording .cam-flip { visibility: hidden; }
 @keyframes rec-pulse {
   0%,100% { box-shadow: 0 0 0 0 rgba(196,120,120,0.4), 0 4px 16px rgba(196,120,120,0.3); }
   50% { box-shadow: 0 0 0 14px rgba(196,120,120,0), 0 4px 20px rgba(196,120,120,0.4); }
 }
-.cam-flip, .cam-video-btn {
+.cam-flip {
   width: 44px; height: 44px; border-radius: 50%;
   background: rgba(255,255,255,0.15); border: none;
   cursor: pointer; color: white;
   display: flex; align-items: center; justify-content: center;
   transition: background 0.15s;
 }
-.cam-flip:hover, .cam-video-btn:hover { background: rgba(255,255,255,0.25); }
-.cam-video-btn.recording { background: var(--rose); }
+.cam-flip:hover { background: rgba(255,255,255,0.25); }
 .cam-rec-timer {
   position: absolute; top: 60px; left: 50%; transform: translateX(-50%);
   background: rgba(0,0,0,0.5); color: white; padding: 4px 12px;
@@ -2185,23 +2213,35 @@ audio { display: none; }
   <div class="cam-card">
     <div class="cam-top">
       <span class="cam-label">Camera</span>
-      <button class="cam-close" onclick="closeCamera()">
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg>
-      </button>
+      <div style="display:flex;gap:10px">
+        <button class="cam-top-btn" id="cam-exp-toggle" onclick="toggleCamExposure()" aria-label="Brightness" title="Brightness">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2.5M12 19.5V22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M2 12h2.5M19.5 12H22M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></svg>
+        </button>
+        <button class="cam-top-btn" onclick="closeCamera()" aria-label="Close camera">
+          <svg width="15" height="15" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg>
+        </button>
+      </div>
     </div>
     <div class="cam-video-wrap">
       <video id="cam-video" autoplay playsinline muted></video>
       <canvas id="cam-canvas" style="display:none"></canvas>
       <div class="cam-rec-timer" id="cam-rec-timer">● 0:00</div>
+      <div class="cam-exp-row" id="cam-exp-row" style="display:none">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.6)" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/></svg>
+        <input type="range" id="cam-exp-slider" min="-1" max="1" step="0.05" value="0" oninput="setCamExposure(parseFloat(this.value))" aria-label="Exposure">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M5 5l1.5 1.5M17.5 17.5L19 19M3 12h2M19 12h2M5 19l1.5-1.5M17.5 6.5L19 5"/></svg>
+      </div>
+    </div>
+    <div class="cam-mode-row" id="cam-mode-row">
+      <button class="cam-mode-btn active" id="cam-mode-photo" onclick="setCamMode('photo')">Photo</button>
+      <button class="cam-mode-btn" id="cam-mode-video" onclick="setCamMode('video')">Video</button>
     </div>
     <div class="cam-controls">
-      <button class="cam-flip" onclick="flipCamera()" title="Flip camera">
+      <button class="cam-flip" onclick="flipCamera()" aria-label="Flip camera" title="Flip camera">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M1 4v6h6M23 20v-6h-6"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10M23 14l-4.64 4.36A9 9 0 013.51 15"/></svg>
       </button>
-      <button class="cam-shutter" onclick="shootPhoto()"></button>
-      <button class="cam-video-btn" id="cam-vid-btn" onclick="toggleCamVideo()" title="Record video">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="2" y="6" width="13" height="12" rx="2"/><path d="M22 8l-5 4 5 4V8"/></svg>
-      </button>
+      <button class="cam-shutter" id="cam-shutter" onclick="camShutterTap()" aria-label="Shutter"><span class="cam-shutter-core" id="cam-shutter-core"></span></button>
+      <div class="cam-ctl-spacer" aria-hidden="true"></div>
     </div>
   </div>
 </div>
@@ -2275,8 +2315,9 @@ audio { display: none; }
         <div id="note-visuals-inner" class="note-visuals-inner"></div>
       </div>
       <div style="display:flex;gap:8px">
-        <button class="note-attach-btn" style="flex:1" onclick="noteOpenCamera()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>Camera</button>
-        <button class="note-attach-btn" style="flex:1" onclick="noteAttach()"><svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 1v10M1 6h10"/></svg>Photo, video or file</button>
+        <button class="note-attach-btn" style="flex:1" onclick="noteOpenCamera()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8.5A1.5 1.5 0 014.5 7H8l1.2-2h5.6L16 7h3.5A1.5 1.5 0 0121 8.5v9A1.5 1.5 0 0119.5 19h-15A1.5 1.5 0 013 17.5z"/><circle cx="12" cy="12.5" r="3.4"/></svg>Camera</button>
+        <button class="note-attach-btn" style="flex:1" onclick="noteAttach('gallery')"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M4 15.5l3.8-3.8a1.6 1.6 0 012.3 0l2 2"/><path d="M12 15.7l2.1-2.1a1.6 1.6 0 012.3 0l3.6 3.6"/><circle cx="9" cy="9" r="1.3" fill="currentColor" stroke="none"/></svg>Gallery</button>
+        <button class="note-attach-btn" style="flex:1" onclick="noteAttach('file')"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3.5h7l4 4V19a1.5 1.5 0 01-1.5 1.5h-9A1.5 1.5 0 016 19V5A1.5 1.5 0 017 3.5z"/><path d="M14 3.5V7a1 1 0 001 1h3.3"/><path d="M9.3 13h5.4M9.3 15.8h5.4"/></svg>File</button>
       </div>
     </div>
     <!-- ── FIXED FOOTER ── -->
@@ -3788,7 +3829,6 @@ async function modalGenerateMidi(){
   }
 }
 
-let camPendingVideoMode=false;
 
 function openFile(accept){ const f=document.getElementById('file-in'); f.accept=accept; f.click(); }
 function handleFile(input){
@@ -4237,14 +4277,16 @@ function _purgeUndo(){
 }
 
 // Shared helper: store a blob as a new media item on an existing entry
-async function _attachBlobToEntry(entryId, blob, mimeType, mediaType, duration){
+async function _attachBlobToEntry(entryId, blob, mimeType, mediaType, duration, name){
   const idx=entries.findIndex(x=>x.id===entryId); if(idx<0) return;
   const mid=uid();
   try{
     await idbPut(mid, blob, mimeType);
     const e=entries[idx];
     if(!e.media) e.media=[];
-    e.media.push({id:mid, type:mediaType, mimeType, duration:duration||null});
+    const item={id:mid, type:mediaType, mimeType, duration:duration||null};
+    if(name) item.name=name; // original filename — shown on generic 'file' chips
+    e.media.push(item);
     e.hasMedia=true;
     try{ persist(); }catch(_){}
     scheduleGdPush();
@@ -4816,16 +4858,22 @@ function renderNoteVisuals(){
   // Support legacy entries
   const allMedia=capEntry.media||((capEntry.hasMedia||capEntry.data)?[{id:capEntry.id,type:capEntry.type==='photo'?'photo':capEntry.type==='video'?'video':'audio',mimeType:capEntry.mimeType||'',duration:capEntry.duration||null}]:[]);
   const vis=allMedia.filter(m=>m.type==='photo'||m.type==='video');
-  if(!vis.length){ section.style.display='none'; return; }
+  const files=allMedia.filter(m=>m.type==='file');
+  if(!vis.length&&!files.length){ section.style.display='none'; return; }
   section.style.display='';
   inner.innerHTML=vis.map(m=>m.type==='photo'
     ?`<img data-mid="${m.id}" class="note-visual-thumb" alt="">`
-    :`<video data-mid="${m.id}" class="note-visual-thumb" muted playsinline></video>`).join('');
+    :`<video data-mid="${m.id}" class="note-visual-thumb" muted playsinline></video>`).join('')
+  + files.map(m=>`<a class="note-file-chip" data-mid="${m.id}" download="${escHtml(m.name||'file')}" title="Download">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3.5h7l4 4V19a1.5 1.5 0 01-1.5 1.5h-9A1.5 1.5 0 016 19V5A1.5 1.5 0 017 3.5z"/><path d="M14 3.5V7a1 1 0 001 1h3.3"/></svg>
+      <span>${escHtml(m.name||'Attached file')}</span></a>`).join('');
   (async()=>{
-    for(const m of vis){
+    for(const m of [...vis,...files]){
       let url=(typeof capEntry.data==='string'&&capEntry.data.startsWith('data:')&&m.id===capEntry.id)?capEntry.data:await getMediaUrl(m.id);
       if(!url) continue;
-      const el=inner.querySelector(`[data-mid="${m.id}"]`); if(el) el.src=url;
+      const el=inner.querySelector(`[data-mid="${m.id}"]`);
+      if(!el) continue;
+      if(m.type==='file') el.href=url; else el.src=url;
     }
   })();
 }
@@ -5023,7 +5071,10 @@ async function noteDelete(){
   if(!ok) return;
   delEntry(capEntry.id); closeNote();
 }
-function noteAttach(){
+// kind: 'gallery' → photos/videos from the OS library; 'file' → any file type.
+// Two distinct entry points (was one bundled "+" button) so the intent is
+// visible up front and the OS opens the right picker.
+function noteAttach(kind){
   if(!capEntry){
     // Create an empty entry on the fly so attach has a target.
     // If user cancels the file picker, closeNote() will clean it up.
@@ -5039,7 +5090,9 @@ function noteAttach(){
     try{persist();}catch(_){}
   }
   attachTargetId=capEntry.id;
-  document.getElementById('attach-in').click();
+  const inp=document.getElementById('attach-in');
+  inp.accept = kind==='gallery' ? 'image/*,video/*' : 'image/*,video/*,audio/*,.txt,.md,.markdown,.pdf,.mid,.midi,.musicxml,.xml,.zip';
+  inp.click();
 }
 // In-app camera (flip/shutter/video-record) — an alternative to the OS file
 // picker above. shootPhoto()/startCamVideo()'s onstop already attach to
@@ -5059,7 +5112,7 @@ function noteOpenCamera(){
     try{persist();}catch(_){}
   }
   curEntry=capEntry;
-  cameraReturnMode=null; camPendingVideoMode=false;
+  cameraReturnMode=null;
   openCamera();
 }
 function toggleNoteExpPop(e){
@@ -5087,14 +5140,18 @@ async function handleAttach(input){
     render(); openDetail(tid); toast('Text added to note');
     return;
   }
-  // Media files → store in IDB
-  const mediaType=mime.startsWith('image')?'photo':mime.startsWith('video')?'video':'audio';
-  await _attachBlobToEntry(tid, file, mime, mediaType);
+  // Media files → store in IDB. Unknown types become generic 'file' attachments
+  // (chip with a download link in the note) rather than masquerading as audio.
+  const mediaType=mime.startsWith('image')?'photo':mime.startsWith('video')?'video':mime.startsWith('audio')?'audio':'file';
+  await _attachBlobToEntry(tid, file, mime, mediaType, null, file.name);
 }
 
 // ── CAMERA ──
 let camStream=null, camFacing='environment', camMR=null, camChunks=[], camSec=0, camTimer=null;
 
+let camMode='photo';        // 'photo' | 'video'
+let camExposure=0;          // slider value −1..+1
+let camExpNative=false;     // true = hardware exposureCompensation is applying it
 async function openCamera(){
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ toast('Camera not available'); return; }
   document.getElementById('cam-overlay').classList.add('show');
@@ -5102,41 +5159,85 @@ async function openCamera(){
 }
 async function startCamStream(){
   if(camStream) camStream.getTracks().forEach(t=>t.stop());
+  // 1080p ideal: sharp enough for socials, far smaller files than 4K sensors default to
+  const videoC={facingMode:camFacing, width:{ideal:1920}, height:{ideal:1080}, frameRate:{ideal:30}};
   try{
     // Request video+audio together — iOS Safari requires single getUserMedia call for MediaRecorder
-    camStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:camFacing},audio:true});
+    camStream=await navigator.mediaDevices.getUserMedia({video:videoC,audio:true});
   }catch(e){
     // Fall back to video-only if mic denied
-    try{ camStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:camFacing},audio:false}); }
+    try{ camStream=await navigator.mediaDevices.getUserMedia({video:videoC,audio:false}); }
     catch(e2){ toast('Camera access denied'); closeCamera(); return; }
   }
   const vid=document.getElementById('cam-video');
   vid.srcObject=camStream;
-  if(camPendingVideoMode){
-    camPendingVideoMode=false;
-    vid.onloadedmetadata=()=>{ vid.onloadedmetadata=null; toggleCamVideo(); };
-  }
+  applyCamExposure(); // re-apply current exposure to the fresh track (flip keeps the setting)
 }
 function closeCamera(){
-  camPendingVideoMode=false;
   if(camStream) camStream.getTracks().forEach(t=>t.stop());
   camStream=null;
   if(camMR&&camMR.state==='recording'){ camMR.stop(); clearInterval(camTimer); }
   camMR=null; camChunks=[];
   document.getElementById('cam-overlay').classList.remove('show');
   document.getElementById('cam-rec-timer').classList.remove('show');
-  document.getElementById('cam-video').srcObject=null;
+  const vid=document.getElementById('cam-video');
+  vid.srcObject=null; vid.style.filter='';
 }
 async function flipCamera(){
   camFacing=camFacing==='environment'?'user':'environment';
   await startCamStream();
 }
+// ── Mode switch (Photo | Video) ──
+function setCamMode(m){
+  if(camMR&&camMR.state==='recording') return; // locked while recording
+  camMode=m;
+  document.getElementById('cam-mode-photo').classList.toggle('active', m==='photo');
+  document.getElementById('cam-mode-video').classList.toggle('active', m==='video');
+  document.getElementById('cam-shutter').classList.toggle('video-mode', m==='video');
+}
+function camShutterTap(){
+  if(camMode==='photo') shootPhoto();
+  else toggleCamVideo();
+}
+// ── Exposure (brightness) ──
+function toggleCamExposure(){
+  const row=document.getElementById('cam-exp-row');
+  row.style.display = row.style.display==='none' ? 'flex' : 'none';
+}
+function setCamExposure(v){ camExposure=v; applyCamExposure(); }
+function applyCamExposure(){
+  camExpNative=false;
+  const vid=document.getElementById('cam-video');
+  const track=camStream?.getVideoTracks?.()[0];
+  // Prefer real sensor exposure compensation (applies to photos AND recorded video)
+  try{
+    const caps=track&&track.getCapabilities&&track.getCapabilities();
+    if(caps&&caps.exposureCompensation&&caps.exposureCompensation.max>caps.exposureCompensation.min){
+      const c=caps.exposureCompensation;
+      const val=camExposure>=0 ? camExposure*c.max : -camExposure*c.min;
+      track.applyConstraints({advanced:[{exposureCompensation: val}]}).then(()=>{ vid.style.filter=''; }).catch(()=>{});
+      camExpNative=true;
+      return;
+    }
+  }catch(_){}
+  // Fallback (iOS Safari etc.): brighten the preview via CSS; shootPhoto() bakes
+  // the same brightness into the captured frame. Recorded video can't be baked
+  // this way — the preview filter is a framing aid only in fallback mode.
+  vid.style.filter = camExposure===0 ? '' : `brightness(${(1+0.45*camExposure).toFixed(2)})`;
+}
 async function shootPhoto(){
   const video=document.getElementById('cam-video');
   const canvas=document.getElementById('cam-canvas');
-  canvas.width=video.videoWidth; canvas.height=video.videoHeight;
-  canvas.getContext('2d').drawImage(video,0,0);
-  const dataUrl=canvas.toDataURL('image/jpeg',0.9);
+  // Downscale to ≤2048px long edge + JPEG 0.85 — crisp for socials, ~5-10× smaller than raw sensor frames
+  const MAXE=2048;
+  const vw=video.videoWidth, vh=video.videoHeight;
+  const scale=Math.min(1, MAXE/Math.max(vw,vh));
+  canvas.width=Math.round(vw*scale); canvas.height=Math.round(vh*scale);
+  const ctx=canvas.getContext('2d');
+  if(!camExpNative&&camExposure!==0) ctx.filter=`brightness(${(1+0.45*camExposure).toFixed(2)})`;
+  ctx.drawImage(video,0,0,canvas.width,canvas.height);
+  ctx.filter='none';
+  const dataUrl=canvas.toDataURL('image/jpeg',0.85);
   closeCamera();
   // If detail panel is open and camera wasn't launched from save modal → attach to entry
   if(curEntry && !cameraReturnMode && !document.getElementById('save-overlay').classList.contains('show')){
@@ -5174,10 +5275,13 @@ async function startCamVideo(){
     'video/webm',
     ''
   ];
+  // ~6 Mbps video / 128 kbps audio: 1080p that looks clean on socials at
+  // roughly 45 MB/min instead of the platform default (often 2-4× larger)
+  const recOpts={videoBitsPerSecond:6_000_000, audioBitsPerSecond:128_000};
   let mr=null;
   for(const mt of mimeTypes){
     if(mt && typeof MediaRecorder.isTypeSupported==='function' && !MediaRecorder.isTypeSupported(mt)) continue;
-    try{ mr=new MediaRecorder(camStream,mt?{mimeType:mt}:{}); break; }catch(_){}
+    try{ mr=new MediaRecorder(camStream, mt?{...recOpts,mimeType:mt}:recOpts); break; }catch(_){}
   }
   if(!mr){ toast('Video recording not supported on this device'); return; }
   camMR=mr;
@@ -5204,10 +5308,9 @@ async function startCamVideo(){
     cameraReturnMode=null;
   };
   camMR.start(500); // collect data every 500ms
-  document.getElementById('cam-vid-btn').classList.add('recording');
-  // Video mode: hide flip+shutter, center stop button
-  const controls=document.querySelector('.cam-controls');
-  if(controls) controls.classList.add('video-mode');
+  document.getElementById('cam-shutter').classList.add('recording');
+  document.querySelector('.cam-controls')?.classList.add('recording');
+  const modeRow=document.getElementById('cam-mode-row'); if(modeRow) modeRow.style.visibility='hidden';
   const timer=document.getElementById('cam-rec-timer');
   timer.classList.add('show');
   camTimer=setInterval(()=>{ camSec++; timer.textContent='● '+fmtDur(camSec); },1000);
@@ -5215,10 +5318,9 @@ async function startCamVideo(){
 function stopCamVideo(){
   if(camMR&&camMR.state==='recording') camMR.stop();
   clearInterval(camTimer);
-  const btn=document.getElementById('cam-vid-btn');
-  if(btn) btn.classList.remove('recording');
-  const controls=document.querySelector('.cam-controls');
-  if(controls) controls.classList.remove('video-mode');
+  document.getElementById('cam-shutter')?.classList.remove('recording');
+  document.querySelector('.cam-controls')?.classList.remove('recording');
+  const modeRow=document.getElementById('cam-mode-row'); if(modeRow) modeRow.style.visibility='';
   const timer=document.getElementById('cam-rec-timer');
   if(timer) timer.classList.remove('show');
 }
