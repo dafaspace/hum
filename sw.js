@@ -1,7 +1,7 @@
 // Hum service worker — offline cache + auto-update.
 // Registered from index.html as ./sw.js (must be a real same-origin file:
 // browsers reject blob:/data: service worker script URLs).
-const CACHE = 'hum-v8-2';
+const CACHE = 'hum-v9';
 
 self.addEventListener('install', () => self.skipWaiting());
 
