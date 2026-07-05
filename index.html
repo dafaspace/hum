@@ -1388,7 +1388,7 @@ body {
 
 /* ── CAMERA ── */
 #cam-overlay {
-  position: fixed; inset: 0; z-index: 120;
+  position: fixed; inset: 0; z-index: 135; /* above #capture-overlay (130) — camera opens on top of the note window */
   background: #000;
   display: none; flex-direction: column;
 }
@@ -2322,7 +2322,10 @@ audio { display: none; }
       <div id="note-visuals-section" class="note-section" style="display:none">
         <div id="note-visuals-inner" class="note-visuals-inner"></div>
       </div>
-      <button class="note-attach-btn" onclick="noteAttach()"><svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 1v10M1 6h10"/></svg>Photo, video or file</button>
+      <div style="display:flex;gap:8px">
+        <button class="note-attach-btn" style="flex:1" onclick="noteOpenCamera()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>Camera</button>
+        <button class="note-attach-btn" style="flex:1" onclick="noteAttach()"><svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 1v10M1 6h10"/></svg>Photo, video or file</button>
+      </div>
     </div>
     <!-- ── FIXED FOOTER ── -->
     <div id="cap-rec-area">
@@ -5328,6 +5331,27 @@ function noteAttach(){
   attachTargetId=capEntry.id;
   document.getElementById('attach-in').click();
 }
+// In-app camera (flip/shutter/video-record) — an alternative to the OS file
+// picker above. shootPhoto()/startCamVideo()'s onstop already attach to
+// `curEntry` when no legacy save-modal is open, so this only needs to make
+// sure a target entry + curEntry exist, then open the camera directly.
+function noteOpenCamera(){
+  if(!capEntry){
+    capEntry={ id:uid(), ts:Date.now(), type:'idea', name:capPendingName||null, project:capProject||null,
+      note:capPendingFields.note||'', tags:capPendingFields.tags||[], bpm:capPendingFields.bpm||null,
+      key:capPendingFields.key||'', status:capPendingFields.status||'raw',
+      mood:null, genre:null, duration:null, transcript:null, media:[], hasMedia:false };
+    capPendingFields={};
+    entries.unshift(capEntry);
+    curEntry=capEntry;
+    const expBtn=document.getElementById('note-exp-btn'); if(expBtn) expBtn.style.display='';
+    const delBtn=document.getElementById('note-del-btn'); if(delBtn) delBtn.style.display='';
+    try{persist();}catch(_){}
+  }
+  curEntry=capEntry;
+  cameraReturnMode=null; camPendingVideoMode=false;
+  openCamera();
+}
 function toggleNoteExpPop(e){
   if(e) e.stopPropagation();
   const pop=document.getElementById('note-exp-pop');
@@ -6959,7 +6983,11 @@ wireCaptureButton(document.getElementById('mob-fab'));
 // closeNote() already stops/saves an active recording and releases the mic
 // during count-in (see above) — cancelRecording() is the old modal-audio path
 // and doesn't touch the real capture state, so it was a no-op here.
-document.addEventListener('keydown',e=>{ if(e.key==='Escape'){closeNote();closeSave();closeProjModal();closeSettings();closeAbout();} });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){
+  // Camera can open on top of the note window — close just the topmost layer first
+  if(document.getElementById('cam-overlay').classList.contains('show')){ closeCamera(); return; }
+  closeNote();closeSave();closeProjModal();closeSettings();closeAbout();
+} });
 document.addEventListener('click',e=>{ const pop=document.getElementById('exp-pop'); if(pop&&pop.classList.contains('open')&&!pop.closest('.exp-pop-wrap').contains(e.target)) closeExpPop(); });
 // Never lose debounced edits when the tab is backgrounded or closed (esp. iOS)
 window.addEventListener('pagehide', persistFlush);
