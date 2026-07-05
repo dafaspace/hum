@@ -1788,25 +1788,6 @@ audio { display: none; }
 </div>
 
 <!-- RECORDING -->
-<div id="rec-overlay">
-  <div class="rec-card">
-    <div class="rec-label">Listening</div>
-    <div class="rec-sub">Capture in progress</div>
-    <div class="rec-waves">
-      <div class="rwave" style="height:8px"></div>
-      <div class="rwave" style="height:18px"></div>
-      <div class="rwave" style="height:30px"></div>
-      <div class="rwave" style="height:14px"></div>
-      <div class="rwave" style="height:38px"></div>
-      <div class="rwave" style="height:22px"></div>
-      <div class="rwave" style="height:10px"></div>
-    </div>
-    <div class="rec-time" id="rec-time">0:00</div>
-    <button class="rec-stop" onclick="stopRecording()"><div class="rec-stop-sq"></div></button>
-    <button class="rec-cancel" onclick="cancelRecording()">cancel</button>
-  </div>
-</div>
-
 <!-- SAVE -->
 <div id="save-overlay">
   <div class="save-card">
@@ -2049,34 +2030,6 @@ audio { display: none; }
 </div>
 
 <!-- DETAIL -->
-<div id="detail">
-  <div class="detail-top">
-    <div id="detail-pill" class="type-pill">—</div>
-    <div style="flex:1"></div>
-    <button class="detail-hbtn" id="d-edit-btn" onclick="if(curEntry)editEntry(curEntry.id)" title="Edit">
-      <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2l2 2-6.5 6.5L2 11l.5-2.5L9 2z"/></svg>
-    </button>
-    <div class="exp-pop-wrap">
-      <button class="detail-hbtn" id="d-exp-btn" onclick="toggleExpPop(event)" title="Export">
-        <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 1v7M3.5 4l3-3 3 3"/><path d="M2 9v2.5h9V9"/></svg>
-      </button>
-      <div class="exp-pop" id="exp-pop">
-        <button class="exp-pop-item" onclick="expTxt();closeExpPop()">TXT</button>
-        <button class="exp-pop-item" onclick="expMd();closeExpPop()">MD</button>
-        <button class="exp-pop-item" onclick="expJson();closeExpPop()">JSON</button>
-        <button class="exp-pop-item" onclick="expAudio();closeExpPop()">Audio file</button>
-      </div>
-    </div>
-    <button class="detail-hbtn danger" id="d-del-btn" onclick="if(curEntry)deleteEntryWithConfirm(curEntry.id)" title="Delete">
-      <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3.5h9M5 3.5V2h3v1.5"/><path d="M3.5 3.5l.7 7h4.6l.7-7"/><line x1="5.5" y1="5.5" x2="5.5" y2="9"/><line x1="7.5" y1="5.5" x2="7.5" y2="9"/></svg>
-    </button>
-    <button class="detail-close" onclick="closeDetail()" title="Close">
-      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 2l8 8M10 2l-8 8"/></svg>
-    </button>
-  </div>
-  <div class="detail-body" id="detail-body"></div>
-</div>
-
 <div id="sidebar-backdrop" onclick="closeSidebar()"></div>
 <!-- SETTINGS -->
 <div id="settings-overlay">
@@ -2266,7 +2219,6 @@ audio { display: none; }
 </div>
 
 <div id="toast" role="status" aria-live="polite"></div>
-<div id="hm-tooltip" class="hm-tooltip"></div>
 <input type="file" id="file-in" style="display:none" onchange="handleFile(this)">
 <input type="file" id="attach-in" accept="image/*,video/*,audio/*,.txt,.md,.markdown" style="display:none" onchange="handleAttach(this)">
 
@@ -2349,18 +2301,6 @@ audio { display: none; }
   </div>
 </div>
 
-
-<div id="attach-rec" style="display:none;position:fixed;inset:0;z-index:120;background:var(--backdrop);align-items:center;justify-content:center" onclick="if(event.target===this)cancelAttachRec()">
-  <div id="attach-rec-card">
-    <div style="font-family:var(--serif);font-size:19px;color:var(--ink)">Record audio</div>
-    <div style="font-size:12px;color:var(--ink3);margin-top:3px">Adds a new take to this note</div>
-    <div id="attach-rec-timer" style="font-family:var(--sans);font-size:34px;font-weight:300;color:var(--ink);margin:22px 0;font-variant-numeric:tabular-nums">0:00</div>
-    <div style="display:flex;gap:10px;justify-content:center">
-      <button id="attach-rec-btn" class="attach-rec-btn go" onclick="toggleAttachRec()">Record</button>
-      <button class="attach-rec-btn ghost" onclick="cancelAttachRec()">Cancel</button>
-    </div>
-  </div>
-</div>
 
 <script>
 const DB='hum_entries', PJ='hum_projects', LV='hum_layout', ST='hum_settings';
@@ -3561,14 +3501,6 @@ function typeIconSvg(t){
 let cameraReturnMode=null; // 'photo'|'video'|null — camera was opened from modal
 let modalRecording=false, modalRecInterval=null, modalRecSec=0, modalRecStream=null;
 
-function openNewCapture(){
-  pendingMediaList=[]; pendingBlob=null; pendingDataUrl=null; pendingVideoBlob=null; pendingTranscript=null; pendingChords=null; pendingMidi=null; pendingMelody=null; pendingMelodyOriginal=null;
-  cameraReturnMode=null;
-  openSaveModal('idea', true);
-}
-
-function handleCapture(){ openNewCapture(); } // legacy alias
-
 // ── INLINE AUDIO RECORDING (in modal) ──
 async function toggleModalAudio(){
   if(modalRecording){ stopModalAudio(); return; }
@@ -3856,13 +3788,7 @@ async function modalGenerateMidi(){
   }
 }
 
-// ── CAMERA FROM MODAL ──
 let camPendingVideoMode=false;
-function openCameraForModal(mode){
-  cameraReturnMode=mode;
-  camPendingVideoMode=(mode==='video');
-  openCamera();
-}
 
 function openFile(accept){ const f=document.getElementById('file-in'); f.accept=accept; f.click(); }
 function handleFile(input){
@@ -3934,13 +3860,6 @@ function openSaveModal(type, isNew){
 }
 
 // Legacy — kept for compatibility (old rec-overlay not used in new flow)
-function startRecording(){ openNewCapture(); }
-function stopRecording(){ stopModalAudio(); }
-function cancelRecording(){
-  cancelModalAudio();
-  document.getElementById('rec-overlay').classList.remove('show');
-}
-
 function closeSave(){
   if(modalRecording) cancelModalAudio();
   document.getElementById('save-overlay').classList.remove('show');
@@ -4238,126 +4157,6 @@ function blobToDataUrl(b){ return new Promise(r=>{ const fr=new FileReader(); fr
 
 // ── DETAIL ──
 function openDetail(id){ openNote(id); }
-function _openDetailLegacy(id){
-  const e=entries.find(x=>x.id===id); if(!e) return;
-  curEntry=e;
-  const panel=document.getElementById('detail');
-  const body=document.getElementById('detail-body');
-  const pill=document.getElementById('detail-pill');
-  pill.innerHTML=typeIconSvg(e.type)+(e.type);
-  pill.className=`type-pill tp-${e.type}`;
-  let h=`<div class="detail-title">${escHtml(e.name||autoTitle(e))}</div><div class="detail-date">${fmtDate(e.ts)}</div>`;
-  // Build media items list (new model or legacy fallback)
-  const mediaItems=e.media||(e.hasMedia||e.data?[{id:e.id,type:e.type==='photo'?'photo':e.type==='video'?'video':'audio',mimeType:e.mimeType||'',duration:e.duration||null}]:[]);
-  if(mediaItems.length){
-    let mh='';
-    let audioIdx=0;
-    for(const m of mediaItems){
-      const mid=m.id;
-      if(m.type==='audio'){
-        const bars=audioIdx===0?waveformBars(e,44,36,'pwbar',';flex:1;max-width:7px'):waveformBars({id:mid,waveform:null},44,36,'pwbar',';flex:1;max-width:7px');
-        mh+=`<div class="detail-player"${audioIdx>0?' style="margin-top:8px"':''}>
-          <audio id="da-${mid}" data-mid="${mid}"></audio>
-          <div class="player-wave">${bars}</div>
-          <div class="player-row">
-            <button class="play-btn2" id="play-${mid}" onclick="togglePlay('${mid}')"><svg viewBox="0 0 12 12"><polygon points="2,1 11,6 2,11"/></svg></button>
-            <div class="player-prog" onclick="seekA(event,'${mid}')"><div class="player-fill" id="pfill-${mid}"></div></div>
-            <span class="player-t" id="ptim-${mid}">${m.duration?fmtDur(m.duration):'—'}</span>
-            <button id="spd-${mid}" onclick="cycleSpeed('${mid}')" style="font-size:10px;font-family:var(--sans);font-weight:600;color:var(--ink2);background:none;border:1px solid var(--paper4);border-radius:4px;padding:1px 5px;cursor:pointer;min-width:32px;white-space:nowrap">1×</button>
-          </div>
-        </div>`;
-        audioIdx++;
-      } else if(m.type==='photo'){
-        mh+=`<img data-mid="${mid}" style="width:100%;border-radius:14px;display:block${mh?';margin-top:8px':''}">`;
-      } else if(m.type==='video'){
-        mh+=`<video data-mid="${mid}" controls playsinline style="width:100%;border-radius:14px;background:#111;display:block${mh?';margin-top:8px':''}"></video>`;
-      }
-    }
-    const secLabel=mediaItems.length>1?`Media (${mediaItems.length})`:(mediaItems[0].type==='audio'?'Recording':mediaItems[0].type==='photo'?'Photo':'Video');
-    h+=`<div class="dsec"><span class="dsec-label">${secLabel}</span>${mh}</div>`;
-  }
-  // Chord section — only for entries with audio
-  const hasAudio=mediaItems.some(m=>m.type==='audio')||(e.type==='audio'&&(e.hasMedia||e.data));
-  if(hasAudio){
-    const chordHeader=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-      <span class="dsec-label" style="margin-bottom:0">Chords</span>
-      <div style="display:flex;gap:6px;align-items:center">
-        ${e.chords?.length?`<button class="chord-analyse-btn" onclick="copyChords('${e.id}')">Copy</button>`:''}
-        <button class="chord-analyse-btn" id="chord-btn-${e.id}" onclick="runChordAnalysis('${e.id}')">Analyse</button>
-      </div>
-    </div>`;
-    const chordBody=e.chords?.length
-      ? `<div class="chord-pills">${e.chords.map((c,i)=>`<div class="chord-pill" onclick="seekToChord('${e.id}',${c.t})"><span class="chord-pill-name">${escHtml(c.chord)}</span><span class="chord-pill-t">${fmtDur(Math.floor(c.t))}</span></div>`).join('')}</div>`
-      : `<div style="font-size:12px;color:var(--ink3)">Press Analyse to detect chords</div>`;
-    h+=`<div class="dsec">${chordHeader}${chordBody}</div>`;
-  }
-  // MIDI section — only for audio entries
-  if(hasAudio){
-    const hasMidi=Array.isArray(e.midi)&&e.midi.length>0;
-    const midiHeader=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-      <span class="dsec-label" style="margin-bottom:0">MIDI</span>
-      <div style="display:flex;gap:6px;align-items:center">
-        ${hasMidi?`<button class="chord-analyse-btn" onclick="downloadMidi('${e.id}')">Download .mid</button>`:''}
-        <button class="chord-analyse-btn" id="midi-btn-${e.id}" onclick="runMidiGeneration('${e.id}')">${hasMidi?'Re-analyse':'Generate MIDI'}</button>
-      </div>
-    </div>`;
-    let midiBody;
-    if(hasMidi){
-      const lo=Math.min(...e.midi.map(n=>n.p));
-      const hi=Math.max(...e.midi.map(n=>n.p));
-      const lastEnd=Math.max(...e.midi.map(n=>n.t+n.d));
-      midiBody=`<div class="midi-info">
-        <div class="midi-info-cell"><div class="midi-info-k">Notes</div><div class="midi-info-v">${e.midi.length}</div></div>
-        <div class="midi-info-cell"><div class="midi-info-k">Range</div><div class="midi-info-v">${midiToNoteName(lo)}–${midiToNoteName(hi)}</div></div>
-        <div class="midi-info-cell"><div class="midi-info-k">Length</div><div class="midi-info-v">${fmtDur(Math.ceil(lastEnd))}</div></div>
-      </div><div id="midi-status-${e.id}"></div>`;
-    } else {
-      midiBody=`<div id="midi-status-${e.id}" style="font-size:12px;color:var(--ink3)">Press Generate to extract notes from audio</div>
-        <div class="midi-warn">First run downloads ~10 MB (basic-pitch model + TensorFlow.js). Subsequent runs are instant — model is cached.</div>`;
-    }
-    h+=`<div class="dsec">${midiHeader}${midiBody}</div>`;
-  }
-  if(e.transcript) h+=`<div class="dsec"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><span class="dsec-label" style="margin-bottom:0">Transcript</span><button onclick="navigator.clipboard.writeText(${JSON.stringify(e.transcript)}).then(()=>toast('Copied'))" style="font-size:11px;padding:3px 9px;border-radius:6px;border:1px solid var(--paper4);background:var(--paper2);color:var(--ink2);cursor:pointer;font-family:var(--sans)">Copy</button></div><div class="detail-text">${escHtml(e.transcript)}</div></div>`;
-  if(e.note||e.text) h+=`<div class="dsec"><span class="dsec-label">Note</span><div class="detail-text">${escHtml(e.note||e.text)}</div></div>`;
-  const metas=[];
-  const proj=projects.find(p=>p.id===e.project);
-  if(proj) metas.push(['Project',proj.name]);
-  if(e.bpm) metas.push(['BPM',e.bpm]);
-  if(e.key) metas.push(['Key',e.key]);
-  if(e.status) metas.push(['Status',{raw:'Sketch',dev:'In progress',done:'Done',archived:'Archived'}[e.status]||e.status]);
-  if(e.duration) metas.push(['Duration',fmtDur(e.duration)]);
-  if(metas.length) h+=`<div class="dsec"><span class="dsec-label">Details</span><div class="meta-grid">${metas.map(([k,v])=>`<div class="meta-cell"><div class="meta-k">${k}</div><div class="meta-v">${escHtml(String(v))}</div></div>`).join('')}</div></div>`;
-  if(e.tags&&e.tags.length) h+=`<div class="dsec"><span class="dsec-label">Tags</span><div class="dtags">${e.tags.map(t=>`<span class="card-tag">#${escHtml(t)}</span>`).join('')}</div></div>`;
-  // Add media — opens a small menu: in-app recorder, or OS picker (photo/video/file)
-  h+=`<div class="detail-add-wrap">
-    <button class="detail-add-media" onclick="toggleAddMenu(event)">
-      <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 1v10M1 6h10"/></svg>
-      Add media
-    </button>
-    <div class="add-menu" id="add-menu" style="display:none">
-      <button onclick="recordToEntry('${e.id}')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0014 0"/><line x1="12" y1="17" x2="12" y2="21"/><line x1="8" y1="21" x2="16" y2="21"/></svg>Record audio</button>
-      <button onclick="attachToEntry('${e.id}')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>Photo, video or file</button>
-    </div>
-  </div>`;
-  body.innerHTML=h; panel.classList.add('open'); _detailSpeedIdx={}; updateFab();
-  // Populate media src from IDB for each media item
-  (async()=>{
-    const items=e.media||(e.hasMedia||e.data?[{id:e.id,type:e.type==='photo'?'photo':e.type==='video'?'video':'audio',mimeType:e.mimeType}]:[]);
-    for(const m of items){
-      let url=null;
-      if(typeof e.data==='string'&&e.data.startsWith('data:')&&m.id===e.id){
-        url=e.data; // legacy base64
-      } else {
-        url=await getMediaUrl(m.id);
-      }
-      if(!url) continue;
-      const da=document.getElementById(`da-${m.id}`); if(da){ da.src=url; wireAudioPlayer(m.id); }
-      const img=body.querySelector(`img[data-mid="${m.id}"]`); if(img) img.src=url;
-      const vid=body.querySelector(`video[data-mid="${m.id}"]`); if(vid) vid.src=url;
-    }
-  })();
-}
-
 function wireAudioPlayer(mid){
   const a=document.getElementById(`da-${mid}`); if(!a) return;
   a.ontimeupdate=()=>{
@@ -4390,7 +4189,6 @@ function togglePlay(mid){
   if(a.paused){ a.play(); b.innerHTML='<svg viewBox="0 0 12 12" fill="white"><rect x="2" y="1" width="3" height="10"/><rect x="7" y="1" width="3" height="10"/></svg>'; }
   else { a.pause(); b.innerHTML='<svg viewBox="0 0 12 12"><polygon points="2,1 11,6 2,11"/></svg>'; }
 }
-function seekA(ev,mid){ const a=document.getElementById(`da-${mid}`); if(!a||!a.duration) return; const r=ev.currentTarget.getBoundingClientRect(); a.currentTime=((ev.clientX-r.left)/r.width)*a.duration; }
 let _detailSpeedIdx={};
 function cycleSpeed(mid){
   const a=document.getElementById(`da-${mid}`),b=document.getElementById(`spd-${mid}`); if(!a||!b) return;
@@ -4398,29 +4196,9 @@ function cycleSpeed(mid){
   a.playbackRate=spds[_detailSpeedIdx[mid]]; b.textContent=spds[_detailSpeedIdx[mid]]+'×';
 }
 function closeDetail(){ closeNote(); }
-function _closeDetailLegacy(){
-  document.querySelectorAll('#detail-body audio').forEach(a=>a.pause());
-  document.getElementById('detail').classList.remove('open'); closeExpPop(); curEntry=null; updateFab();
-}
-function updateFab(){
-  // Hide the global "+" capture FAB while the detail panel is open — the
-  // contextual "Add media" button lives inside detail, and two stacked + buttons
-  // are confusing. Setting display:'' restores CSS/media-query control.
-  const fab=document.getElementById('mob-fab');
-  const noteOpen = document.getElementById('capture-overlay')?.style.display !== 'none';
-  if(fab) fab.style.display = (curEntry || noteOpen) ? 'none' : '';
-}
-function toggleExpPop(ev){ ev.stopPropagation(); const p=document.getElementById('exp-pop'); p.classList.toggle('open'); }
-function closeExpPop(){ const p=document.getElementById('exp-pop'); if(p) p.classList.remove('open'); }
 let _undoTimer=null;
 let _undoEntry=null; // {entry, mediaIds}
 
-async function deleteEntryWithConfirm(id){
-  const ok=await showConfirm({msg:'Delete this note? You can undo for a few seconds after.', okLabel:'Delete'});
-  if(!ok) return;
-  delEntry(id);
-  if(document.getElementById('capture-overlay').style.display!=='none') closeNote();
-}
 function delEntry(id){
   const e=entries.find(x=>x.id===id);
   if(!e) return;
@@ -4475,74 +4253,6 @@ async function _attachBlobToEntry(entryId, blob, mimeType, mediaType, duration){
 }
 
 let attachTargetId=null;
-function attachToEntry(id){
-  closeAddMenu();
-  attachTargetId=id;
-  document.getElementById('attach-in').click();
-}
-
-// ── Add-media menu (in detail panel) ──
-function toggleAddMenu(ev){
-  ev?.stopPropagation();
-  const m=document.getElementById('add-menu');
-  if(m) m.style.display = m.style.display==='none' ? '' : 'none';
-}
-function closeAddMenu(){ const m=document.getElementById('add-menu'); if(m) m.style.display='none'; }
-
-// ── In-app recorder for appending an audio take to an existing entry ──
-let attachMR=null, attachChunks=[], attachStream=null, attachSec=0, attachTimer=null, attachRecording=false, attachRecTarget=null;
-function recordToEntry(id){
-  closeAddMenu();
-  attachRecTarget=id; attachSec=0; attachRecording=false;
-  document.getElementById('attach-rec-timer').textContent='0:00';
-  const btn=document.getElementById('attach-rec-btn');
-  btn.textContent='Record'; btn.classList.remove('recording');
-  document.getElementById('attach-rec').style.display='flex';
-}
-async function toggleAttachRec(){
-  if(attachRecording){ stopAttachRec(); return; }
-  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ toast('Audio requires HTTPS or local install'); return; }
-  try{
-    const stream=await navigator.mediaDevices.getUserMedia({audio:{noiseSuppression:false,echoCancellation:false,autoGainControl:false}});
-    attachStream=stream; attachChunks=[]; attachSec=0;
-    attachMR=new MediaRecorder(stream);
-    attachMR.ondataavailable=e=>attachChunks.push(e.data);
-    attachMR.onstop=onAttachRecStop;
-    attachMR.start();
-    attachRecording=true;
-    const btn=document.getElementById('attach-rec-btn');
-    btn.textContent='Stop'; btn.classList.add('recording');
-    attachTimer=setInterval(()=>{ attachSec++; document.getElementById('attach-rec-timer').textContent=fmtDur(attachSec); },1000);
-  }catch(_){ toast('Mic access denied'); }
-}
-function stopAttachRec(){
-  if(attachMR&&attachRecording){ try{ attachMR.stop(); }catch(_){} }
-  clearInterval(attachTimer);
-}
-async function onAttachRecStop(){
-  attachStream?.getTracks().forEach(t=>t.stop());
-  attachStream=null; attachRecording=false; clearInterval(attachTimer);
-  document.getElementById('attach-rec').style.display='none';
-  const tid=attachRecTarget; attachRecTarget=null;
-  if(!attachChunks.length||!tid) return;
-  const dur=attachSec;
-  let blob=new Blob(attachChunks,{type:attachMR?.mimeType||'audio/webm'});
-  const fmt=settings.recFormat||'mp3-320';
-  if(fmt!=='native'){
-    try{
-      if(fmt==='wav') blob=await convertToWav(blob);
-      else if(fmt==='mp3-320') blob=await encodeMp3(blob,320);
-      else if(fmt==='mp3-128') blob=await encodeMp3(blob,128);
-    }catch(_){ toast('Encoding failed — saving original'); }
-  }
-  await _attachBlobToEntry(tid, blob, blob.type||'audio/webm', 'audio', dur||null);
-}
-function cancelAttachRec(){
-  if(attachRecording&&attachMR){ attachMR.onstop=null; try{ attachMR.stop(); }catch(_){} }
-  attachStream?.getTracks().forEach(t=>t.stop());
-  attachStream=null; attachRecording=false; clearInterval(attachTimer); attachRecTarget=null;
-  document.getElementById('attach-rec').style.display='none';
-}
 
 // Capture buttons open the unified capture screen.
 // Tap = today's flow (opens + starts recording immediately, the common case).
@@ -5511,49 +5221,6 @@ function stopCamVideo(){
   if(controls) controls.classList.remove('video-mode');
   const timer=document.getElementById('cam-rec-timer');
   if(timer) timer.classList.remove('show');
-}
-
-function editEntry(id){
-  const e=entries.find(x=>x.id===id); if(!e) return;
-  editingId=id;
-  currentTags=[...(e.tags||[])]; renderTags();
-  document.getElementById('s-name').value=e.name||autoTitle(e);
-  document.getElementById('s-note').value=e.note||e.text||'';
-  document.getElementById('s-bpm').value=e.bpm||'';
-  document.getElementById('s-key').value=e.key||'';
-  // legacy mood/genre — fold into tags if not already there
-  if(e.mood && !currentTags.includes(e.mood)) currentTags.push(e.mood);
-  if(e.genre && !currentTags.includes(e.genre)) currentTags.push(e.genre);
-  renderTags();
-  const sg=document.getElementById('tag-suggestions'); if(sg) sg.style.display='none';
-  const sgBtn=document.getElementById('sugg-toggle'); if(sgBtn) sgBtn.classList.remove('on');
-  renderSuggestionPills();
-  document.getElementById('s-status').value=e.status||'raw';
-  document.getElementById('s-type').value=e.type;
-  refreshProjSelect(e.project||'');
-  // For edits, expand "More fields" so user can see/edit metadata
-  const more=document.getElementById('more-fields');
-  if(more) more.open=!!(e.bpm||e.key||e.mood||e.genre||(e.status&&e.status!=='raw')||e.name);
-  const np=document.getElementById('s-proj-new'); if(np) np.style.display='none';
-  if(e.transcript){
-    document.getElementById('transcript-fg').style.display='';
-    document.getElementById('s-transcript').style.display='';
-    document.getElementById('s-transcript').value=e.transcript||'';
-    document.getElementById('transcript-status').innerHTML='';
-  } else {
-    document.getElementById('transcript-fg').style.display='none';
-    document.getElementById('transcript-status').innerHTML='';
-    document.getElementById('s-transcript').style.display='none';
-    document.getElementById('s-transcript').value='';
-  }
-  document.getElementById('save-heading').textContent='Edit capture';
-  // hide media row and preview in edit mode
-  document.getElementById('modal-media-row').style.display='none';
-  document.getElementById('modal-media-preview').style.display='none';
-  document.getElementById('modal-rec-bar').style.display='none';
-  document.getElementById('transcribe-row').style.display='none';
-  document.getElementById('save-overlay').classList.add('show');
-  setTimeout(()=>document.getElementById('s-note').focus(),80);
 }
 
 function renderProjects(){
@@ -6981,14 +6648,12 @@ vaultResume();
 wireCaptureButton(document.getElementById('capture-btn'));
 wireCaptureButton(document.getElementById('mob-fab'));
 // closeNote() already stops/saves an active recording and releases the mic
-// during count-in (see above) — cancelRecording() is the old modal-audio path
-// and doesn't touch the real capture state, so it was a no-op here.
+// during count-in (see above), so Escape doesn't need anything extra here.
 document.addEventListener('keydown',e=>{ if(e.key==='Escape'){
   // Camera can open on top of the note window — close just the topmost layer first
   if(document.getElementById('cam-overlay').classList.contains('show')){ closeCamera(); return; }
   closeNote();closeSave();closeProjModal();closeSettings();closeAbout();
 } });
-document.addEventListener('click',e=>{ const pop=document.getElementById('exp-pop'); if(pop&&pop.classList.contains('open')&&!pop.closest('.exp-pop-wrap').contains(e.target)) closeExpPop(); });
 // Never lose debounced edits when the tab is backgrounded or closed (esp. iOS)
 window.addEventListener('pagehide', persistFlush);
 document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') persistFlush(); });
