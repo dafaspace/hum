@@ -220,6 +220,11 @@ body {
 .nav-item .ni-icon { width: 16px; height: 16px; opacity: 0.7; flex-shrink: 0; }
 .nav-item.active .ni-icon { opacity: 1; }
 .nav-item .ni-count { margin-left: auto; font-size: 11px; color: var(--ink3); font-variant-numeric: tabular-nums; }
+/* Always visible (not hover-only) — this is a mobile-first app, and hover-only
+   controls are unreachable on touch. Kept subtle so it doesn't compete with the name. */
+.proj-edit-btn { position: relative; flex-shrink: 0; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; color: var(--ink4); border-radius: 5px; transition: color 0.15s, background 0.15s; }
+.proj-edit-btn:hover { color: var(--ink2); background: var(--paper4); }
+.proj-edit-btn::after { content: ''; position: absolute; inset: -6px; }
 .proj-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
 
 /* ── HEATMAP ── */
@@ -869,6 +874,7 @@ body {
   color: var(--ink2); cursor: pointer;
   transition: all 0.15s;
 }
+.btn-cancel.danger:hover { border-color: var(--rose); color: var(--rose); background: var(--rose-soft); }
 .btn-cancel:hover { border-color: var(--ink4); color: var(--ink); }
 
 /* ── DETAIL ── */
@@ -1989,7 +1995,7 @@ audio { display: none; }
 <!-- PROJECT MODAL -->
 <div id="proj-overlay">
   <div class="proj-card">
-    <h3>New project</h3>
+    <h3 id="proj-modal-title">New project</h3>
     <div class="fg"><label class="flabel">Name</label><input class="finput" id="p-name" type="text" placeholder="Project name…"></div>
     <div class="fg"><label class="flabel">Description</label><textarea class="ftextarea" id="p-desc" placeholder="What's this project about?" style="min-height:52px"></textarea></div>
     <div class="fg">
@@ -2015,8 +2021,9 @@ audio { display: none; }
       </select>
     </div>
     <div class="save-actions">
+      <button class="btn-cancel danger" id="proj-del-btn" onclick="deleteProj()" style="display:none;margin-right:auto">Delete</button>
       <button class="btn-cancel" onclick="closeProjModal()">Cancel</button>
-      <button class="btn-save" onclick="createProj()">Create →</button>
+      <button class="btn-save" id="proj-save-btn" onclick="createProj()">Create →</button>
     </div>
   </div>
 </div>
@@ -2367,6 +2374,7 @@ let pendingMediaList=[];
 // Legacy aliases (used internally, cleared on save/close)
 let pendingBlob=null, pendingDataUrl=null, pendingVideoBlob=null;
 let currentTags=[], selColor='#e8a87c';
+let editingProjId=null;
 let mr=null, recChunks=[], recSec=0, recInterval=null;
 let dateFilter=null; // YYYY-MM-DD or null
 let editingId=null;
@@ -2471,6 +2479,8 @@ async function vaultReconnect(){
   }catch(e){ if(e.name!=='AbortError') toast('Error: '+e.message); }
 }
 async function vaultDisconnect(){
+  const ok=await showConfirm({msg:'Disconnect Local Vault? Hum will stop syncing to this folder. Your files stay right where they are.', okLabel:'Disconnect'});
+  if(!ok) return;
   await kvPut('vault_handle',null);
   _vaultHandle=null;
   settings.vaultName='';
@@ -3106,7 +3116,9 @@ async function gdConnect(){
   }catch(e){ toast('Auth failed: '+e.message); }
   finally{ if(btn){ btn.disabled=false; btn.textContent='Connect'; } }
 }
-function gdDisconnect(){
+async function gdDisconnect(){
+  const ok=await showConfirm({msg:'Disconnect Google Drive? Hum will stop pushing/pulling to your Drive. Files already there are untouched.', okLabel:'Disconnect'});
+  if(!ok) return;
   _gdToken=null; _gdTokenExp=0; _gdVaultId=null; _gdMediaId=null;
   _gdInboxId=null; _gdProjectsRootId=null; _gdProjectFolderIds.clear();
   settings.gdConnected=false; localStorage.setItem(ST,JSON.stringify(settings));
@@ -5469,17 +5481,56 @@ function editEntry(id){
 function renderProjects(){
   document.getElementById('proj-list').innerHTML=projects.map(p=>{
     const cnt=entries.filter(e=>e.project===p.id).length;
-    return `<div class="nav-item" onclick="setView('${p.id}',this)"><div class="proj-dot" style="background:${safeColor(p.color)}"></div>${escHtml(p.name)}<span class="ni-count">${cnt}</span></div>`;
+    return `<div class="nav-item" onclick="setView('${p.id}',this)"><div class="proj-dot" style="background:${safeColor(p.color)}"></div>${escHtml(p.name)}<span class="ni-count">${cnt}</span><span class="proj-edit-btn" onclick="event.stopPropagation();openProjModal('${p.id}')" title="Edit project" role="button" tabindex="0" onkeydown="if(event.key==='Enter'){event.stopPropagation();openProjModal('${p.id}')}"><svg viewBox="0 0 14 14" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 1.5l3 3-7 7-3.5.5.5-3.5 7-7z"/></svg></span></div>`;
   }).join('');
 }
 
-function openProjModal(){ document.getElementById('p-name').value=''; document.getElementById('p-desc').value=''; document.getElementById('proj-overlay').classList.add('show'); setTimeout(()=>document.getElementById('p-name').focus(),80); }
-function closeProjModal(){ document.getElementById('proj-overlay').classList.remove('show'); }
+function openProjModal(id){
+  editingProjId=id||null;
+  const p=id?projects.find(x=>x.id===id):null;
+  document.getElementById('p-name').value=p?p.name:'';
+  document.getElementById('p-desc').value=p?(p.desc||''):'';
+  document.getElementById('p-tpl').value=p?(p.template||'free'):'composition';
+  selColor=p?safeColor(p.color):'#e8a87c';
+  document.querySelectorAll('#color-row .cswatch').forEach(x=>x.classList.toggle('sel', x.dataset.c===selColor));
+  document.getElementById('proj-modal-title').textContent=p?'Edit project':'New project';
+  document.getElementById('proj-save-btn').textContent=p?'Save →':'Create →';
+  document.getElementById('proj-del-btn').style.display=p?'':'none';
+  document.getElementById('proj-overlay').classList.add('show');
+  setTimeout(()=>document.getElementById('p-name').focus(),80);
+}
+function closeProjModal(){ document.getElementById('proj-overlay').classList.remove('show'); editingProjId=null; }
 function pickColor(el){ document.querySelectorAll('.cswatch').forEach(x=>x.classList.remove('sel')); el.classList.add('sel'); selColor=el.dataset.c; }
 function createProj(){
   const name=document.getElementById('p-name').value.trim(); if(!name){toast('Enter a name');return;}
-  projects.push({id:uid(),name,desc:document.getElementById('p-desc').value.trim(),color:selColor,template:document.getElementById('p-tpl').value,ts:Date.now()});
+  const desc=document.getElementById('p-desc').value.trim();
+  const tpl=document.getElementById('p-tpl').value;
+  if(editingProjId){
+    const p=projects.find(x=>x.id===editingProjId); if(!p){ closeProjModal(); return; }
+    p.name=name; p.desc=desc; p.color=selColor; p.template=tpl;
+    persist(); closeProjModal(); renderProjects(); render(); toast('Project updated');
+    return;
+  }
+  projects.push({id:uid(),name,desc,color:selColor,template:tpl,ts:Date.now()});
   persist(); closeProjModal(); renderProjects(); toast('Project created');
+}
+async function deleteProj(){
+  if(!editingProjId) return;
+  const p=projects.find(x=>x.id===editingProjId); if(!p) return;
+  const cnt=entries.filter(e=>e.project===p.id).length;
+  const msg=cnt
+    ? `Delete "${p.name}"? ${cnt} capture${cnt===1?'':'s'} will move to Drafts (unassigned) — nothing is deleted.`
+    : `Delete "${p.name}"?`;
+  const ok=await showConfirm({msg, okLabel:'Delete'});
+  if(!ok) return;
+  entries.forEach(e=>{ if(e.project===p.id) e.project=null; });
+  projects=projects.filter(x=>x.id!==p.id);
+  try{ persist(); }catch(_){}
+  closeProjModal();
+  renderProjects();
+  if(view===p.id) setView('all'); // also re-renders content + heatmap
+  else { render(); renderHeatmap(); }
+  toast('Project deleted');
 }
 
 function expTxt(){
