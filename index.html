@@ -104,6 +104,13 @@ document.head.appendChild(appleIcon);
   --backdrop: rgba(0,0,0,0.62);
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
+/* Global on-brand keyboard focus ring. Zero specificity (:where) so any
+   element with its own bespoke focus treatment (capture buttons, brand mark)
+   overrides it automatically — this only fills the gap everywhere else. */
+:where(button, a, input, textarea, select, [tabindex]):focus-visible {
+  outline: 2px solid var(--warm);
+  outline-offset: 2px;
+}
 html { height: 100%; }
 body {
   height: 100%;
@@ -1651,7 +1658,7 @@ audio { display: none; }
       </div>
       <div class="brand-heatmap" id="brand-heatmap" title="Your activity"></div>
     </div>
-    <div class="brand-sub">capture before it fades <span class="brand-ver">v0.8</span></div>
+    <div class="brand-sub">capture before it fades <span class="brand-ver">v0.8.1</span></div>
     <button class="sidebar-close-btn" onclick="closeSidebar()" aria-label="Close">
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg>
     </button>
@@ -2117,7 +2124,7 @@ audio { display: none; }
 <div id="about-overlay">
   <div class="about-card">
     <div class="about-header">
-      <div class="about-title">Hum <span class="brand-ver" style="font-size:12px;opacity:0.5">v0.8</span></div>
+      <div class="about-title">Hum <span class="brand-ver" style="font-size:12px;opacity:0.5">v0.8.1</span></div>
       <div class="about-sub">Capture creative moments before they fade.</div>
     </div>
 
