@@ -4347,7 +4347,7 @@ let _undoTimer=null;
 let _undoEntry=null; // {entry, mediaIds}
 
 async function deleteEntryWithConfirm(id){
-  const ok=await showConfirm({msg:'Delete this note? This cannot be undone.', okLabel:'Delete'});
+  const ok=await showConfirm({msg:'Delete this note? You can undo for a few seconds after.', okLabel:'Delete'});
   if(!ok) return;
   delEntry(id);
   if(document.getElementById('capture-overlay').style.display!=='none') closeNote();
@@ -4857,7 +4857,9 @@ function closeNote(){
   const ov=document.getElementById('capture-overlay');
   if(!ov||ov.style.display==='none') return;
   persistFlush(); // commit any pending debounced text edits before we leave
-  if(capCountingIn){ _stopMetro(); capCountingIn=false; }
+  // Mid-count-in: mic stream was already opened for it and must be released
+  // here too, or it leaks (matches cancelCapRec's count-in handling below).
+  if(capCountingIn){ _stopMetro(); capCountingIn=false; capStream?.getTracks().forEach(t=>t.stop()); capStream=null; }
   if(capRecording) stopCapRec();
   _stopMetro();
   if(_humPlayNodes) _stopMelodyPlayback();
@@ -5238,7 +5240,7 @@ async function noteDelete(){
   if(!capEntry) return;
   const btn=document.getElementById('note-del-btn');
   if(btn) btn.blur();
-  const ok=await showConfirm({msg:'Delete this note? This cannot be undone.', okLabel:'Delete'});
+  const ok=await showConfirm({msg:'Delete this note? You can undo for a few seconds after.', okLabel:'Delete'});
   if(!ok) return;
   delEntry(capEntry.id); closeNote();
 }
@@ -6539,8 +6541,12 @@ async function runChordAnalysis(entryId){
 }
 
 function seekToChord(entryId, t){
-  // Find first audio player in detail panel and seek
-  const audio=document.querySelector('#detail-body audio');
+  // Chords are always analysed from the entry's first audio take (see
+  // runChordAnalysis) — seek that take's own player, id'd `da-<mediaId>`.
+  const e=entries.find(x=>x.id===entryId); if(!e) return;
+  const audioItem=(e.media||[]).find(m=>m.type==='audio')||((e.hasMedia&&e.type==='audio')?{id:e.id}:null);
+  if(!audioItem) return;
+  const audio=document.getElementById(`da-${audioItem.id}`);
   if(audio&&audio.duration) audio.currentTime=t;
 }
 
@@ -6845,7 +6851,10 @@ if(settings.gdClientId) loadGsi();
 vaultResume();
 wireCaptureButton(document.getElementById('capture-btn'));
 wireCaptureButton(document.getElementById('mob-fab'));
-document.addEventListener('keydown',e=>{ if(e.key==='Escape'){closeNote();closeSave();closeProjModal();closeSettings();closeAbout();cancelRecording();} });
+// closeNote() already stops/saves an active recording and releases the mic
+// during count-in (see above) — cancelRecording() is the old modal-audio path
+// and doesn't touch the real capture state, so it was a no-op here.
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){closeNote();closeSave();closeProjModal();closeSettings();closeAbout();} });
 document.addEventListener('click',e=>{ const pop=document.getElementById('exp-pop'); if(pop&&pop.classList.contains('open')&&!pop.closest('.exp-pop-wrap').contains(e.target)) closeExpPop(); });
 // Never lose debounced edits when the tab is backgrounded or closed (esp. iOS)
 window.addEventListener('pagehide', persistFlush);
