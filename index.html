@@ -465,9 +465,18 @@ body {
 #capture-btn.recording .cap-wave .b2 { animation: cap-bar .9s ease-in-out .18s infinite; }
 #capture-btn.recording .cap-wave .b3 { animation: cap-bar .9s ease-in-out .36s infinite; }
 @keyframes cap-bar { 0%,100% { transform: scaleY(.42); } 50% { transform: scaleY(1.15); } }
+/* One global guard for every decorative infinite-loop animation in the app.
+   Each element keeps a STATIC state cue that doesn't depend on the animation:
+   capture buttons keep their recording color + still bars; #cap-rec-btn keeps
+   its circle→stop-square shape morph; the camera shutter keeps its rose fill;
+   the modal recording dot stays solid; rwave bars freeze at their own inline
+   height. Nothing here relies on motion to communicate state. */
 @media (prefers-reduced-motion: reduce) {
   #capture-btn, #capture-btn.recording, #capture-btn.recording .cap-wave rect,
-  #mob-fab, #mob-fab.recording, #mob-fab.recording .cap-wave rect { animation: none !important; }
+  #mob-fab, #mob-fab.recording, #mob-fab.recording .cap-wave rect,
+  .rwave, #cap-rec-btn.recording, #cap-rec-btn.beat, .modal-rec-dot,
+  .cam-shutter.recording, .transcript-dot
+  { animation: none !important; }
   #capture-btn.recording .cap-wave rect, #mob-fab.recording .cap-wave rect { transform: scaleY(1); }
 }
 
@@ -1104,9 +1113,12 @@ body {
 .note-mel-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 9px; }
 .note-mel-btn { font-size: 11px; padding: 5px 11px; border-radius: 7px; border: 1px solid var(--paper4); background: var(--surface); color: var(--ink2); cursor: pointer; font-family: var(--sans); transition: all 0.12s; white-space: nowrap; }
 .note-mel-btn:hover { border-color: var(--ink4); color: var(--ink); }
-.note-mel-btn.icon { padding: 5px 9px; display:inline-flex; align-items:center; justify-content:center; }
-.note-mel-btn.del { padding: 5px 9px; display:inline-flex; align-items:center; justify-content:center; color: var(--rose); border-color: var(--rose); }
+.note-mel-btn.icon { position: relative; padding: 5px 9px; display:inline-flex; align-items:center; justify-content:center; }
+.note-mel-btn.del { position: relative; padding: 5px 9px; display:inline-flex; align-items:center; justify-content:center; color: var(--rose); border-color: var(--rose); }
 .note-mel-btn.del:hover { background: var(--rose); color: #fff; }
+/* -3px, not -6px: .note-mel-edit's row gap is only 6px — a larger slop would
+   make adjacent buttons' invisible hit zones overlap each other */
+.note-mel-btn.icon::after, .note-mel-btn.del::after { content: ''; position: absolute; inset: -3px; }
 .note-mel-btn.play { background: var(--plum); border-color: var(--plum); color: #fff; font-weight: 500; }
 .note-mel-btn.play:hover { opacity: 0.88; color: #fff; }
 .note-mel-sel { font-size: 11px; padding: 4px 6px; border-radius: 7px; border: 1px solid var(--paper4); background: var(--surface); color: var(--ink2); font-family: var(--sans); cursor: pointer; }
@@ -1117,13 +1129,16 @@ body {
 .note-take-head { display: flex; align-items: center; margin-bottom: 6px; }
 .note-take-label { font-family: var(--sans); font-size: 11px; font-weight: 500; color: var(--ink2); flex: 1; }
 .note-take-dur { font-family: var(--sans); font-size: 11px; color: var(--ink3); margin-right: 6px; }
-.note-take-del { width: 22px; height: 22px; border: none; background: none; cursor: pointer; color: var(--ink3); display: flex; align-items: center; justify-content: center; border-radius: 5px; padding: 0; flex-shrink: 0; transition: all 0.12s; }
+.note-take-del { position: relative; width: 22px; height: 22px; border: none; background: none; cursor: pointer; color: var(--ink3); display: flex; align-items: center; justify-content: center; border-radius: 5px; padding: 0; flex-shrink: 0; transition: all 0.12s; }
 .note-take-del:hover { color: var(--rose); background: var(--rose-soft); }
+/* invisible hit-slop: pads the tap target to ~34px without enlarging the icon — this is a destructive action, worth protecting from fat-finger misses */
+.note-take-del::after { content: ''; position: absolute; inset: -6px; }
 .note-take-transcript { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--paper4); }
 .note-take-transcript-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
 .note-take-transcript-label { font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink3); font-weight: 500; font-family: var(--sans); }
-.note-take-transcript-action { width: 22px; height: 22px; border: none; background: none; cursor: pointer; color: var(--ink3); display: flex; align-items: center; justify-content: center; border-radius: 5px; padding: 0; flex-shrink: 0; transition: all 0.12s; }
+.note-take-transcript-action { position: relative; width: 22px; height: 22px; border: none; background: none; cursor: pointer; color: var(--ink3); display: flex; align-items: center; justify-content: center; border-radius: 5px; padding: 0; flex-shrink: 0; transition: all 0.12s; }
 .note-take-transcript-action:hover { color: var(--ink); background: var(--paper3); }
+.note-take-transcript-action::after { content: ''; position: absolute; inset: -6px; }
 .note-take-transcript-text { font-size: 12.5px; color: var(--ink2); line-height: 1.6; white-space: pre-wrap; }
 .note-take-transcript-actions { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--paper4); display: flex; justify-content: flex-end; }
 .note-take-mini-btn { font-size: 11px; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--paper4); background: var(--surface); color: var(--ink2); cursor: pointer; font-family: var(--sans); transition: all 0.12s; white-space: nowrap; }
@@ -1403,6 +1418,13 @@ body {
 }
 .cam-shutter:active { transform: scale(0.92); }
 .cam-shutter.recording { background: var(--rose); border-color: var(--rose); animation: rec-pulse 1.4s ease-in-out infinite; }
+/* restored: shared by the camera shutter's recording state (was accidentally
+   dropped when #capture-btn was redesigned — that button now uses its own
+   cap-rec-ring keyframe, but cam-shutter still needs this one) */
+@keyframes rec-pulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(196,120,120,0.4), 0 4px 16px rgba(196,120,120,0.3); }
+  50% { box-shadow: 0 0 0 14px rgba(196,120,120,0), 0 4px 20px rgba(196,120,120,0.4); }
+}
 .cam-flip, .cam-video-btn {
   width: 44px; height: 44px; border-radius: 50%;
   background: rgba(255,255,255,0.15); border: none;
@@ -1658,7 +1680,7 @@ audio { display: none; }
       </div>
       <div class="brand-heatmap" id="brand-heatmap" title="Your activity"></div>
     </div>
-    <div class="brand-sub">capture before it fades <span class="brand-ver">v0.8.1</span></div>
+    <div class="brand-sub">capture before it fades <span class="brand-ver">v0.8.2</span></div>
     <button class="sidebar-close-btn" onclick="closeSidebar()" aria-label="Close">
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg>
     </button>
@@ -2124,7 +2146,7 @@ audio { display: none; }
 <div id="about-overlay">
   <div class="about-card">
     <div class="about-header">
-      <div class="about-title">Hum <span class="brand-ver" style="font-size:12px;opacity:0.5">v0.8.1</span></div>
+      <div class="about-title">Hum <span class="brand-ver" style="font-size:12px;opacity:0.5">v0.8.2</span></div>
       <div class="about-sub">Capture creative moments before they fade.</div>
     </div>
 
@@ -2216,7 +2238,7 @@ audio { display: none; }
   </div>
 </div>
 
-<div id="toast"></div>
+<div id="toast" role="status" aria-live="polite"></div>
 <div id="hm-tooltip" class="hm-tooltip"></div>
 <input type="file" id="file-in" style="display:none" onchange="handleFile(this)">
 <input type="file" id="attach-in" accept="image/*,video/*,audio/*,.txt,.md,.markdown" style="display:none" onchange="handleAttach(this)">
