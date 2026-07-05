@@ -1693,11 +1693,31 @@ audio { display: none; }
   </div>
 
   <div class="sidebar-scroll">
+    <div class="heatmap-wrap">
+      <div class="heatmap-head">
+        <span class="heatmap-title">Activity</span>
+        <button class="heatmap-clear" id="heatmap-clear-btn" onclick="clearDateFilter()" style="display:none">Clear</button>
+      </div>
+      <div class="heatmap-grid" id="heatmap-grid"></div>
+      <div class="heatmap-foot">
+        <span class="heatmap-sub" id="heatmap-sub-label"></span>
+        <div class="heatmap-scale">
+          <span>Less</span>
+          <span class="heatmap-scale-cell" style="background:var(--paper3)"></span>
+          <span class="heatmap-scale-cell hm-l1"></span>
+          <span class="heatmap-scale-cell hm-l2"></span>
+          <span class="heatmap-scale-cell hm-l3"></span>
+          <span class="heatmap-scale-cell hm-l4"></span>
+          <span>More</span>
+        </div>
+      </div>
+    </div>
     <div class="nav-section">
       <span class="nav-label">Projects</span>
       <div id="proj-list"></div>
     </div>
   </div>
+  <div class="hm-tooltip" id="hm-tooltip"></div>
 
   <div class="sidebar-bottom">
     <button id="new-proj-btn" onclick="openProjModal()">+ New project</button>
@@ -3196,18 +3216,52 @@ function renderHeatmap(){
   }
 
   const el = document.getElementById('brand-heatmap');
-  if(!el) return;
-  let html = '';
-  for(let w = 0; w < WEEKS; w++){
-    html += '<div class="bhm-col">';
-    for(let d = 0; d < 7; d++){
-      const day = allDays[w * 7 + d];
-      const bg = (!day || day.future) ? 'transparent' : color(day.count);
-      html += `<div class="bhm-cell" style="background:${bg}"></div>`;
+  if(el){
+    let html = '';
+    for(let w = 0; w < WEEKS; w++){
+      html += '<div class="bhm-col">';
+      for(let d = 0; d < 7; d++){
+        const day = allDays[w * 7 + d];
+        const bg = (!day || day.future) ? 'transparent' : color(day.count);
+        html += `<div class="bhm-cell" style="background:${bg}"></div>`;
+      }
+      html += '</div>';
     }
-    html += '</div>';
+    el.innerHTML = html;
   }
-  el.innerHTML = html;
+
+  // Sidebar heatmap — the interactive one: click a day to filter, hover for a tooltip.
+  const grid = document.getElementById('heatmap-grid');
+  if(grid){
+    const todayKey = dateKey(today);
+    let gh = '';
+    for(let w = 0; w < WEEKS; w++){
+      gh += '<div class="hm-week">';
+      for(let d = 0; d < 7; d++){
+        const day = allDays[w * 7 + d];
+        if(!day || day.future){ gh += '<div class="hm-cell hidden-day"></div>'; continue; }
+        const r = day.count / max;
+        const lvl = day.count===0 ? '' : (r<=0.25?' hm-l1':r<=0.5?' hm-l2':r<=0.75?' hm-l3':' hm-l4');
+        const cls = 'hm-cell'+lvl+(day.key===todayKey?' today':'')+(day.key===dateFilter?' selected':'');
+        gh += `<div class="${cls}" data-key="${day.key}" data-count="${day.count}" data-iso="${day.key}" onclick="toggleDateFilter('${day.key}')" onmouseenter="showHmTip(event)" onmouseleave="hideHmTip()"></div>`;
+      }
+      gh += '</div>';
+    }
+    grid.innerHTML = gh;
+    const total = allDays.filter(d=>!d.future).reduce((s,d)=>s+d.count,0);
+    const subEl = document.getElementById('heatmap-sub-label'); if(subEl) subEl.textContent = `${total} in ${WEEKS} weeks`;
+    const clearBtn = document.getElementById('heatmap-clear-btn'); if(clearBtn) clearBtn.style.display = dateFilter ? '' : 'none';
+  }
+}
+function toggleDateFilter(key){
+  dateFilter = (dateFilter===key) ? null : key; // clicking the selected day again clears it
+  renderHeatmap();
+  render();
+}
+function clearDateFilter(){
+  dateFilter = null;
+  renderHeatmap();
+  render();
 }
 
 function showHmTip(ev){
