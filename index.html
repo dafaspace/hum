@@ -4289,6 +4289,15 @@ async function _attachBlobToEntry(entryId, blob, mimeType, mediaType, duration, 
     if(name) item.name=name; // original filename — shown on generic 'file' chips
     e.media.push(item);
     e.hasMedia=true;
+    // The first media on an untouched placeholder entry defines what that entry IS.
+    // Audio captures already set the type upfront (onCapRecStop), but photo/video
+    // arrive later via the picker or camera, so without this a photo-first capture
+    // stays type:'idea' forever — wrong pill, and invisible under the photo filter.
+    // A generic 'file' has no matching entry type, so it stays an idea.
+    if(e.media.length===1 && e.type==='idea' && !(e.note&&e.note.trim()) && !(e.name&&e.name.trim())
+       && (mediaType==='photo'||mediaType==='video'||mediaType==='audio')){
+      e.type=mediaType;
+    }
     try{ persist(); }catch(_){}
     scheduleGdPush();
     render(); openDetail(entryId); toast(mediaType.charAt(0).toUpperCase()+mediaType.slice(1)+' added');
