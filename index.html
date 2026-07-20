@@ -6779,12 +6779,34 @@ if ('serviceWorker' in navigator) {
     // Keep local dev clean — no stale caching across edits
     navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(r => r.unregister()));
   } else {
+    let _swReg = null, _lastUpdateCheck = 0;
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js').catch(() => {});
+      navigator.serviceWorker.register('./sw.js').then(reg => { _swReg = reg; }).catch(() => {});
     });
+    // Signal 1: the SW's fetch handler noticed the HTML changed (fires on navigation).
     navigator.serviceWorker.addEventListener('message', e => {
       if (e.data && e.data.type === 'SW_UPDATE') _showSwUpdateBar();
     });
+    // Signal 2: a new SW installed and took over. sw.js bumps CACHE every release,
+    // so new bytes = new version. Guarded by hadController so the very first
+    // registration (which also fires controllerchange) doesn't cry "update".
+    let hadController = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (hadController) _showSwUpdateBar();
+      hadController = true;
+    });
+    // An installed PWA can stay open for days and would otherwise never re-fetch
+    // sw.js, so it'd never learn about a deploy. Re-check when the app returns to
+    // the foreground, throttled so app-switching doesn't hammer the server.
+    const checkForUpdate = () => {
+      if (!_swReg || document.visibilityState !== 'visible') return;
+      const now = Date.now();
+      if (now - _lastUpdateCheck < 60000) return; // at most once a minute
+      _lastUpdateCheck = now;
+      _swReg.update().catch(() => {});
+    };
+    document.addEventListener('visibilitychange', checkForUpdate);
+    window.addEventListener('focus', checkForUpdate);
   }
 }
 function _showSwUpdateBar() {
