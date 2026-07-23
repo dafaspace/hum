@@ -1007,6 +1007,26 @@ body {
 /* ── Unified capture overlay ── */
 #capture-overlay { position: fixed; inset: 0; z-index: 130; background: var(--backdrop); display: none; align-items: center; justify-content: center; padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
 #capture-panel { display: flex; flex-direction: column; background: var(--surface); border-radius: 22px; width: min(440px,92vw); height: min(720px, 88dvh); max-height: 88dvh; box-shadow: 0 16px 56px rgba(var(--shadow-rgb),0.3); overflow: hidden; }
+/* The note window grows out of the orb that opened it and returns the same way —
+   the app's signature moment, and the one place a spatial link really pays off.
+   transform-origin is set from the live trigger position in JS. The curve is a
+   critically-damped feel (no overshoot): this is a reposition, not a flick. */
+#capture-overlay { opacity: 0; transition: opacity .2s ease-out; }
+#capture-overlay.note-in { opacity: 1; }
+#capture-panel { transform: scale(.90); opacity: 0; transform-origin: 50% 100%; will-change: transform, opacity;
+  transition: transform .40s cubic-bezier(.22,1,.36,1), opacity .22s ease-out; }
+#capture-overlay.note-in #capture-panel { transform: scale(1); opacity: 1; }
+@media (prefers-reduced-motion: reduce){
+  /* Gentler equivalent, not "no feedback": keep the fade, drop the scale travel */
+  #capture-panel { transform: none !important; transition: opacity .18s ease !important; }
+}
+/* Grabber is a mobile-sheet affordance; on desktop the panel isn't draggable. */
+#sheet-grabber { display: none; }
+#sheet-grabber span { display: block; width: 36px; height: 5px; border-radius: 3px; background: var(--paper4); margin: 0 auto; }
+/* While a finger is on the sheet, motion must follow it exactly — no transition
+   is allowed to smooth (and therefore lag) 1:1 tracking. */
+#capture-panel.dragging { transition: none !important; }
+#capture-overlay.dragging { transition: none !important; }
 #cap-head { display: flex; align-items: flex-start; justify-content: space-between; padding: 22px 22px 14px; }
 #cap-takes { flex: 1; overflow-y: auto; padding: 0 22px; min-height: 80px; }
 #cap-rec-area { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 18px 22px calc(20px + env(safe-area-inset-bottom)); border-top: 1px solid var(--paper4); }
@@ -1513,6 +1533,35 @@ body {
   }
 
   body { background: var(--mob-bg); }
+
+  /* ── NOTE WINDOW AS A BOTTOM SHEET ──
+     On a phone the note stops being a centred desktop card and becomes a sheet
+     that rises from the bottom — spatially consistent with the FAB it opens
+     from, and grabbable. Entrance is a translate, not a scale, so the drag
+     gesture and the entrance animate the exact same property (a scale entrance
+     would fight translateY the moment a finger grabbed it mid-flight). */
+  #capture-overlay { align-items: flex-end; padding: 0; }
+  #capture-panel {
+    width: 100%;
+    height: auto;
+    max-height: 92dvh;
+    border-radius: 22px 22px 0 0;
+    transform-origin: 50% 100% !important;
+    transform: translateY(100%);
+    opacity: 1;
+    transition: transform .42s cubic-bezier(.22,1,.36,1);
+    padding-bottom: env(safe-area-inset-bottom);
+    touch-action: pan-y;
+  }
+  #capture-overlay.note-in #capture-panel { transform: translateY(0); }
+  #sheet-grabber { display: block; padding: 9px 0 5px; cursor: grab; touch-action: none; }
+  #sheet-grabber:active { cursor: grabbing; }
+  /* The header is the second drag surface, so the browser must not claim the
+     vertical gesture for scrolling before our handler sees it. */
+  #note-head { padding-top: 4px; touch-action: none; }
+  @media (prefers-reduced-motion: reduce){
+    #capture-panel { transform: translateY(0) !important; transition: opacity .18s ease !important; }
+  }
 
   /* ── SIDEBAR overlay ── */
   #sidebar {
@@ -2281,6 +2330,8 @@ audio { display: none; }
 <!-- UNIFIED NOTE WINDOW -->
 <div id="capture-overlay" style="display:none">
   <div id="capture-panel">
+    <!-- Sheet grabber: mobile-only affordance + the primary drag target -->
+    <div id="sheet-grabber" aria-hidden="true"><span></span></div>
     <!-- ── FIXED HEADER ── -->
     <div id="note-head">
       <div id="note-title-row">
@@ -4742,6 +4793,135 @@ async function deleteCapTake(mid){
 /* ══════════════════════════════════════════
    UNIFIED NOTE WINDOW
 ══════════════════════════════════════════ */
+let _noteOpen=false, _noteHideTimer=null;
+// Whichever capture orb the user can actually see right now (desktop bar vs mobile FAB).
+function _visibleCaptureTrigger(){
+  const c=document.getElementById('capture-btn');
+  const f=document.getElementById('mob-fab');
+  const vis=el=>el && el.getClientRects().length>0;
+  return vis(c)?c:(vis(f)?f:null);
+}
+// Scale the note panel from the orb's position rather than its own centre, so the
+// window reads as growing out of the button that opened it.
+function _anchorNotePanelTo(trigger){
+  const panel=document.getElementById('capture-panel');
+  if(!panel) return;
+  if(!trigger){ panel.style.transformOrigin='50% 100%'; return; }
+  const p=panel.getBoundingClientRect();
+  if(!p.width||!p.height) return; // not laid out yet — caller re-anchors after display:flex
+  const t=trigger.getBoundingClientRect();
+  panel.style.transformOrigin=`${Math.round(t.left+t.width/2-p.left)}px ${Math.round(t.top+t.height/2-p.top)}px`;
+}
+// ── BOTTOM-SHEET PHYSICS (mobile) ────────────────────────────────────────────
+// The sheet must track the finger 1:1, resist at its top edge, and on release
+// continue at the finger's own velocity toward wherever the momentum was headed.
+// A CSS transition can do none of that (fixed duration, ignores velocity, can't
+// be grabbed mid-flight), so this is a real spring integrator instead.
+const _SHEET_BP=680;
+let _sheetY=0, _sheetSpringCancel=null, _sheetDrag=null;
+function _isSheetMode(){ return window.matchMedia(`(max-width:${_SHEET_BP}px)`).matches; }
+function _panelEl(){ return document.getElementById('capture-panel'); }
+// Critically damped, response ≈0.35s. Returns a cancel fn so a new gesture can
+// seize control mid-animation (interruptibility) rather than waiting it out.
+function _spring(from,to,velocity,onUpdate,onDone){
+  // Tuned numerically to Apple's sheet spec (response ≈0.3s, damping ratio ≈0.8):
+  // settles in ~230-320ms across the real range and stays stable even at absurd
+  // release velocities, where a stiffer/looser pair oscillates.
+  const stiffness=420, damping=33;
+  let x=from, v=velocity, last=performance.now(), raf=0;
+  const step=now=>{
+    const dt=Math.min((now-last)/1000,.032); last=now;
+    v+=((-stiffness*(x-to))-damping*v)*dt;
+    x+=v*dt;
+    if(Math.abs(x-to)<0.5 && Math.abs(v)<25){ onUpdate(to); onDone&&onDone(); return; }
+    onUpdate(x);
+    raf=requestAnimationFrame(step);
+  };
+  raf=requestAnimationFrame(step);
+  return ()=>cancelAnimationFrame(raf);
+}
+// Where a flick would come to rest (Apple's exponential-decay projection, not
+// the textbook v²/2a). We snap based on this, so a fast flick throws the sheet.
+function _project(v,decel=0.998){ return (v/1000)*decel/(1-decel); }
+// Progressive resistance past the top edge — reads as "responsive, nothing more
+// here", where a hard stop reads as frozen.
+function _rubberband(overshoot,dim,c=0.55){ return (overshoot*dim*c)/(dim+c*Math.abs(overshoot)); }
+function _applySheetY(y){
+  const p=_panelEl(); if(!p) return;
+  _sheetY=y;
+  p.style.transform=`translateY(${y}px)`;
+  // Backdrop tracks the drag continuously, not just on commit.
+  const ov=document.getElementById('capture-overlay');
+  const h=p.offsetHeight||1;
+  if(ov) ov.style.opacity=String(Math.max(0,1-(Math.max(0,y)/h)*1.1));
+}
+function _clearSheetInlineStyle(){
+  const p=_panelEl(), ov=document.getElementById('capture-overlay');
+  if(p) p.style.transform='';
+  if(ov) ov.style.opacity='';
+  _sheetY=0;
+}
+function _sheetVelocity(samples){
+  if(samples.length<2) return 0;
+  const a=samples[0], b=samples[samples.length-1];
+  const dt=Math.max(1,b.t-a.t);
+  return (b.y-a.y)/dt*1000; // px/s
+}
+function _wireSheetDrag(){
+  const panel=_panelEl(); if(!panel) return;
+  const targets=[document.getElementById('sheet-grabber'), document.getElementById('note-head')].filter(Boolean);
+  targets.forEach(el=>{
+    el.addEventListener('pointerdown', e=>{
+      if(!_isSheetMode() || !_noteOpen) return;
+      if(e.button!=null && e.button!==0) return;
+      // Never hijack a press on a real control inside the header.
+      if(e.target.closest('input,textarea,select,button,a,[contenteditable]')) return;
+      if(_sheetSpringCancel){ _sheetSpringCancel(); _sheetSpringCancel=null; } // grab mid-flight
+      _sheetDrag={ startY:e.clientY, baseY:_sheetY, pid:e.pointerId, moved:false,
+                   samples:[{y:e.clientY,t:performance.now()}] };
+      try{ el.setPointerCapture(e.pointerId); }catch(_){}
+      panel.classList.add('dragging');
+      document.getElementById('capture-overlay').classList.add('dragging');
+    });
+    el.addEventListener('pointermove', e=>{
+      if(!_sheetDrag || e.pointerId!==_sheetDrag.pid) return;
+      const dy=e.clientY-_sheetDrag.startY;
+      if(!_sheetDrag.moved && Math.abs(dy)<8) return; // hysteresis before committing
+      _sheetDrag.moved=true;
+      const h=panel.offsetHeight||1;
+      let y=_sheetDrag.baseY+dy;
+      if(y<0) y=-_rubberband(-y,h); // dragging above the open position resists
+      _applySheetY(y);
+      const s=_sheetDrag.samples; s.push({y:e.clientY,t:performance.now()}); if(s.length>6) s.shift();
+      e.preventDefault();
+    });
+    const end=e=>{
+      if(!_sheetDrag || (e.pointerId!=null && e.pointerId!==_sheetDrag.pid)) return;
+      const drag=_sheetDrag; _sheetDrag=null;
+      panel.classList.remove('dragging');
+      document.getElementById('capture-overlay').classList.remove('dragging');
+      try{ el.releasePointerCapture(drag.pid); }catch(_){}
+      if(!drag.moved) return; // never travelled — that was a tap
+      const h=panel.offsetHeight||1;
+      const v=_sheetVelocity(drag.samples);
+      // Decide from where the momentum lands, not from where the finger stopped.
+      const dismiss=(_sheetY+_project(v)) > h*0.35;
+      if(dismiss){
+        _sheetSpringCancel=_spring(_sheetY,h,v,_applySheetY,()=>{
+          _sheetSpringCancel=null;
+          closeNote();              // drops .note-in → CSS target is translateY(100%)
+          _clearSheetInlineStyle(); // …which is exactly where we already are: no jump
+        });
+      } else {
+        _sheetSpringCancel=_spring(_sheetY,0,v,_applySheetY,()=>{
+          _sheetSpringCancel=null; _clearSheetInlineStyle();
+        });
+      }
+    };
+    el.addEventListener('pointerup',end);
+    el.addEventListener('pointercancel',end);
+  });
+}
 function openNote(id, autoRecord){
   // Close detail panel if open
   document.getElementById('detail')?.classList.remove('open');
@@ -4770,8 +4950,22 @@ function openNote(id, autoRecord){
   const expBtn=document.getElementById('note-exp-btn'); if(expBtn) expBtn.style.display=id?'':'none';
   const delBtn=document.getElementById('note-del-btn'); if(delBtn) delBtn.style.display=id?'':'none';
   curEntry=capEntry;
-  document.getElementById('capture-overlay').style.display='flex';
-  const fab=document.getElementById('mob-fab'); if(fab) fab.style.display='none';
+  const ov=document.getElementById('capture-overlay');
+  const fab=document.getElementById('mob-fab');
+  clearTimeout(_noteHideTimer); _noteHideTimer=null; // cancel a pending hide if reopened mid-exit
+  if(_sheetSpringCancel){ _sheetSpringCancel(); _sheetSpringCancel=null; }
+  _sheetDrag=null; _clearSheetInlineStyle(); // start from a clean slate, not last drag's offset
+  _noteOpen=true;
+  // Measure the trigger BEFORE hiding the FAB, or its rect collapses to zero.
+  const trigger=_visibleCaptureTrigger();
+  ov.style.display='flex';
+  _anchorNotePanelTo(trigger); // now the panel has a box to measure against
+  // Commit the pre-animation state with a forced reflow rather than waiting for
+  // rAF: a throttled/backgrounded tab never fires rAF, which would leave the
+  // panel stuck at opacity 0 — an invisible note window.
+  void document.getElementById('capture-panel').offsetWidth;
+  ov.classList.add('note-in');
+  if(fab) fab.style.display='none';
   // New entry: default is to start recording immediately (the common case).
   // A long-press on the capture button passes autoRecord=false — open blank
   // and let the user type or attach instead, without ever touching the mic.
@@ -4782,7 +4976,11 @@ function openNote(id, autoRecord){
 }
 function closeNote(){
   const ov=document.getElementById('capture-overlay');
-  if(!ov||ov.style.display==='none') return;
+  // _noteOpen (not the display style) is the source of truth: the panel stays
+  // visible through its exit animation, and a second Escape must not re-run
+  // all the teardown below on a note that's already closing.
+  if(!ov||!_noteOpen) return;
+  _noteOpen=false;
   persistFlush(); // commit any pending debounced text edits before we leave
   // Mid-count-in: mic stream was already opened for it and must be released
   // here too, or it leaks (matches cancelCapRec's count-in handling below).
@@ -4793,7 +4991,11 @@ function closeNote(){
   closeCapProjMenu();
   closeNoteTagDrop();
   document.querySelectorAll('#note-takes audio').forEach(a=>a.pause());
-  ov.style.display='none';
+  // Exit along the same path it entered (spatial consistency): shrink back toward
+  // the orb, then hide once the motion has actually finished.
+  ov.classList.remove('note-in');
+  clearTimeout(_noteHideTimer);
+  _noteHideTimer=setTimeout(()=>{ ov.style.display='none'; _noteHideTimer=null; }, 260);
   const fab=document.getElementById('mob-fab'); if(fab) fab.style.display='';
   // Auto-delete empty entries (no media, no text, no tags, no transcript)
   if(capEntry){
@@ -6860,6 +7062,7 @@ vaultResume();
 window.addEventListener('load', ()=>{ setTimeout(()=>requestPersistentStorage(true), 1200); });
 wireCaptureButton(document.getElementById('capture-btn'));
 wireCaptureButton(document.getElementById('mob-fab'));
+_wireSheetDrag();
 // closeNote() already stops/saves an active recording and releases the mic
 // during count-in (see above), so Escape doesn't need anything extra here.
 document.addEventListener('keydown',e=>{ if(e.key==='Escape'){
