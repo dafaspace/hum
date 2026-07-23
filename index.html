@@ -1007,6 +1007,19 @@ body {
 /* ── Unified capture overlay ── */
 #capture-overlay { position: fixed; inset: 0; z-index: 130; background: var(--backdrop); display: none; align-items: center; justify-content: center; padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
 #capture-panel { display: flex; flex-direction: column; background: var(--surface); border-radius: 22px; width: min(440px,92vw); height: min(720px, 88dvh); max-height: 88dvh; box-shadow: 0 16px 56px rgba(var(--shadow-rgb),0.3); overflow: hidden; }
+/* The note window grows out of the orb that opened it and returns the same way —
+   the app's signature moment, and the one place a spatial link really pays off.
+   transform-origin is set from the live trigger position in JS. The curve is a
+   critically-damped feel (no overshoot): this is a reposition, not a flick. */
+#capture-overlay { opacity: 0; transition: opacity .2s ease-out; }
+#capture-overlay.note-in { opacity: 1; }
+#capture-panel { transform: scale(.90); opacity: 0; transform-origin: 50% 100%; will-change: transform, opacity;
+  transition: transform .40s cubic-bezier(.22,1,.36,1), opacity .22s ease-out; }
+#capture-overlay.note-in #capture-panel { transform: scale(1); opacity: 1; }
+@media (prefers-reduced-motion: reduce){
+  /* Gentler equivalent, not "no feedback": keep the fade, drop the scale travel */
+  #capture-panel { transform: none !important; transition: opacity .18s ease !important; }
+}
 #cap-head { display: flex; align-items: flex-start; justify-content: space-between; padding: 22px 22px 14px; }
 #cap-takes { flex: 1; overflow-y: auto; padding: 0 22px; min-height: 80px; }
 #cap-rec-area { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 18px 22px calc(20px + env(safe-area-inset-bottom)); border-top: 1px solid var(--paper4); }
@@ -4742,6 +4755,25 @@ async function deleteCapTake(mid){
 /* ══════════════════════════════════════════
    UNIFIED NOTE WINDOW
 ══════════════════════════════════════════ */
+let _noteOpen=false, _noteHideTimer=null;
+// Whichever capture orb the user can actually see right now (desktop bar vs mobile FAB).
+function _visibleCaptureTrigger(){
+  const c=document.getElementById('capture-btn');
+  const f=document.getElementById('mob-fab');
+  const vis=el=>el && el.getClientRects().length>0;
+  return vis(c)?c:(vis(f)?f:null);
+}
+// Scale the note panel from the orb's position rather than its own centre, so the
+// window reads as growing out of the button that opened it.
+function _anchorNotePanelTo(trigger){
+  const panel=document.getElementById('capture-panel');
+  if(!panel) return;
+  if(!trigger){ panel.style.transformOrigin='50% 100%'; return; }
+  const p=panel.getBoundingClientRect();
+  if(!p.width||!p.height) return; // not laid out yet — caller re-anchors after display:flex
+  const t=trigger.getBoundingClientRect();
+  panel.style.transformOrigin=`${Math.round(t.left+t.width/2-p.left)}px ${Math.round(t.top+t.height/2-p.top)}px`;
+}
 function openNote(id, autoRecord){
   // Close detail panel if open
   document.getElementById('detail')?.classList.remove('open');
@@ -4770,8 +4802,20 @@ function openNote(id, autoRecord){
   const expBtn=document.getElementById('note-exp-btn'); if(expBtn) expBtn.style.display=id?'':'none';
   const delBtn=document.getElementById('note-del-btn'); if(delBtn) delBtn.style.display=id?'':'none';
   curEntry=capEntry;
-  document.getElementById('capture-overlay').style.display='flex';
-  const fab=document.getElementById('mob-fab'); if(fab) fab.style.display='none';
+  const ov=document.getElementById('capture-overlay');
+  const fab=document.getElementById('mob-fab');
+  clearTimeout(_noteHideTimer); _noteHideTimer=null; // cancel a pending hide if reopened mid-exit
+  _noteOpen=true;
+  // Measure the trigger BEFORE hiding the FAB, or its rect collapses to zero.
+  const trigger=_visibleCaptureTrigger();
+  ov.style.display='flex';
+  _anchorNotePanelTo(trigger); // now the panel has a box to measure against
+  // Commit the pre-animation state with a forced reflow rather than waiting for
+  // rAF: a throttled/backgrounded tab never fires rAF, which would leave the
+  // panel stuck at opacity 0 — an invisible note window.
+  void document.getElementById('capture-panel').offsetWidth;
+  ov.classList.add('note-in');
+  if(fab) fab.style.display='none';
   // New entry: default is to start recording immediately (the common case).
   // A long-press on the capture button passes autoRecord=false — open blank
   // and let the user type or attach instead, without ever touching the mic.
@@ -4782,7 +4826,11 @@ function openNote(id, autoRecord){
 }
 function closeNote(){
   const ov=document.getElementById('capture-overlay');
-  if(!ov||ov.style.display==='none') return;
+  // _noteOpen (not the display style) is the source of truth: the panel stays
+  // visible through its exit animation, and a second Escape must not re-run
+  // all the teardown below on a note that's already closing.
+  if(!ov||!_noteOpen) return;
+  _noteOpen=false;
   persistFlush(); // commit any pending debounced text edits before we leave
   // Mid-count-in: mic stream was already opened for it and must be released
   // here too, or it leaks (matches cancelCapRec's count-in handling below).
@@ -4793,7 +4841,11 @@ function closeNote(){
   closeCapProjMenu();
   closeNoteTagDrop();
   document.querySelectorAll('#note-takes audio').forEach(a=>a.pause());
-  ov.style.display='none';
+  // Exit along the same path it entered (spatial consistency): shrink back toward
+  // the orb, then hide once the motion has actually finished.
+  ov.classList.remove('note-in');
+  clearTimeout(_noteHideTimer);
+  _noteHideTimer=setTimeout(()=>{ ov.style.display='none'; _noteHideTimer=null; }, 260);
   const fab=document.getElementById('mob-fab'); if(fab) fab.style.display='';
   // Auto-delete empty entries (no media, no text, no tags, no transcript)
   if(capEntry){
