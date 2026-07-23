@@ -1266,6 +1266,14 @@ body {
 .theme-switch input:checked + .theme-switch-slider { background: var(--warm); border-color: var(--warm); }
 .theme-switch input:checked + .theme-switch-slider::before { left: 20px; background: #fff; }
 .settings-hint { font-size: 11px; color: var(--ink3); margin-top: 6px; line-height: 1.6; }
+/* Storage-safety state line: green when the browser promised not to evict the
+   archive, amber when it can be cleared under disk pressure. */
+.storage-state { display: flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 500; font-family: var(--sans); }
+.storage-state .st-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.storage-state.safe { color: var(--sage); }
+.storage-state.safe .st-dot { background: var(--sage); }
+.storage-state.risk { color: var(--warm2); }
+.storage-state.risk .st-dot { background: var(--warm2); }
 .settings-badge-free { font-size: 9px; font-weight: 500; letter-spacing: 0.05em; text-transform: uppercase; background: var(--sage); color: #fff; border-radius: 4px; padding: 1px 5px; margin-left: 5px; vertical-align: middle; }
 .settings-badge-paid { font-size: 9px; font-weight: 500; letter-spacing: 0.05em; text-transform: uppercase; background: var(--ink3); color: #fff; border-radius: 4px; padding: 1px 5px; margin-left: 5px; vertical-align: middle; }
 .settings-ext-link { font-size: 11px; color: var(--warm2); white-space: nowrap; text-decoration: none; font-family: var(--sans); padding: 6px 10px; border: 1px solid var(--warm); border-radius: 7px; background: var(--warm-soft); }
@@ -2104,6 +2112,13 @@ audio { display: none; }
       <div class="settings-hint">Alternative to Groq. Used only if no Groq key. Stored locally only.</div>
     </div>
     <hr class="settings-sep">
+    <div class="settings-section-title">Storage</div>
+    <div id="storage-state" class="storage-state"></div>
+    <div class="settings-hint" id="storage-detail" style="margin-top:6px"></div>
+    <div class="gd-btn-row" id="storage-protect-row" style="display:none;margin-top:8px">
+      <button class="gd-small-btn primary" onclick="requestPersistentStorage()" id="storage-protect-btn">Protect my archive</button>
+    </div>
+    <hr class="settings-sep">
     <div class="settings-section-title">Backup</div>
     <div class="settings-hint" style="margin-top:0;margin-bottom:10px">Save all notes, projects and media into a single ZIP file. Restore on any device without an account.</div>
     <div class="gd-btn-row">
@@ -2629,6 +2644,68 @@ function _dataUrlToBlob(dataUrl){
   return new Blob([buf], {type: mime});
 }
 
+// ── STORAGE SAFETY ──
+// This app is someone's creative archive, and by default a browser may evict
+// localStorage + IndexedDB under disk pressure with no warning. Persistent
+// storage asks the browser to promise it won't. Chrome grants it silently based
+// on engagement/installation; Safari grants it on home-screen install; either
+// way it can only ever help, so we ask once on startup and surface the result.
+let _storagePersisted=null; // null = unknown/unsupported
+async function checkPersistentStorage(){
+  if(!navigator.storage || !navigator.storage.persisted) return null;
+  try{ _storagePersisted=await navigator.storage.persisted(); }catch(_){ _storagePersisted=null; }
+  return _storagePersisted;
+}
+async function requestPersistentStorage(silent){
+  if(!navigator.storage || !navigator.storage.persist) return null;
+  try{
+    if(await navigator.storage.persisted()){ _storagePersisted=true; }
+    else { _storagePersisted=await navigator.storage.persist(); }
+  }catch(_){ _storagePersisted=null; }
+  if(!silent){
+    toast(_storagePersisted ? 'Archive protected from auto-cleanup'
+                            : 'Browser declined — keep exporting ZIP backups');
+  }
+  refreshStorageUi();
+  return _storagePersisted;
+}
+function _fmtBytes(n){
+  if(!n && n!==0) return '';
+  if(n<1024*1024) return Math.round(n/1024)+' KB';
+  if(n<1024*1024*1024) return (n/1024/1024).toFixed(1)+' MB';
+  return (n/1024/1024/1024).toFixed(2)+' GB';
+}
+async function refreshStorageUi(){
+  const stateEl=document.getElementById('storage-state');
+  const detailEl=document.getElementById('storage-detail');
+  const protectRow=document.getElementById('storage-protect-row');
+  if(!stateEl||!detailEl) return;
+  const persisted=await checkPersistentStorage();
+  // Usage figure, when the browser exposes it
+  let usageTxt='';
+  if(navigator.storage && navigator.storage.estimate){
+    try{
+      const {usage}=await navigator.storage.estimate();
+      if(usage!=null) usageTxt=_fmtBytes(usage)+' stored';
+    }catch(_){}
+  }
+  const last=settings.lastBackupTs;
+  const backupTxt = last
+    ? 'Last ZIP backup '+fmtRelTime(last)
+    : 'No ZIP backup yet';
+  if(persisted===true){
+    stateEl.className='storage-state safe';
+    stateEl.innerHTML='<span class="st-dot"></span>Protected from auto-cleanup';
+    detailEl.textContent=[usageTxt,backupTxt].filter(Boolean).join(' · ');
+    if(protectRow) protectRow.style.display='none';
+  } else {
+    stateEl.className='storage-state risk';
+    stateEl.innerHTML='<span class="st-dot"></span>'+(persisted===false?'Can be cleared by the browser':'Protection status unknown');
+    detailEl.textContent=[usageTxt,backupTxt,'Your captures live in this browser. Protect them, and keep a ZIP backup.'].filter(Boolean).join(' · ');
+    if(protectRow) protectRow.style.display='';
+  }
+}
+
 async function exportAllZip(){
   if(typeof JSZip === 'undefined'){ toast('ZIP library not loaded'); return; }
   const btn = document.getElementById('backup-export-btn');
@@ -2713,6 +2790,11 @@ async function exportAllZip(){
     const stamp = new Date().toISOString().slice(0,10);
     dl(out, `hum-backup-${stamp}.zip`);
     if(status) status.textContent = `Exported ${cleanedEntries.length} entries, ${sortedProjects.length} projects, ${mediaFiles.length} media files.`;
+    // Remember when the archive was last safely off-device, so Storage can nudge
+    // if it ever goes stale (this is the only backup the app can verify happened).
+    settings.lastBackupTs = Date.now();
+    try{ localStorage.setItem(ST, JSON.stringify(settings)); }catch(_){}
+    refreshStorageUi();
     toast('Backup ready');
   }catch(err){
     console.error(err);
@@ -4278,6 +4360,23 @@ function _purgeUndo(){
 }
 
 // Shared helper: store a blob as a new media item on an existing entry
+// Derive an entry's type from the media it holds, so the pill and type filters
+// reflect what the entry actually IS regardless of capture order (photo-first,
+// audio-then-photo, etc). Audio is the primary creative content in this app, so
+// a recorded take wins over a reference photo/video. Only re-derives "untouched
+// placeholder" entries — ones with no user title/note and a media-derived-or-idea
+// type — so it never overrides a deliberately chosen type (dream/text) or an
+// entry the user has started curating. Called from every path that adds media
+// (attach, camera, in-note recording) so the two paths can't drift apart.
+function deriveEntryType(e){
+  if(!e) return;
+  const userTyped=(e.note&&e.note.trim())||(e.name&&e.name.trim());
+  const placeholderType=e.type==='idea'||e.type==='audio'||e.type==='photo'||e.type==='video';
+  if(userTyped || !placeholderType) return;
+  const types=(e.media||[]).map(m=>m.type);
+  const derived=types.includes('audio')?'audio':types.includes('video')?'video':types.includes('photo')?'photo':null;
+  if(derived) e.type=derived;
+}
 async function _attachBlobToEntry(entryId, blob, mimeType, mediaType, duration, name){
   const idx=entries.findIndex(x=>x.id===entryId); if(idx<0) return;
   const mid=uid();
@@ -4286,9 +4385,12 @@ async function _attachBlobToEntry(entryId, blob, mimeType, mediaType, duration, 
     const e=entries[idx];
     if(!e.media) e.media=[];
     const item={id:mid, type:mediaType, mimeType, duration:duration||null};
-    if(name) item.name=name; // original filename — shown on generic 'file' chips
+    // Original filename is only meaningful for generic 'file' chips (shown as the
+    // download name). Photo/video/audio don't display it, so don't stash it on them.
+    if(name && mediaType==='file') item.name=name;
     e.media.push(item);
     e.hasMedia=true;
+    deriveEntryType(e);
     try{ persist(); }catch(_){}
     scheduleGdPush();
     render(); openDetail(entryId); toast(mediaType.charAt(0).toUpperCase()+mediaType.slice(1)+' added');
@@ -4589,6 +4691,9 @@ async function onCapRecStop(){
   if(lockedBpm){ mediaItem.tempoBpm=lockedBpm; mediaItem.tempoLocked=true; } // exact tempo, not estimated
   capEntry.media.push(mediaItem);
   capEntry.hasMedia=true; capEntry.mimeType=capEntry.media[0].mimeType;
+  // A take recorded into a photo-first entry should make it read as audio (the
+  // reverse-order case the attach path also handles) — one shared rule, both paths.
+  deriveEntryType(capEntry);
   if(!capEntry.duration) capEntry.duration=dur||null;
   // Count-in gives an exact tempo — lock it onto the entry, skip BPM estimation
   if(lockedBpm && capEntry.bpm==null){
@@ -5508,6 +5613,7 @@ function openSettings(){
   document.getElementById('openai-key').value=settings.openaiKey||'';
   document.getElementById('rec-format').value=settings.recFormat||'mp3-320';
   updateVaultUi();
+  refreshStorageUi();
   document.getElementById('gd-client-id').value=settings.gdClientId||'';
   const tt=document.getElementById('theme-toggle-input'); if(tt) tt.checked=settings.theme==='dark';
   updateGdUi();
@@ -6748,6 +6854,10 @@ renderHeatmap();
 migrateLegacyMedia().then(()=>{ migrateMediaArray(); render(); }).catch(err=>console.warn('Media migration failed:',err));
 if(settings.gdClientId) loadGsi();
 vaultResume();
+// Ask the browser not to evict the archive. Silent: it either quietly succeeds
+// or the Storage section in Settings shows it needs attention. Deferred so it
+// never competes with the capture button becoming usable.
+window.addEventListener('load', ()=>{ setTimeout(()=>requestPersistentStorage(true), 1200); });
 wireCaptureButton(document.getElementById('capture-btn'));
 wireCaptureButton(document.getElementById('mob-fab'));
 // closeNote() already stops/saves an active recording and releases the mic
@@ -6770,12 +6880,39 @@ if ('serviceWorker' in navigator) {
     // Keep local dev clean — no stale caching across edits
     navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(r => r.unregister()));
   } else {
+    let _swReg = null, _lastUpdateCheck = 0;
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js').catch(() => {});
+      navigator.serviceWorker.register('./sw.js').then(reg => { _swReg = reg; }).catch(() => {});
     });
+    // Signal 1: the SW's fetch handler noticed the HTML changed (fires on navigation).
     navigator.serviceWorker.addEventListener('message', e => {
       if (e.data && e.data.type === 'SW_UPDATE') _showSwUpdateBar();
     });
+    // Signal 2: a new SW installed and took over. sw.js bumps CACHE every release,
+    // so new bytes = new version. Guarded by hadController so the very first
+    // registration (which also fires controllerchange) doesn't cry "update".
+    let hadController = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (hadController) _showSwUpdateBar();
+      hadController = true;
+    });
+    // An installed PWA can stay open for days and would otherwise never re-fetch
+    // sw.js, so it'd never learn about a deploy. Re-check when the app returns to
+    // the foreground, throttled so app-switching doesn't hammer the server.
+    let _updateInFlight = false;
+    const checkForUpdate = () => {
+      if (!_swReg || _updateInFlight || document.visibilityState !== 'visible') return;
+      if (Date.now() - _lastUpdateCheck < 60000) return; // at most once a minute
+      _updateInFlight = true;
+      // Advance the throttle only on SUCCESS, so a failed check (e.g. a brief
+      // offline blip) can retry on the next foreground instead of waiting 60s.
+      _swReg.update()
+        .then(() => { _lastUpdateCheck = Date.now(); })
+        .catch(() => {})
+        .finally(() => { _updateInFlight = false; });
+    };
+    document.addEventListener('visibilitychange', checkForUpdate);
+    window.addEventListener('focus', checkForUpdate);
   }
 }
 function _showSwUpdateBar() {
