@@ -1,5 +1,9 @@
+# Internal dev docs — this repo is also the GitHub Pages site, so anything
+# tracked here is publicly served at dafaspace.github.io/hum/<file>.
+CLAUDE.md
 DEV.md
 Archive/
+Prototypes/
 client_secret*.json
 .claude/
 .DS_Store
