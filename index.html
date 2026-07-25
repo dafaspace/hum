@@ -111,6 +111,29 @@ document.head.appendChild(appleIcon);
   outline: 2px solid var(--warm);
   outline-offset: 2px;
 }
+/* Press feedback on pointer-DOWN, everywhere. Until now the app only had :hover,
+   which does nothing on a touchscreen: you pressed a control and nothing happened
+   until release. Zero specificity (:where) so bespoke press states (the capture
+   orb, the shutter) still win. Transform+opacity only, so it composites. */
+:where(button, .card, .stream-entry, .nav-item, .tfilter-pill, .exp-pop-item,
+       .cswatch, .proj-edit-btn, .note-file-chip, [role="button"]):active {
+  transform: scale(0.97);
+  opacity: 0.85;
+}
+/* Full-width rows would look wrong shrinking toward their centre; dim them instead. */
+:where(.card, .stream-entry, .nav-item, .exp-pop-item):active {
+  transform: none;
+  opacity: 0.72;
+}
+:where(button, .card, .stream-entry, .nav-item, .tfilter-pill, .exp-pop-item,
+       .cswatch, .proj-edit-btn, .note-file-chip, [role="button"]) {
+  transition: transform .12s cubic-bezier(.22,1,.36,1), opacity .12s ease-out;
+}
+@media (prefers-reduced-motion: reduce){
+  /* Keep the feedback, drop the movement — opacity alone still confirms the press. */
+  :where(button, .card, .stream-entry, .nav-item, .tfilter-pill, .exp-pop-item,
+         .cswatch, .proj-edit-btn, .note-file-chip, [role="button"]):active { transform: none; }
+}
 html { height: 100%; }
 body {
   height: 100%;
@@ -212,7 +235,8 @@ body {
   cursor: pointer;
   font-size: 13px; font-weight: 400;
   color: var(--ink2);
-  transition: background 0.15s, color 0.15s;
+  /* opacity included so the global :active press state animates rather than snapping */
+  transition: background 0.15s, color 0.15s, opacity .12s ease-out;
   user-select: none;
 }
 .nav-item:hover { background: var(--paper3); color: var(--ink); }
@@ -545,7 +569,7 @@ body {
   border-radius: var(--r2);
   padding: 16px 18px;
   cursor: pointer;
-  transition: border-color 0.15s, box-shadow 0.18s, transform 0.15s;
+  transition: border-color 0.15s, box-shadow 0.18s, transform 0.15s, opacity .12s ease-out;
   position: relative; overflow: hidden;
 }
 .card:hover {
