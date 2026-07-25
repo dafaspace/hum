@@ -368,7 +368,7 @@ body {
   box-shadow:0 8px 40px rgba(0,0,0,0.18);
 }
 .about-header { margin-bottom:20px; }
-.about-title { font-family:var(--serif); font-size:22px; font-weight:500; color:var(--ink); }
+.about-title { font-family:var(--serif); font-size:22px; font-weight:500; color:var(--ink); letter-spacing:-0.01em; }
 .about-sub { font-family:var(--sans); font-size:13px; color:var(--ink2); margin-top:3px; }
 .about-section { display:flex; gap:12px; margin-bottom:18px; }
 .about-section-icon { flex-shrink:0; margin-top:2px; color:var(--warm2); }
@@ -382,10 +382,17 @@ body {
 /* ── MAIN ── */
 #main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
 
+/* Chrome reads as a translucent layer over the page rather than an opaque strip:
+   a slightly lighter, saturated material with a hairline that fades toward the
+   edges, instead of a hard 1px rule cutting the window in two. */
 #topbar {
   padding: 18px 24px 14px;
   display: flex; align-items: center; gap: 14px;
-  border-bottom: 1px solid var(--paper4);
+  background: color-mix(in srgb, var(--paper) 72%, transparent);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid color-mix(in srgb, var(--paper4) 55%, transparent);
+  position: relative; z-index: 5;
 }
 #view-title {
   font-family: var(--serif); font-size: 22px; font-weight: 500;
@@ -712,15 +719,27 @@ body {
   display: flex; align-items: center; justify-content: center;
   color: var(--ink3);
 }
-.empty-title { font-family: var(--serif); font-size: 19px; font-weight: 500; color: var(--ink2); margin-bottom: 6px; }
+.empty-title { font-family: var(--serif); font-size: 19px; font-weight: 500; color: var(--ink2); margin-bottom: 6px; letter-spacing: -0.01em; }
 .empty-sub { font-size: 13px; color: var(--ink3); }
 
 /* ── STATUS BAR ── */
 #statusbar {
   padding: 7px 24px;
-  border-top: 1px solid var(--paper4);
+  border-top: 1px solid color-mix(in srgb, var(--paper4) 55%, transparent);
   display: flex; align-items: center; gap: 16px;
-  background: var(--paper2);
+  background: color-mix(in srgb, var(--paper2) 72%, transparent);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  position: relative; z-index: 5;
+}
+/* Translucency is a preference, not a given: make the chrome solid when the user
+   asks for reduced transparency, and keep contrast when they ask for more. */
+@media (prefers-reduced-transparency: reduce) {
+  #topbar { background: var(--paper); backdrop-filter: none; -webkit-backdrop-filter: none; }
+  #statusbar { background: var(--paper2); backdrop-filter: none; -webkit-backdrop-filter: none; }
+}
+@media (prefers-contrast: more) {
+  #topbar, #statusbar { border-color: var(--ink3); }
 }
 .sb-item { font-size: 11px; color: var(--ink3); display: flex; align-items: center; gap: 5px; }
 .sb-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--moss); }
@@ -743,7 +762,7 @@ body {
 }
 .rec-label {
   font-family: var(--serif); font-size: 18px; font-weight: 500;
-  color: var(--ink); margin-bottom: 4px;
+  color: var(--ink); margin-bottom: 4px; letter-spacing: -0.008em;
 }
 .rec-sub {
   font-size: 11px; letter-spacing: 0.12em;
@@ -759,8 +778,10 @@ body {
 .rwave:nth-child(7) { animation-delay:.33s }
 @keyframes rwave { 0%,100%{height:6px;opacity:.3} 50%{height:42px;opacity:.85} }
 .rec-time {
+  /* Largest type in the app, so it needs the tightest tracking — it was the only
+     display-size text set POSITIVE, which reads as letters drifting apart. */
   font-family: var(--serif); font-size: 44px; font-weight: 500;
-  color: var(--ink); letter-spacing: 0.02em;
+  color: var(--ink); letter-spacing: -0.02em;
   margin-bottom: 28px;
   font-variant-numeric: tabular-nums;
 }
@@ -1059,7 +1080,7 @@ body {
 #cap-rec-btn .srec-shape { width: 26px; height: 26px; border-radius: 50%; background: #fff; transition: all 0.2s; }
 #cap-rec-btn.recording { animation: capRecBreath 2s ease-in-out infinite; }
 #cap-rec-btn.recording .srec-shape { width: 22px; height: 22px; border-radius: 5px; }
-#cap-timer { font-family: var(--sans); font-size: 26px; font-weight: 300; color: var(--ink); font-variant-numeric: tabular-nums; }
+#cap-timer { font-family: var(--sans); font-size: 26px; font-weight: 300; color: var(--ink); font-variant-numeric: tabular-nums; letter-spacing: -0.015em; }
 .cap-title { width: 90%; border: none; border-bottom: 1px dashed var(--ink4); background: none; font-family: var(--serif); font-size: 20px; color: var(--ink); padding: 2px 4px 4px; margin: -2px -4px 0; border-radius: 4px 4px 0 0; outline: none; transition: background 0.15s, border-color 0.15s; }
 .cap-title:hover { background: var(--paper2); }
 .cap-title:focus { background: var(--paper2); border-bottom: 1px solid var(--warm); }
@@ -1613,9 +1634,13 @@ body {
     flex-wrap: wrap;
     padding: calc(env(safe-area-inset-top) + 16px) 20px 0;
     border-bottom: none;
-    background: var(--mob-bg);
+    /* Same translucent material as desktop, tuned for the phone's own bg token */
+    background: color-mix(in srgb, var(--mob-bg) 72%, transparent);
     gap: 0;
     row-gap: 10px;
+  }
+  @media (prefers-reduced-transparency: reduce) {
+    #topbar { background: var(--mob-bg); }
   }
   #sidebar-toggle { display: none; }
   #view-title { display: none; }
