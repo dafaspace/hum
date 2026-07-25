@@ -1244,7 +1244,7 @@ body {
   display: flex; align-items: center; gap: 4px;
 }
 #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
-#sw-update-bar {
+#sw-update-bar, #backup-nudge {
   position: fixed; bottom: calc(80px + env(safe-area-inset-bottom)); left: 50%;
   transform: translateX(-50%) translateY(8px);
   background: var(--ink); color: var(--paper);
@@ -1256,8 +1256,12 @@ body {
   opacity: 0; pointer-events: none;
   transition: opacity 0.25s, transform 0.25s;
 }
-#sw-update-bar.show { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
-#sw-update-bar button { background: var(--warm); color: #fff; border: none; border-radius: 100px; padding: 5px 13px; font-family: var(--sans); font-size: 12px; font-weight: 500; cursor: pointer; }
+#sw-update-bar.show, #backup-nudge.show { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
+/* Backup nudge reuses the update bar's shape (same selector) so the app keeps one
+   language for "something wants your attention down here". */
+#backup-nudge .bn-dismiss { background: none; color: var(--paper); opacity: .55; padding: 5px 9px; }
+#backup-nudge .bn-dismiss:hover { opacity: 1; }
+#sw-update-bar button, #backup-nudge button { background: var(--warm); color: #fff; border: none; border-radius: 100px; padding: 5px 13px; font-family: var(--sans); font-size: 12px; font-weight: 500; cursor: pointer; }
 
 /* ── SETTINGS ── */
 .settings-btn {
@@ -2167,6 +2171,15 @@ audio { display: none; }
     <div class="gd-btn-row" id="storage-protect-row" style="display:none;margin-top:8px">
       <button class="gd-small-btn primary" onclick="requestPersistentStorage()" id="storage-protect-btn">Protect my archive</button>
     </div>
+    <div id="storage-remind-row" style="display:none;margin-top:10px">
+      <label class="flabel" for="storage-remind-sel">Remind me to back up</label>
+      <select class="fselect" id="storage-remind-sel" onchange="setBackupRemind(this.value)">
+        <option value="7">Every week</option>
+        <option value="14">Every 2 weeks</option>
+        <option value="30">Every month</option>
+        <option value="0">Never</option>
+      </select>
+    </div>
     <hr class="settings-sep">
     <div class="settings-section-title">Backup</div>
     <div class="settings-hint" style="margin-top:0;margin-bottom:10px">Save all notes, projects and media into a single ZIP file. Restore on any device without an account.</div>
@@ -2726,10 +2739,30 @@ function _fmtBytes(n){
   if(n<1024*1024*1024) return (n/1024/1024).toFixed(1)+' MB';
   return (n/1024/1024/1024).toFixed(2)+' GB';
 }
+// Is a copy of the archive being written somewhere outside this browser,
+// automatically? That's the only thing that actually survives "clear site data",
+// a lost phone, or a dead disk — so it, not persist(), decides the headline state.
+function _autoBackupTarget(){
+  if(_vaultHandle) return 'Local Vault';
+  if(settings.gdClientId && settings.gdConnected) return 'Google Drive';
+  return null;
+}
+// Nag only when nothing automatic is running. Interval is in days; 0 = off.
+function _backupOverdue(){
+  if(_autoBackupTarget()) return false;          // already covered, don't nag
+  const days=settings.backupRemindDays;
+  if(days===0) return false;                     // user switched reminders off
+  const every=(days||14)*86400000;               // default: every 2 weeks
+  const last=settings.lastBackupTs;
+  if(!last) return entries.length>0;             // never backed up, but has work to lose
+  return (Date.now()-last)>every;
+}
 async function refreshStorageUi(){
   const stateEl=document.getElementById('storage-state');
   const detailEl=document.getElementById('storage-detail');
   const protectRow=document.getElementById('storage-protect-row');
+  const remindRow=document.getElementById('storage-remind-row');
+  const remindSel=document.getElementById('storage-remind-sel');
   if(!stateEl||!detailEl) return;
   const persisted=await checkPersistentStorage();
   // Usage figure, when the browser exposes it
@@ -2741,13 +2774,31 @@ async function refreshStorageUi(){
     }catch(_){}
   }
   const last=settings.lastBackupTs;
-  const backupTxt = last
-    ? 'Last ZIP backup '+fmtRelTime(last)
-    : 'No ZIP backup yet';
-  if(persisted===true){
+  const backupTxt = last ? 'Last ZIP backup '+fmtRelTime(last) : 'No ZIP backup yet';
+  const auto=_autoBackupTarget();
+  if(remindSel) remindSel.value=String(settings.backupRemindDays??14);
+  // Reminders are pointless while something automatic is running, so hide the control.
+  if(remindRow) remindRow.style.display=auto?'none':'';
+
+  if(auto){
+    // A second copy is being written outside the browser: that outranks persist(),
+    // which only protects against automatic eviction on this device.
     stateEl.className='storage-state safe';
-    stateEl.innerHTML='<span class="st-dot"></span>Protected from auto-cleanup';
-    detailEl.textContent=[usageTxt,backupTxt].filter(Boolean).join(' · ');
+    stateEl.innerHTML='<span class="st-dot"></span>Auto-syncing to '+escHtml(auto);
+    detailEl.textContent=[usageTxt, persisted===true?'Protected from auto-cleanup':null, backupTxt]
+      .filter(Boolean).join(' · ');
+    if(protectRow) protectRow.style.display=persisted===true?'none':'';
+    return;
+  }
+  if(persisted===true){
+    // Safe from eviction, but still a single copy on one device.
+    stateEl.className=_backupOverdue()?'storage-state risk':'storage-state safe';
+    stateEl.innerHTML='<span class="st-dot"></span>'+(_backupOverdue()
+      ? 'Backup due — one copy only'
+      : 'Protected from auto-cleanup');
+    detailEl.textContent=[usageTxt,backupTxt,
+      _backupOverdue()?'Export a ZIP, or set up Local Vault / Drive for automatic copies.':null]
+      .filter(Boolean).join(' · ');
     if(protectRow) protectRow.style.display='none';
   } else {
     stateEl.className='storage-state risk';
@@ -2755,6 +2806,11 @@ async function refreshStorageUi(){
     detailEl.textContent=[usageTxt,backupTxt,'Your captures live in this browser. Protect them, and keep a ZIP backup.'].filter(Boolean).join(' · ');
     if(protectRow) protectRow.style.display='';
   }
+}
+function setBackupRemind(v){
+  settings.backupRemindDays=parseInt(v,10);
+  try{ localStorage.setItem(ST,JSON.stringify(settings)); }catch(_){}
+  refreshStorageUi();
 }
 
 async function exportAllZip(){
@@ -7060,6 +7116,8 @@ vaultResume();
 // or the Storage section in Settings shows it needs attention. Deferred so it
 // never competes with the capture button becoming usable.
 window.addEventListener('load', ()=>{ setTimeout(()=>requestPersistentStorage(true), 1200); });
+// Backup nudge comes later still: capture must never wait on a reminder.
+window.addEventListener('load', ()=>{ setTimeout(_maybeNudgeBackup, 2600); });
 wireCaptureButton(document.getElementById('capture-btn'));
 wireCaptureButton(document.getElementById('mob-fab'));
 _wireSheetDrag();
@@ -7117,6 +7175,34 @@ if ('serviceWorker' in navigator) {
     document.addEventListener('visibilitychange', checkForUpdate);
     window.addEventListener('focus', checkForUpdate);
   }
+}
+// Nudge to back up, but only when nothing automatic is covering the archive
+// (see _backupOverdue). Shown once per session, dismissable, and it snoozes for
+// a week rather than nagging on every launch.
+function _maybeNudgeBackup(){
+  if(!_backupOverdue()) return;
+  const snoozed=settings.backupNudgeSnoozeTs||0;
+  if(Date.now()-snoozed < 7*86400000) return;
+  if(document.getElementById('backup-nudge')) return;
+  const last=settings.lastBackupTs;
+  const msg=last ? 'Your last backup was '+fmtRelTime(last) : 'Your archive has never been backed up';
+  const bar=document.createElement('div');
+  bar.id='backup-nudge';
+  bar.innerHTML=`<span>${escHtml(msg)}</span>`;
+  const back=document.createElement('button');
+  back.textContent='Back up';
+  back.onclick=()=>{ bar.remove(); openSettings(); setTimeout(()=>{ const b=document.getElementById('backup-export-btn'); if(b) b.focus(); },350); };
+  const later=document.createElement('button');
+  later.className='bn-dismiss'; later.textContent='Later';
+  later.onclick=()=>{
+    settings.backupNudgeSnoozeTs=Date.now();
+    try{ localStorage.setItem(ST,JSON.stringify(settings)); }catch(_){}
+    bar.remove();
+  };
+  bar.append(back,later);
+  document.body.appendChild(bar);
+  void bar.offsetWidth; // commit pre-animation state without relying on rAF
+  bar.classList.add('show');
 }
 function _showSwUpdateBar() {
   if (document.getElementById('sw-update-bar')) return;
