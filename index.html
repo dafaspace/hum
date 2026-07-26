@@ -111,6 +111,29 @@ document.head.appendChild(appleIcon);
   outline: 2px solid var(--warm);
   outline-offset: 2px;
 }
+/* Press feedback on pointer-DOWN, everywhere. Until now the app only had :hover,
+   which does nothing on a touchscreen: you pressed a control and nothing happened
+   until release. Zero specificity (:where) so bespoke press states (the capture
+   orb, the shutter) still win. Transform+opacity only, so it composites. */
+:where(button, .card, .stream-entry, .nav-item, .tfilter-pill, .exp-pop-item,
+       .cswatch, .proj-edit-btn, .note-file-chip, [role="button"]):active {
+  transform: scale(0.97);
+  opacity: 0.85;
+}
+/* Full-width rows would look wrong shrinking toward their centre; dim them instead. */
+:where(.card, .stream-entry, .nav-item, .exp-pop-item):active {
+  transform: none;
+  opacity: 0.72;
+}
+:where(button, .card, .stream-entry, .nav-item, .tfilter-pill, .exp-pop-item,
+       .cswatch, .proj-edit-btn, .note-file-chip, [role="button"]) {
+  transition: transform .12s cubic-bezier(.22,1,.36,1), opacity .12s ease-out;
+}
+@media (prefers-reduced-motion: reduce){
+  /* Keep the feedback, drop the movement — opacity alone still confirms the press. */
+  :where(button, .card, .stream-entry, .nav-item, .tfilter-pill, .exp-pop-item,
+         .cswatch, .proj-edit-btn, .note-file-chip, [role="button"]):active { transform: none; }
+}
 html { height: 100%; }
 body {
   height: 100%;
@@ -212,7 +235,8 @@ body {
   cursor: pointer;
   font-size: 13px; font-weight: 400;
   color: var(--ink2);
-  transition: background 0.15s, color 0.15s;
+  /* opacity included so the global :active press state animates rather than snapping */
+  transition: background 0.15s, color 0.15s, opacity .12s ease-out;
   user-select: none;
 }
 .nav-item:hover { background: var(--paper3); color: var(--ink); }
@@ -344,7 +368,7 @@ body {
   box-shadow:0 8px 40px rgba(0,0,0,0.18);
 }
 .about-header { margin-bottom:20px; }
-.about-title { font-family:var(--serif); font-size:22px; font-weight:500; color:var(--ink); }
+.about-title { font-family:var(--serif); font-size:22px; font-weight:500; color:var(--ink); letter-spacing:-0.01em; }
 .about-sub { font-family:var(--sans); font-size:13px; color:var(--ink2); margin-top:3px; }
 .about-section { display:flex; gap:12px; margin-bottom:18px; }
 .about-section-icon { flex-shrink:0; margin-top:2px; color:var(--warm2); }
@@ -358,10 +382,17 @@ body {
 /* ── MAIN ── */
 #main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
 
+/* Chrome reads as a translucent layer over the page rather than an opaque strip:
+   a slightly lighter, saturated material with a hairline that fades toward the
+   edges, instead of a hard 1px rule cutting the window in two. */
 #topbar {
   padding: 18px 24px 14px;
   display: flex; align-items: center; gap: 14px;
-  border-bottom: 1px solid var(--paper4);
+  background: color-mix(in srgb, var(--paper) 72%, transparent);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid color-mix(in srgb, var(--paper4) 55%, transparent);
+  position: relative; z-index: 5;
 }
 #view-title {
   font-family: var(--serif); font-size: 22px; font-weight: 500;
@@ -545,7 +576,7 @@ body {
   border-radius: var(--r2);
   padding: 16px 18px;
   cursor: pointer;
-  transition: border-color 0.15s, box-shadow 0.18s, transform 0.15s;
+  transition: border-color 0.15s, box-shadow 0.18s, transform 0.15s, opacity .12s ease-out;
   position: relative; overflow: hidden;
 }
 .card:hover {
@@ -688,15 +719,27 @@ body {
   display: flex; align-items: center; justify-content: center;
   color: var(--ink3);
 }
-.empty-title { font-family: var(--serif); font-size: 19px; font-weight: 500; color: var(--ink2); margin-bottom: 6px; }
+.empty-title { font-family: var(--serif); font-size: 19px; font-weight: 500; color: var(--ink2); margin-bottom: 6px; letter-spacing: -0.01em; }
 .empty-sub { font-size: 13px; color: var(--ink3); }
 
 /* ── STATUS BAR ── */
 #statusbar {
   padding: 7px 24px;
-  border-top: 1px solid var(--paper4);
+  border-top: 1px solid color-mix(in srgb, var(--paper4) 55%, transparent);
   display: flex; align-items: center; gap: 16px;
-  background: var(--paper2);
+  background: color-mix(in srgb, var(--paper2) 72%, transparent);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  position: relative; z-index: 5;
+}
+/* Translucency is a preference, not a given: make the chrome solid when the user
+   asks for reduced transparency, and keep contrast when they ask for more. */
+@media (prefers-reduced-transparency: reduce) {
+  #topbar { background: var(--paper); backdrop-filter: none; -webkit-backdrop-filter: none; }
+  #statusbar { background: var(--paper2); backdrop-filter: none; -webkit-backdrop-filter: none; }
+}
+@media (prefers-contrast: more) {
+  #topbar, #statusbar { border-color: var(--ink3); }
 }
 .sb-item { font-size: 11px; color: var(--ink3); display: flex; align-items: center; gap: 5px; }
 .sb-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--moss); }
@@ -719,7 +762,7 @@ body {
 }
 .rec-label {
   font-family: var(--serif); font-size: 18px; font-weight: 500;
-  color: var(--ink); margin-bottom: 4px;
+  color: var(--ink); margin-bottom: 4px; letter-spacing: -0.008em;
 }
 .rec-sub {
   font-size: 11px; letter-spacing: 0.12em;
@@ -735,8 +778,10 @@ body {
 .rwave:nth-child(7) { animation-delay:.33s }
 @keyframes rwave { 0%,100%{height:6px;opacity:.3} 50%{height:42px;opacity:.85} }
 .rec-time {
+  /* Largest type in the app, so it needs the tightest tracking — it was the only
+     display-size text set POSITIVE, which reads as letters drifting apart. */
   font-family: var(--serif); font-size: 44px; font-weight: 500;
-  color: var(--ink); letter-spacing: 0.02em;
+  color: var(--ink); letter-spacing: -0.02em;
   margin-bottom: 28px;
   font-variant-numeric: tabular-nums;
 }
@@ -1035,7 +1080,7 @@ body {
 #cap-rec-btn .srec-shape { width: 26px; height: 26px; border-radius: 50%; background: #fff; transition: all 0.2s; }
 #cap-rec-btn.recording { animation: capRecBreath 2s ease-in-out infinite; }
 #cap-rec-btn.recording .srec-shape { width: 22px; height: 22px; border-radius: 5px; }
-#cap-timer { font-family: var(--sans); font-size: 26px; font-weight: 300; color: var(--ink); font-variant-numeric: tabular-nums; }
+#cap-timer { font-family: var(--sans); font-size: 26px; font-weight: 300; color: var(--ink); font-variant-numeric: tabular-nums; letter-spacing: -0.015em; }
 .cap-title { width: 90%; border: none; border-bottom: 1px dashed var(--ink4); background: none; font-family: var(--serif); font-size: 20px; color: var(--ink); padding: 2px 4px 4px; margin: -2px -4px 0; border-radius: 4px 4px 0 0; outline: none; transition: background 0.15s, border-color 0.15s; }
 .cap-title:hover { background: var(--paper2); }
 .cap-title:focus { background: var(--paper2); border-bottom: 1px solid var(--warm); }
@@ -1130,6 +1175,13 @@ body {
 .note-analysis-action:hover { border-color: var(--ink4); color: var(--ink); }
 .note-analysis-text { font-size: 12.5px; color: var(--ink2); line-height: 1.7; white-space: pre-wrap; margin-top: 6px; }
 .note-analysis-hint { font-size: 12px; color: var(--ink3); margin-top: 4px; }
+/* Segmented voice/instrument picker: two halves of one control, so it reads as
+   a choice between two states rather than two independent buttons. */
+.mel-mode { display: inline-flex; margin-top: 7px; border: 1px solid var(--paper4); border-radius: 8px; overflow: hidden; background: var(--paper2); }
+.mel-mode-btn { font-family: var(--sans); font-size: 11px; padding: 4px 12px; border: none; background: none; color: var(--ink3); cursor: pointer; transition: background .12s, color .12s; }
+.mel-mode-btn + .mel-mode-btn { border-left: 1px solid var(--paper4); }
+.mel-mode-btn:hover { color: var(--ink2); }
+.mel-mode-btn.on { background: var(--surface); color: var(--ink); font-weight: 500; }
 /* Melody view */
 .note-mel-roll { margin-top: 8px; position: relative; }
 .mel-playhead { position: absolute; top: 0; width: 2px; height: 130px; background: var(--warm2); opacity: 0.9; left: 24px; pointer-events: none; box-shadow: 0 0 5px var(--warm2); border-radius: 1px; }
@@ -1244,7 +1296,7 @@ body {
   display: flex; align-items: center; gap: 4px;
 }
 #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
-#sw-update-bar {
+#sw-update-bar, #backup-nudge {
   position: fixed; bottom: calc(80px + env(safe-area-inset-bottom)); left: 50%;
   transform: translateX(-50%) translateY(8px);
   background: var(--ink); color: var(--paper);
@@ -1256,8 +1308,12 @@ body {
   opacity: 0; pointer-events: none;
   transition: opacity 0.25s, transform 0.25s;
 }
-#sw-update-bar.show { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
-#sw-update-bar button { background: var(--warm); color: #fff; border: none; border-radius: 100px; padding: 5px 13px; font-family: var(--sans); font-size: 12px; font-weight: 500; cursor: pointer; }
+#sw-update-bar.show, #backup-nudge.show { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
+/* Backup nudge reuses the update bar's shape (same selector) so the app keeps one
+   language for "something wants your attention down here". */
+#backup-nudge .bn-dismiss { background: none; color: var(--paper); opacity: .55; padding: 5px 9px; }
+#backup-nudge .bn-dismiss:hover { opacity: 1; }
+#sw-update-bar button, #backup-nudge button { background: var(--warm); color: #fff; border: none; border-radius: 100px; padding: 5px 13px; font-family: var(--sans); font-size: 12px; font-weight: 500; cursor: pointer; }
 
 /* ── SETTINGS ── */
 .settings-btn {
@@ -1585,9 +1641,13 @@ body {
     flex-wrap: wrap;
     padding: calc(env(safe-area-inset-top) + 16px) 20px 0;
     border-bottom: none;
-    background: var(--mob-bg);
+    /* Same translucent material as desktop, tuned for the phone's own bg token */
+    background: color-mix(in srgb, var(--mob-bg) 72%, transparent);
     gap: 0;
     row-gap: 10px;
+  }
+  @media (prefers-reduced-transparency: reduce) {
+    #topbar { background: var(--mob-bg); }
   }
   #sidebar-toggle { display: none; }
   #view-title { display: none; }
@@ -1771,7 +1831,7 @@ audio { display: none; }
       </div>
       <div class="brand-heatmap" id="brand-heatmap" title="Your activity"></div>
     </div>
-    <div class="brand-sub">capture before it fades <span class="brand-ver">v0.11</span></div>
+    <div class="brand-sub">capture before it fades <span class="brand-ver">v0.12</span></div>
     <button class="sidebar-close-btn" onclick="closeSidebar()" aria-label="Close">
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg>
     </button>
@@ -1824,7 +1884,7 @@ audio { display: none; }
       <div class="brand-wrap" onclick="toggleTheme()" title="Switch theme" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleTheme()}">
         <span class="brand">hum</span>
         <span class="brand-dot"></span>
-        <span class="brand-ver">v0.11</span>
+        <span class="brand-ver">v0.12</span>
       </div>
       <div style="display:flex;align-items:center;gap:4px">
         <button class="mob-settings-btn" onclick="openSettings()" title="Settings">
@@ -2167,6 +2227,15 @@ audio { display: none; }
     <div class="gd-btn-row" id="storage-protect-row" style="display:none;margin-top:8px">
       <button class="gd-small-btn primary" onclick="requestPersistentStorage()" id="storage-protect-btn">Protect my archive</button>
     </div>
+    <div id="storage-remind-row" style="display:none;margin-top:10px">
+      <label class="flabel" for="storage-remind-sel">Remind me to back up</label>
+      <select class="fselect" id="storage-remind-sel" onchange="setBackupRemind(this.value)">
+        <option value="7">Every week</option>
+        <option value="14">Every 2 weeks</option>
+        <option value="30">Every month</option>
+        <option value="0">Never</option>
+      </select>
+    </div>
     <hr class="settings-sep">
     <div class="settings-section-title">Backup</div>
     <div class="settings-hint" style="margin-top:0;margin-bottom:10px">Save all notes, projects and media into a single ZIP file. Restore on any device without an account.</div>
@@ -2219,7 +2288,7 @@ audio { display: none; }
 <div id="about-overlay">
   <div class="about-card">
     <div class="about-header">
-      <div class="about-title">Hum <span class="brand-ver" style="font-size:12px;opacity:0.5">v0.11</span></div>
+      <div class="about-title">Hum <span class="brand-ver" style="font-size:12px;opacity:0.5">v0.12</span></div>
       <div class="about-sub">Capture creative moments before they fade.</div>
     </div>
 
@@ -2726,10 +2795,30 @@ function _fmtBytes(n){
   if(n<1024*1024*1024) return (n/1024/1024).toFixed(1)+' MB';
   return (n/1024/1024/1024).toFixed(2)+' GB';
 }
+// Is a copy of the archive being written somewhere outside this browser,
+// automatically? That's the only thing that actually survives "clear site data",
+// a lost phone, or a dead disk — so it, not persist(), decides the headline state.
+function _autoBackupTarget(){
+  if(_vaultHandle) return 'Local Vault';
+  if(settings.gdClientId && settings.gdConnected) return 'Google Drive';
+  return null;
+}
+// Nag only when nothing automatic is running. Interval is in days; 0 = off.
+function _backupOverdue(){
+  if(_autoBackupTarget()) return false;          // already covered, don't nag
+  const days=settings.backupRemindDays;
+  if(days===0) return false;                     // user switched reminders off
+  const every=(days||14)*86400000;               // default: every 2 weeks
+  const last=settings.lastBackupTs;
+  if(!last) return entries.length>0;             // never backed up, but has work to lose
+  return (Date.now()-last)>every;
+}
 async function refreshStorageUi(){
   const stateEl=document.getElementById('storage-state');
   const detailEl=document.getElementById('storage-detail');
   const protectRow=document.getElementById('storage-protect-row');
+  const remindRow=document.getElementById('storage-remind-row');
+  const remindSel=document.getElementById('storage-remind-sel');
   if(!stateEl||!detailEl) return;
   const persisted=await checkPersistentStorage();
   // Usage figure, when the browser exposes it
@@ -2741,13 +2830,31 @@ async function refreshStorageUi(){
     }catch(_){}
   }
   const last=settings.lastBackupTs;
-  const backupTxt = last
-    ? 'Last ZIP backup '+fmtRelTime(last)
-    : 'No ZIP backup yet';
-  if(persisted===true){
+  const backupTxt = last ? 'Last ZIP backup '+fmtRelTime(last) : 'No ZIP backup yet';
+  const auto=_autoBackupTarget();
+  if(remindSel) remindSel.value=String(settings.backupRemindDays??14);
+  // Reminders are pointless while something automatic is running, so hide the control.
+  if(remindRow) remindRow.style.display=auto?'none':'';
+
+  if(auto){
+    // A second copy is being written outside the browser: that outranks persist(),
+    // which only protects against automatic eviction on this device.
     stateEl.className='storage-state safe';
-    stateEl.innerHTML='<span class="st-dot"></span>Protected from auto-cleanup';
-    detailEl.textContent=[usageTxt,backupTxt].filter(Boolean).join(' · ');
+    stateEl.innerHTML='<span class="st-dot"></span>Auto-syncing to '+escHtml(auto);
+    detailEl.textContent=[usageTxt, persisted===true?'Protected from auto-cleanup':null, backupTxt]
+      .filter(Boolean).join(' · ');
+    if(protectRow) protectRow.style.display=persisted===true?'none':'';
+    return;
+  }
+  if(persisted===true){
+    // Safe from eviction, but still a single copy on one device.
+    stateEl.className=_backupOverdue()?'storage-state risk':'storage-state safe';
+    stateEl.innerHTML='<span class="st-dot"></span>'+(_backupOverdue()
+      ? 'Backup due — one copy only'
+      : 'Protected from auto-cleanup');
+    detailEl.textContent=[usageTxt,backupTxt,
+      _backupOverdue()?'Export a ZIP, or set up Local Vault / Drive for automatic copies.':null]
+      .filter(Boolean).join(' · ');
     if(protectRow) protectRow.style.display='none';
   } else {
     stateEl.className='storage-state risk';
@@ -2755,6 +2862,11 @@ async function refreshStorageUi(){
     detailEl.textContent=[usageTxt,backupTxt,'Your captures live in this browser. Protect them, and keep a ZIP backup.'].filter(Boolean).join(' · ');
     if(protectRow) protectRow.style.display='';
   }
+}
+function setBackupRemind(v){
+  settings.backupRemindDays=parseInt(v,10);
+  try{ localStorage.setItem(ST,JSON.stringify(settings)); }catch(_){}
+  refreshStorageUi();
 }
 
 async function exportAllZip(){
@@ -5221,16 +5333,32 @@ function renderNoteAnalysis(){
 // Melody lives on each audio take: m.midi / m.midiOriginal / m.midiStats.
 let _melSel={mid:null, idx:-1};
 function _findTakeMedia(mid){ return capEntry&&capEntry.media?capEntry.media.find(x=>x.id===mid):null; }
+// Voice/Instrument picker. Voice runs a monophonic model (one line, follows a
+// hum); Instrument runs a polyphonic one (hears chords). Picking the wrong one
+// is the single most likely reason a take comes back as nonsense.
+function _takeModeToggleHtml(m){
+  const mode=_takeMode(m);
+  const btn=(v,label,title)=>`<button class="mel-mode-btn${mode===v?' on':''}" title="${title}"
+      onclick="setTakeMode('${m.id}','${v}')">${label}</button>`;
+  return `<div class="mel-mode" role="group" aria-label="Analysis mode">
+    ${btn('voice','Voice','Humming or singing — one melody line')}
+    ${btn('instrument','Instrument','Piano, guitar — can hear chords')}
+  </div>`;
+}
 function _takeMelodyHtml(m){
   const hasMidi=Array.isArray(m.midi)&&m.midi.length>0;
   const NAMES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
   if(!hasMidi){
+    const isInstr=_takeMode(m)==='instrument';
     return `<div class="note-take-melody">
       <div class="note-take-transcript-head">
         <span class="note-take-transcript-label">Melody</span>
         <button class="note-take-mini-btn" id="melbtn-${m.id}" onclick="runTakeMidi('${m.id}')">Analyse</button>
       </div>
-      <div class="note-analysis-hint" id="melstatus-${m.id}">Sing it as “da-da-da” (not “mmm”) for cleaner notes, then Analyse.</div>
+      ${_takeModeToggleHtml(m)}
+      <div class="note-analysis-hint" id="melstatus-${m.id}">${isInstr
+        ? 'Polyphonic: hears chords. Play cleanly, then Analyse.'
+        : 'Sing it as “da-da-da” (not “mmm”) for cleaner notes, then Analyse.'}</div>
     </div>`;
   }
   const sel=(_melSel.mid===m.id)?_melSel.idx:-1;
@@ -5244,7 +5372,10 @@ function _takeMelodyHtml(m){
   const isModified=m.midiOriginal&&JSON.stringify(m.midi.map(n=>n.p))!==JSON.stringify(m.midiOriginal.map(n=>n.p));
   const selName=(sel>=0&&m.midi[sel])?midiToNoteName(m.midi[sel].p):'';
   const st=m.midiStats;
-  const diag=st?` · ${st.loHz}–${st.hiHz} Hz · ${st.voiced}/${st.total} voiced`:'';
+  // Instrument stats count notes, not voiced frames — label them honestly.
+  const diag=st?(st.mode==='instrument'
+    ? ` · ${st.loHz}–${st.hiHz} Hz · polyphonic`
+    : ` · ${st.loHz}–${st.hiHz} Hz · ${st.voiced}/${st.total} voiced`):'';
   return `<div class="note-take-melody">
     <div class="note-take-transcript-head">
       <span class="note-take-transcript-label">Melody</span>
@@ -5253,6 +5384,7 @@ function _takeMelodyHtml(m){
         <button class="note-take-mini-btn" id="melbtn-${m.id}" onclick="runTakeMidi('${m.id}')">Re-analyse</button>
       </div>
     </div>
+    ${_takeModeToggleHtml(m)}
     <div class="note-mel-roll">${renderHumPianoRoll(rollNotes, totalDur, {interactive:true, selected:sel, mid:m.id})}<div class="mel-playhead" id="melph-${m.id}" style="display:none"></div></div>
     <div class="note-mel-names">${names}</div>
     ${sel>=0?`<div class="note-mel-edit"><span class="note-mel-edit-lbl">${selName}</span>
@@ -5267,7 +5399,7 @@ function _takeMelodyHtml(m){
       <button class="note-mel-btn" onclick="noteMelodySnap('${m.id}')">Snap</button>
       ${isModified?`<button class="note-mel-btn" onclick="noteMelodyReset('${m.id}')">↺ Reset</button>`:''}
     </div>
-    <div class="note-mel-meta">${m.midi.length} notes · ${midiToNoteName(lo)}–${midiToNoteName(hi)}${capEntry.bpm?` · ${capEntry.bpm} BPM`:''}${diag} · tap note to edit</div>
+    <div class="note-mel-meta">${m.midi.length} note${m.midi.length===1?'':'s'} · ${midiToNoteName(lo)}–${midiToNoteName(hi)}${capEntry.bpm?` · ${capEntry.bpm} BPM`:''}${diag} · tap note to edit</div>
   </div>`;
 }
 // Refresh only one take's melody block — leaves the <audio> player (and its playback) untouched
@@ -6496,6 +6628,36 @@ async function spiceTranscribe(blob, opts, onStatus){
   return {notes, stats};
 }
 
+// Polyphonic path: basic-pitch handles chords, which SPICE structurally cannot
+// (a monophonic model reads a chord as noise). Post-processing is deliberately
+// the SAME as the voice path, so switching mode changes the model, not the rules.
+async function instrumentTranscribe(blob, opts, onStatus){
+  opts=opts||{};
+  const raw=await generateMidi(blob, onStatus); // [{t,d,p,v}]
+  if(!raw.length) return {notes:[], stats:{mode:'instrument', total:0, voiced:0, loHz:0, hiHz:0}};
+  const hz=p=>440*Math.pow(2,(p-69)/12);
+  const pitches=raw.map(n=>n.p);
+  const stats={ mode:'instrument', total:raw.length, voiced:raw.length,
+    loHz:Math.round(hz(Math.min(...pitches))), hiHz:Math.round(hz(Math.max(...pitches))) };
+  let segs=raw.map(n=>({t:n.t, dur:n.d, pitch:n.p, v:n.v}));
+  if(opts.key){
+    const k=_parseKeyField(opts.key);
+    if(k){ segs=quantizeToScale(segs.map(s=>({...s})), k.root, _SCALES[k.mode==='min'?'min':'maj']); }
+  }
+  if(opts.tempoLocked && opts.bpm) segs=_quantizeRhythm(segs, opts.bpm);
+  const notes=segs.map((s,i)=>({t:Math.round(s.t*1000)/1000, d:Math.round(s.dur*1000)/1000,
+                                p:s.pitch, v:raw[i]?.v??96}));
+  return {notes, stats};
+}
+// Which model a take is analysed with. Stored per take because one note can hold
+// a hummed idea and a piano version of it side by side.
+function _takeMode(m){ return m&&m.midiMode==='instrument' ? 'instrument' : 'voice'; }
+function setTakeMode(mid, mode){
+  const m=_findTakeMedia(mid); if(!m) return;
+  m.midiMode=mode;
+  try{ persist(); }catch(_){}
+  refreshTakeMelody(mid);
+}
 // Analyse ONE take (audio media item) → store melody on that media item.
 async function runTakeMidi(mid){
   if(!capEntry) return;
@@ -6516,17 +6678,25 @@ async function runTakeMidi(mid){
     if(!blob){ toast('Audio not available'); return; }
     const bpm=m.tempoBpm||capEntry.bpm||null;
     const tempoLocked=!!m.tempoLocked;
+    const opts={bpm, tempoLocked, key:capEntry.key};
+    const mode=_takeMode(m);
     let res;
-    try{
-      res=await spiceTranscribe(blob, {bpm, tempoLocked, key:capEntry.key}, setStatus);
-    }catch(spiceErr){
-      console.warn('SPICE failed, basic-pitch fallback:', spiceErr);
-      setStatus('Falling back to basic-pitch…');
-      const notes=await generateMidi(blob, setStatus);
-      res={notes, stats:null};
+    if(mode==='instrument'){
+      res=await instrumentTranscribe(blob, opts, setStatus);
+    } else {
+      try{
+        res=await spiceTranscribe(blob, opts, setStatus);
+      }catch(spiceErr){
+        console.warn('SPICE failed, basic-pitch fallback:', spiceErr);
+        setStatus('Falling back to basic-pitch…');
+        res=await instrumentTranscribe(blob, opts, setStatus);
+      }
     }
     if(!res.notes.length){
-      setStatus(res.stats?`No notes detected (${res.stats.loHz}–${res.stats.hiHz} Hz, ${res.stats.voiced}/${res.stats.total} voiced). Try “da-da-da”, louder.`:'No notes detected — try “da-da-da”.');
+      const hint = mode==='instrument'
+        ? 'No notes detected. Play louder, or try Voice mode if this is a hummed melody.'
+        : 'No notes detected. Try “da-da-da”, louder — or switch to Instrument if you played an instrument.';
+      setStatus(res.stats?`${hint} (${res.stats.loHz}–${res.stats.hiHz} Hz, ${res.stats.voiced}/${res.stats.total} voiced)`:hint);
       return;
     }
     m.midi=res.notes;
@@ -7060,6 +7230,8 @@ vaultResume();
 // or the Storage section in Settings shows it needs attention. Deferred so it
 // never competes with the capture button becoming usable.
 window.addEventListener('load', ()=>{ setTimeout(()=>requestPersistentStorage(true), 1200); });
+// Backup nudge comes later still: capture must never wait on a reminder.
+window.addEventListener('load', ()=>{ setTimeout(_maybeNudgeBackup, 2600); });
 wireCaptureButton(document.getElementById('capture-btn'));
 wireCaptureButton(document.getElementById('mob-fab'));
 _wireSheetDrag();
@@ -7117,6 +7289,34 @@ if ('serviceWorker' in navigator) {
     document.addEventListener('visibilitychange', checkForUpdate);
     window.addEventListener('focus', checkForUpdate);
   }
+}
+// Nudge to back up, but only when nothing automatic is covering the archive
+// (see _backupOverdue). Shown once per session, dismissable, and it snoozes for
+// a week rather than nagging on every launch.
+function _maybeNudgeBackup(){
+  if(!_backupOverdue()) return;
+  const snoozed=settings.backupNudgeSnoozeTs||0;
+  if(Date.now()-snoozed < 7*86400000) return;
+  if(document.getElementById('backup-nudge')) return;
+  const last=settings.lastBackupTs;
+  const msg=last ? 'Your last backup was '+fmtRelTime(last) : 'Your archive has never been backed up';
+  const bar=document.createElement('div');
+  bar.id='backup-nudge';
+  bar.innerHTML=`<span>${escHtml(msg)}</span>`;
+  const back=document.createElement('button');
+  back.textContent='Back up';
+  back.onclick=()=>{ bar.remove(); openSettings(); setTimeout(()=>{ const b=document.getElementById('backup-export-btn'); if(b) b.focus(); },350); };
+  const later=document.createElement('button');
+  later.className='bn-dismiss'; later.textContent='Later';
+  later.onclick=()=>{
+    settings.backupNudgeSnoozeTs=Date.now();
+    try{ localStorage.setItem(ST,JSON.stringify(settings)); }catch(_){}
+    bar.remove();
+  };
+  bar.append(back,later);
+  document.body.appendChild(bar);
+  void bar.offsetWidth; // commit pre-animation state without relying on rAF
+  bar.classList.add('show');
 }
 function _showSwUpdateBar() {
   if (document.getElementById('sw-update-bar')) return;
