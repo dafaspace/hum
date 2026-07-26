@@ -1175,6 +1175,13 @@ body {
 .note-analysis-action:hover { border-color: var(--ink4); color: var(--ink); }
 .note-analysis-text { font-size: 12.5px; color: var(--ink2); line-height: 1.7; white-space: pre-wrap; margin-top: 6px; }
 .note-analysis-hint { font-size: 12px; color: var(--ink3); margin-top: 4px; }
+/* Segmented voice/instrument picker: two halves of one control, so it reads as
+   a choice between two states rather than two independent buttons. */
+.mel-mode { display: inline-flex; margin-top: 7px; border: 1px solid var(--paper4); border-radius: 8px; overflow: hidden; background: var(--paper2); }
+.mel-mode-btn { font-family: var(--sans); font-size: 11px; padding: 4px 12px; border: none; background: none; color: var(--ink3); cursor: pointer; transition: background .12s, color .12s; }
+.mel-mode-btn + .mel-mode-btn { border-left: 1px solid var(--paper4); }
+.mel-mode-btn:hover { color: var(--ink2); }
+.mel-mode-btn.on { background: var(--surface); color: var(--ink); font-weight: 500; }
 /* Melody view */
 .note-mel-roll { margin-top: 8px; position: relative; }
 .mel-playhead { position: absolute; top: 0; width: 2px; height: 130px; background: var(--warm2); opacity: 0.9; left: 24px; pointer-events: none; box-shadow: 0 0 5px var(--warm2); border-radius: 1px; }
@@ -5326,16 +5333,32 @@ function renderNoteAnalysis(){
 // Melody lives on each audio take: m.midi / m.midiOriginal / m.midiStats.
 let _melSel={mid:null, idx:-1};
 function _findTakeMedia(mid){ return capEntry&&capEntry.media?capEntry.media.find(x=>x.id===mid):null; }
+// Voice/Instrument picker. Voice runs a monophonic model (one line, follows a
+// hum); Instrument runs a polyphonic one (hears chords). Picking the wrong one
+// is the single most likely reason a take comes back as nonsense.
+function _takeModeToggleHtml(m){
+  const mode=_takeMode(m);
+  const btn=(v,label,title)=>`<button class="mel-mode-btn${mode===v?' on':''}" title="${title}"
+      onclick="setTakeMode('${m.id}','${v}')">${label}</button>`;
+  return `<div class="mel-mode" role="group" aria-label="Analysis mode">
+    ${btn('voice','Voice','Humming or singing — one melody line')}
+    ${btn('instrument','Instrument','Piano, guitar — can hear chords')}
+  </div>`;
+}
 function _takeMelodyHtml(m){
   const hasMidi=Array.isArray(m.midi)&&m.midi.length>0;
   const NAMES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
   if(!hasMidi){
+    const isInstr=_takeMode(m)==='instrument';
     return `<div class="note-take-melody">
       <div class="note-take-transcript-head">
         <span class="note-take-transcript-label">Melody</span>
         <button class="note-take-mini-btn" id="melbtn-${m.id}" onclick="runTakeMidi('${m.id}')">Analyse</button>
       </div>
-      <div class="note-analysis-hint" id="melstatus-${m.id}">Sing it as “da-da-da” (not “mmm”) for cleaner notes, then Analyse.</div>
+      ${_takeModeToggleHtml(m)}
+      <div class="note-analysis-hint" id="melstatus-${m.id}">${isInstr
+        ? 'Polyphonic: hears chords. Play cleanly, then Analyse.'
+        : 'Sing it as “da-da-da” (not “mmm”) for cleaner notes, then Analyse.'}</div>
     </div>`;
   }
   const sel=(_melSel.mid===m.id)?_melSel.idx:-1;
@@ -5349,7 +5372,10 @@ function _takeMelodyHtml(m){
   const isModified=m.midiOriginal&&JSON.stringify(m.midi.map(n=>n.p))!==JSON.stringify(m.midiOriginal.map(n=>n.p));
   const selName=(sel>=0&&m.midi[sel])?midiToNoteName(m.midi[sel].p):'';
   const st=m.midiStats;
-  const diag=st?` · ${st.loHz}–${st.hiHz} Hz · ${st.voiced}/${st.total} voiced`:'';
+  // Instrument stats count notes, not voiced frames — label them honestly.
+  const diag=st?(st.mode==='instrument'
+    ? ` · ${st.loHz}–${st.hiHz} Hz · polyphonic`
+    : ` · ${st.loHz}–${st.hiHz} Hz · ${st.voiced}/${st.total} voiced`):'';
   return `<div class="note-take-melody">
     <div class="note-take-transcript-head">
       <span class="note-take-transcript-label">Melody</span>
@@ -5358,6 +5384,7 @@ function _takeMelodyHtml(m){
         <button class="note-take-mini-btn" id="melbtn-${m.id}" onclick="runTakeMidi('${m.id}')">Re-analyse</button>
       </div>
     </div>
+    ${_takeModeToggleHtml(m)}
     <div class="note-mel-roll">${renderHumPianoRoll(rollNotes, totalDur, {interactive:true, selected:sel, mid:m.id})}<div class="mel-playhead" id="melph-${m.id}" style="display:none"></div></div>
     <div class="note-mel-names">${names}</div>
     ${sel>=0?`<div class="note-mel-edit"><span class="note-mel-edit-lbl">${selName}</span>
@@ -5372,7 +5399,7 @@ function _takeMelodyHtml(m){
       <button class="note-mel-btn" onclick="noteMelodySnap('${m.id}')">Snap</button>
       ${isModified?`<button class="note-mel-btn" onclick="noteMelodyReset('${m.id}')">↺ Reset</button>`:''}
     </div>
-    <div class="note-mel-meta">${m.midi.length} notes · ${midiToNoteName(lo)}–${midiToNoteName(hi)}${capEntry.bpm?` · ${capEntry.bpm} BPM`:''}${diag} · tap note to edit</div>
+    <div class="note-mel-meta">${m.midi.length} note${m.midi.length===1?'':'s'} · ${midiToNoteName(lo)}–${midiToNoteName(hi)}${capEntry.bpm?` · ${capEntry.bpm} BPM`:''}${diag} · tap note to edit</div>
   </div>`;
 }
 // Refresh only one take's melody block — leaves the <audio> player (and its playback) untouched
@@ -6601,6 +6628,36 @@ async function spiceTranscribe(blob, opts, onStatus){
   return {notes, stats};
 }
 
+// Polyphonic path: basic-pitch handles chords, which SPICE structurally cannot
+// (a monophonic model reads a chord as noise). Post-processing is deliberately
+// the SAME as the voice path, so switching mode changes the model, not the rules.
+async function instrumentTranscribe(blob, opts, onStatus){
+  opts=opts||{};
+  const raw=await generateMidi(blob, onStatus); // [{t,d,p,v}]
+  if(!raw.length) return {notes:[], stats:{mode:'instrument', total:0, voiced:0, loHz:0, hiHz:0}};
+  const hz=p=>440*Math.pow(2,(p-69)/12);
+  const pitches=raw.map(n=>n.p);
+  const stats={ mode:'instrument', total:raw.length, voiced:raw.length,
+    loHz:Math.round(hz(Math.min(...pitches))), hiHz:Math.round(hz(Math.max(...pitches))) };
+  let segs=raw.map(n=>({t:n.t, dur:n.d, pitch:n.p, v:n.v}));
+  if(opts.key){
+    const k=_parseKeyField(opts.key);
+    if(k){ segs=quantizeToScale(segs.map(s=>({...s})), k.root, _SCALES[k.mode==='min'?'min':'maj']); }
+  }
+  if(opts.tempoLocked && opts.bpm) segs=_quantizeRhythm(segs, opts.bpm);
+  const notes=segs.map((s,i)=>({t:Math.round(s.t*1000)/1000, d:Math.round(s.dur*1000)/1000,
+                                p:s.pitch, v:raw[i]?.v??96}));
+  return {notes, stats};
+}
+// Which model a take is analysed with. Stored per take because one note can hold
+// a hummed idea and a piano version of it side by side.
+function _takeMode(m){ return m&&m.midiMode==='instrument' ? 'instrument' : 'voice'; }
+function setTakeMode(mid, mode){
+  const m=_findTakeMedia(mid); if(!m) return;
+  m.midiMode=mode;
+  try{ persist(); }catch(_){}
+  refreshTakeMelody(mid);
+}
 // Analyse ONE take (audio media item) → store melody on that media item.
 async function runTakeMidi(mid){
   if(!capEntry) return;
@@ -6621,17 +6678,25 @@ async function runTakeMidi(mid){
     if(!blob){ toast('Audio not available'); return; }
     const bpm=m.tempoBpm||capEntry.bpm||null;
     const tempoLocked=!!m.tempoLocked;
+    const opts={bpm, tempoLocked, key:capEntry.key};
+    const mode=_takeMode(m);
     let res;
-    try{
-      res=await spiceTranscribe(blob, {bpm, tempoLocked, key:capEntry.key}, setStatus);
-    }catch(spiceErr){
-      console.warn('SPICE failed, basic-pitch fallback:', spiceErr);
-      setStatus('Falling back to basic-pitch…');
-      const notes=await generateMidi(blob, setStatus);
-      res={notes, stats:null};
+    if(mode==='instrument'){
+      res=await instrumentTranscribe(blob, opts, setStatus);
+    } else {
+      try{
+        res=await spiceTranscribe(blob, opts, setStatus);
+      }catch(spiceErr){
+        console.warn('SPICE failed, basic-pitch fallback:', spiceErr);
+        setStatus('Falling back to basic-pitch…');
+        res=await instrumentTranscribe(blob, opts, setStatus);
+      }
     }
     if(!res.notes.length){
-      setStatus(res.stats?`No notes detected (${res.stats.loHz}–${res.stats.hiHz} Hz, ${res.stats.voiced}/${res.stats.total} voiced). Try “da-da-da”, louder.`:'No notes detected — try “da-da-da”.');
+      const hint = mode==='instrument'
+        ? 'No notes detected. Play louder, or try Voice mode if this is a hummed melody.'
+        : 'No notes detected. Try “da-da-da”, louder — or switch to Instrument if you played an instrument.';
+      setStatus(res.stats?`${hint} (${res.stats.loHz}–${res.stats.hiHz} Hz, ${res.stats.voiced}/${res.stats.total} voiced)`:hint);
       return;
     }
     m.midi=res.notes;
