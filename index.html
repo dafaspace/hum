@@ -6166,10 +6166,20 @@ function humSegmentNotes(frames){
   const TOL=1.2;    // semitone tolerance — wider for real voice drift
   const MIN_F=2;    // ~46 ms minimum note @ 23ms hop — catches 32nd notes at ≥65 BPM
 
+  const medOf=arr=>{ const s=[...arr].sort((a,b)=>a-b); return s[Math.floor(s.length/2)]; };
   const flush=(endT)=>{
     if(start>=0&&pitches.length>=MIN_F){
-      const s=[...pitches].sort((a,b)=>a-b);
-      notes.push({t:start, dur:Math.round((endT-start)*1000)/1000, pitch:s[Math.floor(s.length/2)]});
+      // Resolve octave outliers against the note's OWN median, not against
+      // whichever frame arrived first — the first frames are the attack, which
+      // is exactly where the tracker mis-locks. The sustained body outvotes it.
+      let med=medOf(pitches);
+      const fixed=pitches.map(p=>{
+        const d=p-med;
+        if(Math.abs(Math.abs(d)-12)<=1.5) return d>0?p-12:p+12;
+        if(Math.abs(Math.abs(d)-24)<=1.5) return d>0?p-24:p+24;
+        return p;
+      });
+      notes.push({t:start, dur:Math.round((endT-start)*1000)/1000, pitch:medOf(fixed)});
     }
     start=-1; pitches=[];
   };
@@ -6180,8 +6190,18 @@ function humSegmentNotes(frames){
     if(voiced){
       if(start<0){ start=f.t; pitches=[f.midi]; }
       else{
-        const med=pitches[Math.floor(pitches.length/2)];
-        if(Math.abs(f.midi-med)<=TOL) pitches.push(f.midi);
+        const med=medOf(pitches);
+        const diff=f.midi-med;
+        if(Math.abs(diff)<=TOL) pitches.push(f.midi);
+        // Octave error, not a new note: the voice is rich in harmonics and the
+        // tracker sometimes locks onto half or double the fundamental, usually
+        // during the unstable attack. Left alone this splits one sung note into
+        // two an octave apart (and stretches the piano roll to two octaves, which
+        // squashes every row). Keep the raw value and let flush() decide the
+        // octave from the note's median once the whole note is in.
+        else if(Math.abs(Math.abs(diff)-12)<=1.5 || Math.abs(Math.abs(diff)-24)<=1.5){
+          pitches.push(f.midi);
+        }
         else{ flush(f.t); start=f.t; pitches=[f.midi]; }
       }
     } else {
@@ -6194,6 +6214,9 @@ function humSegmentNotes(frames){
   // Only collapse truly zero-gap fragments of DIFFERENT pitch that are both micro-short
   // (glitch frames that slipped past MIN_F=2 due to pitch tolerance boundaries).
   const GLITCH_DUR = 0.055; // < 55ms = shorter than a 32nd @ 90 BPM → suspect glitch
+  const SAME_PITCH_GAP = 0.12; // generous: depth, not length, decides (see _wentSilent)
+  // Did the signal actually drop to silence between these two times, or merely dip?
+  const _wentSilent=(t0,t1)=>frames.some(f=>f && f.t>=t0-1e-6 && f.t<t1+1e-6 && (f.rms||0)<rmsFloor);
   const merged=[];
   for(const n of notes){
     const prev=merged[merged.length-1];
@@ -6201,7 +6224,17 @@ function humSegmentNotes(frames){
     // Absorb a tiny different-pitch glitch into the previous note
     if(prev && prev.pitch!==n.pitch && n.dur<=GLITCH_DUR && gap<0.03){
       prev.dur=Math.round((n.t+n.dur-prev.t)*1000)/1000;
-    } else { merged.push({...n}); }
+    }
+    // Same pitch, and the frames separating them never actually went quiet: this
+    // is one held note that the articulation detector cut in half on a mid-note
+    // volume dip (vibrato, breath). A genuine re-attack ("da-da" on one pitch)
+    // drops to real silence, so it keeps its two notes. Judging by depth rather
+    // than by gap length is what separates the two cases honestly — a fixed time
+    // threshold just lands arbitrarily between them.
+    else if(prev && prev.pitch===n.pitch && gap<=SAME_PITCH_GAP && !_wentSilent(prev.t+prev.dur, n.t)){
+      prev.dur=Math.round((n.t+n.dur-prev.t)*1000)/1000;
+    }
+    else { merged.push({...n}); }
   }
   return merged;
 }
@@ -6619,10 +6652,12 @@ async function spiceTranscribe(blob, opts, onStatus){
     hiHz:voicedFreqs.length?Math.round(Math.max(...voicedFreqs)):0 };
   let segs=humSegmentNotes(frames); // [{t,dur,pitch}]
   if(!segs.length) return {notes:[], stats};
-  if(opts.key){
-    const k=_parseKeyField(opts.key);
-    if(k){ segs=quantizeToScale(segs.map(s=>({...s})), k.root, _SCALES[k.mode==='min'?'min':'maj']); }
-  }
+  // NO automatic scale snapping. quantizeToScale moves a note by up to 3 semitones
+  // to force it into a key, and the key here was only ever GUESSED by detectKey.
+  // A wrong guess silently rewrote what was actually sung: a real B major triad
+  // (B/D#/F#) came back as B minor because D# was pulled down to D. Transcription
+  // must report what it heard; snapping is an editorial choice and already has its
+  // own button (Snap) with a root/mode the user picks deliberately.
   if(opts.tempoLocked && opts.bpm) segs=_quantizeRhythm(segs, opts.bpm);
   const notes=segs.map(s=>({t:Math.round(s.t*1000)/1000, d:Math.round(s.dur*1000)/1000, p:s.pitch, v:96}));
   return {notes, stats};
@@ -6640,10 +6675,7 @@ async function instrumentTranscribe(blob, opts, onStatus){
   const stats={ mode:'instrument', total:raw.length, voiced:raw.length,
     loHz:Math.round(hz(Math.min(...pitches))), hiHz:Math.round(hz(Math.max(...pitches))) };
   let segs=raw.map(n=>({t:n.t, dur:n.d, pitch:n.p, v:n.v}));
-  if(opts.key){
-    const k=_parseKeyField(opts.key);
-    if(k){ segs=quantizeToScale(segs.map(s=>({...s})), k.root, _SCALES[k.mode==='min'?'min':'maj']); }
-  }
+  // Same rule as the voice path: never snap to a guessed key (see spiceTranscribe).
   if(opts.tempoLocked && opts.bpm) segs=_quantizeRhythm(segs, opts.bpm);
   const notes=segs.map((s,i)=>({t:Math.round(s.t*1000)/1000, d:Math.round(s.dur*1000)/1000,
                                 p:s.pitch, v:raw[i]?.v??96}));
