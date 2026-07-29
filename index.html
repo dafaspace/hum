@@ -3,39 +3,18 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#faf7f2">
 <title>Hum</title>
-<link rel="manifest" id="pwa-manifest">
+<!-- Real, same-origin manifest + raster icons. Chrome only builds a WebAPK (a
+     genuine installed app) from these; the previous blob: manifest with SVG
+     data: icons silently degraded to a home-screen shortcut, which is what
+     broke with "Shortcut not found on the device". -->
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <meta name="apple-mobile-web-app-title" content="Hum">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<script>
-// Inline manifest (no separate file needed)
-const manifest = {
-  name: "Hum",
-  short_name: "Hum",
-  description: "Capture before it fades",
-  start_url: "./",
-  display: "standalone",
-  background_color: "#faf7f2",
-  theme_color: "#faf7f2",
-  orientation: "portrait-primary",
-  icons: [
-    { src: "data:image/svg+xml," + encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' fill='%23faf7f2' rx='42'/><circle cx='96' cy='96' r='52' fill='%23e8a87c'/><rect x='87' y='60' width='18' height='42' rx='9' fill='white'/><path d='M72 96a24 24 0 0048 0' stroke='white' stroke-width='5' stroke-linecap='round' fill='none'/><line x1='96' y1='120' x2='96' y2='132' stroke='white' stroke-width='5' stroke-linecap='round'/><line x1='82' y1='138' x2='110' y2='138' stroke='white' stroke-width='5' stroke-linecap='round'/></svg>`), sizes: "192x192", type: "image/svg+xml" },
-    { src: "data:image/svg+xml," + encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' fill='%23faf7f2' rx='112'/><circle cx='256' cy='256' r='138' fill='%23e8a87c'/><rect x='232' y='162' width='48' height='110' rx='24' fill='white'/><path d='M192 256a64 64 0 00128 0' stroke='white' stroke-width='13' stroke-linecap='round' fill='none'/><line x1='256' y1='320' x2='256' y2='352' stroke='white' stroke-width='13' stroke-linecap='round'/><line x1='218' y1='366' x2='294' y2='366' stroke='white' stroke-width='13' stroke-linecap='round'/></svg>`), sizes: "512x512", type: "image/svg+xml" }
-  ]
-};
-const blob = new Blob([JSON.stringify(manifest)], {type:'application/json'});
-document.getElementById('pwa-manifest').href = URL.createObjectURL(blob);
-
-// Apple touch icon (inline SVG → PNG via canvas would require more code; SVG works on modern iOS)
-const appleIcon = document.createElement('link');
-appleIcon.rel = 'apple-touch-icon';
-appleIcon.href = "data:image/svg+xml," + encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect width='180' height='180' fill='%23faf7f2' rx='38'/><circle cx='90' cy='90' r='50' fill='%23e8a87c'/><rect x='82' y='56' width='16' height='38' rx='8' fill='white'/><path d='M67 90a23 23 0 0046 0' stroke='white' stroke-width='4.5' stroke-linecap='round' fill='none'/><line x1='90' y1='113' x2='90' y2='124' stroke='white' stroke-width='4.5' stroke-linecap='round'/><line x1='77' y1='129' x2='103' y2='129' stroke='white' stroke-width='4.5' stroke-linecap='round'/></svg>`);
-document.head.appendChild(appleIcon);
-</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&family=Geist:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
@@ -1831,7 +1810,7 @@ audio { display: none; }
       </div>
       <div class="brand-heatmap" id="brand-heatmap" title="Your activity"></div>
     </div>
-    <div class="brand-sub">capture before it fades <span class="brand-ver">v0.12</span></div>
+    <div class="brand-sub">capture before it fades <span class="brand-ver">v0.12.2</span></div>
     <button class="sidebar-close-btn" onclick="closeSidebar()" aria-label="Close">
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg>
     </button>
@@ -1884,7 +1863,7 @@ audio { display: none; }
       <div class="brand-wrap" onclick="toggleTheme()" title="Switch theme" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleTheme()}">
         <span class="brand">hum</span>
         <span class="brand-dot"></span>
-        <span class="brand-ver">v0.12</span>
+        <span class="brand-ver">v0.12.2</span>
       </div>
       <div style="display:flex;align-items:center;gap:4px">
         <button class="mob-settings-btn" onclick="openSettings()" title="Settings">
@@ -2288,7 +2267,7 @@ audio { display: none; }
 <div id="about-overlay">
   <div class="about-card">
     <div class="about-header">
-      <div class="about-title">Hum <span class="brand-ver" style="font-size:12px;opacity:0.5">v0.12</span></div>
+      <div class="about-title">Hum <span class="brand-ver" style="font-size:12px;opacity:0.5">v0.12.2</span></div>
       <div class="about-sub">Capture creative moments before they fade.</div>
     </div>
 
@@ -6166,10 +6145,20 @@ function humSegmentNotes(frames){
   const TOL=1.2;    // semitone tolerance — wider for real voice drift
   const MIN_F=2;    // ~46 ms minimum note @ 23ms hop — catches 32nd notes at ≥65 BPM
 
+  const medOf=arr=>{ const s=[...arr].sort((a,b)=>a-b); return s[Math.floor(s.length/2)]; };
   const flush=(endT)=>{
     if(start>=0&&pitches.length>=MIN_F){
-      const s=[...pitches].sort((a,b)=>a-b);
-      notes.push({t:start, dur:Math.round((endT-start)*1000)/1000, pitch:s[Math.floor(s.length/2)]});
+      // Resolve octave outliers against the note's OWN median, not against
+      // whichever frame arrived first — the first frames are the attack, which
+      // is exactly where the tracker mis-locks. The sustained body outvotes it.
+      let med=medOf(pitches);
+      const fixed=pitches.map(p=>{
+        const d=p-med;
+        if(Math.abs(Math.abs(d)-12)<=1.5) return d>0?p-12:p+12;
+        if(Math.abs(Math.abs(d)-24)<=1.5) return d>0?p-24:p+24;
+        return p;
+      });
+      notes.push({t:start, dur:Math.round((endT-start)*1000)/1000, pitch:medOf(fixed)});
     }
     start=-1; pitches=[];
   };
@@ -6180,8 +6169,18 @@ function humSegmentNotes(frames){
     if(voiced){
       if(start<0){ start=f.t; pitches=[f.midi]; }
       else{
-        const med=pitches[Math.floor(pitches.length/2)];
-        if(Math.abs(f.midi-med)<=TOL) pitches.push(f.midi);
+        const med=medOf(pitches);
+        const diff=f.midi-med;
+        if(Math.abs(diff)<=TOL) pitches.push(f.midi);
+        // Octave error, not a new note: the voice is rich in harmonics and the
+        // tracker sometimes locks onto half or double the fundamental, usually
+        // during the unstable attack. Left alone this splits one sung note into
+        // two an octave apart (and stretches the piano roll to two octaves, which
+        // squashes every row). Keep the raw value and let flush() decide the
+        // octave from the note's median once the whole note is in.
+        else if(Math.abs(Math.abs(diff)-12)<=1.5 || Math.abs(Math.abs(diff)-24)<=1.5){
+          pitches.push(f.midi);
+        }
         else{ flush(f.t); start=f.t; pitches=[f.midi]; }
       }
     } else {
@@ -6194,6 +6193,9 @@ function humSegmentNotes(frames){
   // Only collapse truly zero-gap fragments of DIFFERENT pitch that are both micro-short
   // (glitch frames that slipped past MIN_F=2 due to pitch tolerance boundaries).
   const GLITCH_DUR = 0.055; // < 55ms = shorter than a 32nd @ 90 BPM → suspect glitch
+  const SAME_PITCH_GAP = 0.12; // generous: depth, not length, decides (see _wentSilent)
+  // Did the signal actually drop to silence between these two times, or merely dip?
+  const _wentSilent=(t0,t1)=>frames.some(f=>f && f.t>=t0-1e-6 && f.t<t1+1e-6 && (f.rms||0)<rmsFloor);
   const merged=[];
   for(const n of notes){
     const prev=merged[merged.length-1];
@@ -6201,7 +6203,17 @@ function humSegmentNotes(frames){
     // Absorb a tiny different-pitch glitch into the previous note
     if(prev && prev.pitch!==n.pitch && n.dur<=GLITCH_DUR && gap<0.03){
       prev.dur=Math.round((n.t+n.dur-prev.t)*1000)/1000;
-    } else { merged.push({...n}); }
+    }
+    // Same pitch, and the frames separating them never actually went quiet: this
+    // is one held note that the articulation detector cut in half on a mid-note
+    // volume dip (vibrato, breath). A genuine re-attack ("da-da" on one pitch)
+    // drops to real silence, so it keeps its two notes. Judging by depth rather
+    // than by gap length is what separates the two cases honestly — a fixed time
+    // threshold just lands arbitrarily between them.
+    else if(prev && prev.pitch===n.pitch && gap<=SAME_PITCH_GAP && !_wentSilent(prev.t+prev.dur, n.t)){
+      prev.dur=Math.round((n.t+n.dur-prev.t)*1000)/1000;
+    }
+    else { merged.push({...n}); }
   }
   return merged;
 }
@@ -6619,10 +6631,12 @@ async function spiceTranscribe(blob, opts, onStatus){
     hiHz:voicedFreqs.length?Math.round(Math.max(...voicedFreqs)):0 };
   let segs=humSegmentNotes(frames); // [{t,dur,pitch}]
   if(!segs.length) return {notes:[], stats};
-  if(opts.key){
-    const k=_parseKeyField(opts.key);
-    if(k){ segs=quantizeToScale(segs.map(s=>({...s})), k.root, _SCALES[k.mode==='min'?'min':'maj']); }
-  }
+  // NO automatic scale snapping. quantizeToScale moves a note by up to 3 semitones
+  // to force it into a key, and the key here was only ever GUESSED by detectKey.
+  // A wrong guess silently rewrote what was actually sung: a real B major triad
+  // (B/D#/F#) came back as B minor because D# was pulled down to D. Transcription
+  // must report what it heard; snapping is an editorial choice and already has its
+  // own button (Snap) with a root/mode the user picks deliberately.
   if(opts.tempoLocked && opts.bpm) segs=_quantizeRhythm(segs, opts.bpm);
   const notes=segs.map(s=>({t:Math.round(s.t*1000)/1000, d:Math.round(s.dur*1000)/1000, p:s.pitch, v:96}));
   return {notes, stats};
@@ -6640,10 +6654,7 @@ async function instrumentTranscribe(blob, opts, onStatus){
   const stats={ mode:'instrument', total:raw.length, voiced:raw.length,
     loHz:Math.round(hz(Math.min(...pitches))), hiHz:Math.round(hz(Math.max(...pitches))) };
   let segs=raw.map(n=>({t:n.t, dur:n.d, pitch:n.p, v:n.v}));
-  if(opts.key){
-    const k=_parseKeyField(opts.key);
-    if(k){ segs=quantizeToScale(segs.map(s=>({...s})), k.root, _SCALES[k.mode==='min'?'min':'maj']); }
-  }
+  // Same rule as the voice path: never snap to a guessed key (see spiceTranscribe).
   if(opts.tempoLocked && opts.bpm) segs=_quantizeRhythm(segs, opts.bpm);
   const notes=segs.map((s,i)=>({t:Math.round(s.t*1000)/1000, d:Math.round(s.dur*1000)/1000,
                                 p:s.pitch, v:raw[i]?.v??96}));
