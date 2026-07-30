@@ -7,3 +7,4 @@ Prototypes/
 client_secret*.json
 .claude/
 .DS_Store
+serve.py
