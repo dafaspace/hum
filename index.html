@@ -1092,8 +1092,16 @@ body {
 .cap-metro-btn.on { border-color: var(--warm); color: var(--warm2); opacity: 1; background: var(--warm-soft); }
 .cap-metro-btn.on #cap-metro-bpm { display: inline; }
 #cap-metro-hint { font-size: 10.5px; color: var(--ink3); line-height: 1.4; text-align: center; max-width: 280px; }
-#cap-metro-tempo { display: flex; align-items: center; gap: 8px; font-family: var(--sans); }
-#cap-metro-tempo #cap-bpm-val { font-size: 13px; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; min-width: 26px; text-align: center; }
+#cap-metro-tempo { display: flex; flex-direction: column; align-items: center; gap: 5px; font-family: var(--sans); }
+.cap-bpm-row { display: flex; align-items: center; gap: 8px; }
+.cap-bpm-lbl { font-size: 10px; color: var(--ink3); letter-spacing: 0.04em; min-width: 48px; text-align: right; }
+.cap-bpm-hint { font-size: 10px; color: var(--ink3); text-align: center; max-width: 260px; line-height: 1.45; }
+.cap-bpm-hint b { color: var(--warm2); font-weight: 500; }
+.note-mel-tempo { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-family: var(--sans); }
+.note-mel-tempo .lbl { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink3); }
+.note-mel-tempo .val { font-size: 12px; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; min-width: 28px; text-align: center; }
+.note-mel-tempo .sub { font-size: 10.5px; color: var(--ink3); }
+#cap-metro-tempo .cap-bpm-val { font-size: 13px; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; min-width: 26px; text-align: center; }
 .cap-bpm-unit { font-size: 10px; color: var(--ink3); letter-spacing: 0.08em; }
 .cap-bpm-adj { width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--paper4); background: var(--paper2); color: var(--ink2); font-size: 15px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; flex-shrink: 0; }
 .cap-bpm-adj:hover { border-color: var(--warm); color: var(--warm2); }
@@ -1154,8 +1162,8 @@ body {
 .note-analysis-action:hover { border-color: var(--ink4); color: var(--ink); }
 .note-analysis-text { font-size: 12.5px; color: var(--ink2); line-height: 1.7; white-space: pre-wrap; margin-top: 6px; }
 .note-analysis-hint { font-size: 12px; color: var(--ink3); margin-top: 4px; }
-/* Segmented voice/instrument picker: two halves of one control, so it reads as
-   a choice between two states rather than two independent buttons. */
+/* Segmented mono/poly picker: two halves of one control, so it reads as a
+   choice between two states rather than two independent buttons. */
 .mel-mode { display: inline-flex; margin-top: 7px; border: 1px solid var(--paper4); border-radius: 8px; overflow: hidden; background: var(--paper2); }
 .mel-mode-btn { font-family: var(--sans); font-size: 11px; padding: 4px 12px; border: none; background: none; color: var(--ink3); cursor: pointer; transition: background .12s, color .12s; }
 .mel-mode-btn + .mel-mode-btn { border-left: 1px solid var(--paper4); }
@@ -1810,7 +1818,7 @@ audio { display: none; }
       </div>
       <div class="brand-heatmap" id="brand-heatmap" title="Your activity"></div>
     </div>
-    <div class="brand-sub">capture before it fades <span class="brand-ver">v0.13.2</span></div>
+    <div class="brand-sub">capture before it fades <span class="brand-ver">v0.14.2</span></div>
     <button class="sidebar-close-btn" onclick="closeSidebar()" aria-label="Close">
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg>
     </button>
@@ -1863,7 +1871,7 @@ audio { display: none; }
       <div class="brand-wrap" onclick="toggleTheme()" title="Switch theme" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleTheme()}">
         <span class="brand">hum</span>
         <span class="brand-dot"></span>
-        <span class="brand-ver">v0.13.2</span>
+        <span class="brand-ver">v0.14.2</span>
       </div>
       <div style="display:flex;align-items:center;gap:4px">
         <button class="mob-settings-btn" onclick="openSettings()" title="Settings">
@@ -2267,7 +2275,7 @@ audio { display: none; }
 <div id="about-overlay">
   <div class="about-card">
     <div class="about-header">
-      <div class="about-title">Hum <span class="brand-ver" style="font-size:12px;opacity:0.5">v0.13.2</span></div>
+      <div class="about-title">Hum <span class="brand-ver" style="font-size:12px;opacity:0.5">v0.14.2</span></div>
       <div class="about-sub">Capture creative moments before they fade.</div>
     </div>
 
@@ -2451,9 +2459,19 @@ audio { display: none; }
         <button class="cap-arrow" id="cap-cancel" onclick="cancelCapRec()" disabled>Cancel</button>
       </div>
       <div id="cap-metro-tempo" style="display:none">
-        <button class="cap-bpm-adj" onclick="adjCapBpm(-5)" aria-label="Slower">−</button>
-        <span id="cap-bpm-val">90</span><span class="cap-bpm-unit">BPM</span>
-        <button class="cap-bpm-adj" onclick="adjCapBpm(5)" aria-label="Faster">+</button>
+        <div class="cap-bpm-row">
+          <span class="cap-bpm-lbl">Sing at</span>
+          <button class="cap-bpm-adj" onclick="adjCapBpm(-5)" aria-label="Slower">−</button>
+          <span id="cap-bpm-val" class="cap-bpm-val">90</span><span class="cap-bpm-unit">BPM</span>
+          <button class="cap-bpm-adj" onclick="adjCapBpm(5)" aria-label="Faster">+</button>
+        </div>
+        <div class="cap-bpm-row">
+          <span class="cap-bpm-lbl">Save as</span>
+          <button class="cap-bpm-adj" onclick="adjCapTargetBpm(-5)" aria-label="Slower target">−</button>
+          <span id="cap-tgt-val" class="cap-bpm-val">90</span><span class="cap-bpm-unit">BPM</span>
+          <button class="cap-bpm-adj" onclick="adjCapTargetBpm(5)" aria-label="Faster target">+</button>
+        </div>
+        <div id="cap-bpm-hint" class="cap-bpm-hint"></div>
       </div>
     </div>
   </div>
@@ -4584,7 +4602,16 @@ let capRec=null, capChunks=[], capStream=null, capSec=0, capTimer=null, capRecor
 let capAutoName='', capPendingName=null; // editable title state
 // ── Count-in metronome state ──
 let capCountIn=false;          // metronome count-in enabled (persisted in settings)
-let capBpmSel=90;              // selected tempo for count-in
+let capBpmSel=90;              // tempo the metronome clicks — what you sing to
+// The tempo the melody is DELIVERED at, which need not be the one you sang.
+// Singing slower is the cheapest accuracy win there is: every source of error —
+// intonation, articulation, timing — gets worse as notes get shorter, and the
+// measured ceiling is ~90 ms per note (sixteenths at 160 BPM). MIDI is symbolic,
+// so re-timing it is exact: scaling every onset and duration by the tempo ratio
+// leaves note VALUES untouched (a quarter stays a quarter) for ANY pair of
+// tempos, not just neat fractions like 1/2 — d·(rec/out)·(out/60) = d·rec/60.
+let capTargetBpm=90;
+let _capRecTarget=null;        // target captured at the moment recording started
 let capCountingIn=false;       // currently playing the audible count-in
 let _metroCtx=null;            // AudioContext for count-in clicks
 let _metroTimers=[];           // pending setTimeout ids (count-in + visual pulse)
@@ -4672,9 +4699,20 @@ function toggleCapMetro(){
   try{ localStorage.setItem(ST, JSON.stringify(settings)); }catch(_){}
   _syncMetroUI();
 }
+function adjCapTargetBpm(d){
+  capTargetBpm=Math.max(40,Math.min(300,capTargetBpm+d));
+  settings.targetBpm=capTargetBpm;
+  try{ localStorage.setItem(ST, JSON.stringify(settings)); }catch(_){}
+  _syncMetroUI();
+}
 function adjCapBpm(d){
+  const wasLinked=(capTargetBpm===capBpmSel);
   capBpmSel=Math.max(40,Math.min(240,capBpmSel+d));
+  // Until the two are deliberately separated they move together, so the control
+  // stays invisible to anyone who doesn't want it.
+  if(wasLinked) capTargetBpm=capBpmSel;
   settings.metroBpm=capBpmSel;
+  settings.targetBpm=capTargetBpm;
   try{ localStorage.setItem(ST, JSON.stringify(settings)); }catch(_){}
   _syncMetroUI();
 }
@@ -4683,6 +4721,14 @@ function _syncMetroUI(){
   if(btn) btn.classList.toggle('on',capCountIn);
   const bpmL=document.getElementById('cap-metro-bpm'); if(bpmL) bpmL.textContent=capBpmSel;
   const bpmV=document.getElementById('cap-bpm-val'); if(bpmV) bpmV.textContent=capBpmSel;
+  const tgtV=document.getElementById('cap-tgt-val'); if(tgtV) tgtV.textContent=capTargetBpm;
+  const bpmHint=document.getElementById('cap-bpm-hint');
+  if(bpmHint){
+    bpmHint.innerHTML = capTargetBpm===capBpmSel
+      ? 'Short notes are where accuracy dies. Sing slower than the target and the MIDI speeds up afterwards — losslessly.'
+      : `Sing at <b>${capBpmSel}</b> — saved at <b>${capTargetBpm}</b> (${(capTargetBpm/capBpmSel).toFixed(2)}×).`;
+    // (bpmHint, not hint — the count-in headphone warning below already owns that name)
+  }
   const tempo=document.getElementById('cap-metro-tempo'); if(tempo) tempo.style.display=capCountIn?'flex':'none';
   const hint=document.getElementById('cap-metro-hint'); if(hint) hint.style.display=capCountIn?'block':'none';
 }
@@ -4767,7 +4813,7 @@ async function toggleCapRec(){
       const completed=await _runCountIn();
       capCountingIn=false;
       if(!completed){ stream.getTracks().forEach(t=>t.stop()); capStream=null; _resetCapRecUI(); return; }
-      capRecBpm=capBpmSel;
+      capRecBpm=capBpmSel; _capRecTarget=capTargetBpm;
     } else {
       capRecBpm=null;
     }
@@ -4827,12 +4873,16 @@ async function onCapRecStop(){
   }
   const mid=uid();
   const lockedBpm=capRecBpm; capRecBpm=null; // tempo from count-in for THIS take (null = free time)
+  const capRecTargetBpm=_capRecTarget; _capRecTarget=null;
   try{ await idbPut(mid, blob, mime); }catch(err){ toast('Could not store take: '+(err.message||'error')); return; }
   // Legacy takes have no .take field but render positionally (i+1); count them so numbers don't collide
   const audioTakes=(capEntry.media||[]).filter(x=>x.type==='audio');
   const nextTake=Math.max(0, audioTakes.length, ...audioTakes.map(x=>x.take||0))+1;
   const mediaItem={id:mid, type:'audio', mimeType:mime, duration:dur||null, take:nextTake};
-  if(lockedBpm){ mediaItem.tempoBpm=lockedBpm; mediaItem.tempoLocked=true; } // exact tempo, not estimated
+  if(lockedBpm){
+    mediaItem.tempoBpm=lockedBpm; mediaItem.tempoLocked=true; // exact tempo, not estimated
+    mediaItem.outBpm=capRecTargetBpm||lockedBpm;              // tempo the melody is delivered at
+  }
   capEntry.media.push(mediaItem);
   capEntry.hasMedia=true; capEntry.mimeType=capEntry.media[0].mimeType;
   // A take recorded into a photo-first entry should make it read as audio (the
@@ -5322,24 +5372,24 @@ function _takeModeToggleHtml(m){
   const btn=(v,label,title)=>`<button class="mel-mode-btn${mode===v?' on':''}" title="${title}"
       onclick="setTakeMode('${m.id}','${v}')">${label}</button>`;
   return `<div class="mel-mode" role="group" aria-label="Analysis mode">
-    ${btn('voice','Voice','Humming or singing — one melody line')}
-    ${btn('instrument','Instrument','Piano, guitar — can hear chords')}
+    ${btn('mono','Mono','One note at a time — humming, or a single line on any instrument')}
+    ${btn('poly','Poly','Several notes at once — chords, or piano with the sustain pedal down')}
   </div>`;
 }
 function _takeMelodyHtml(m){
   const hasMidi=Array.isArray(m.midi)&&m.midi.length>0;
   const NAMES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
   if(!hasMidi){
-    const isInstr=_takeMode(m)==='instrument';
+    const isPoly=_takeMode(m)==='poly';
     return `<div class="note-take-melody">
       <div class="note-take-transcript-head">
         <span class="note-take-transcript-label">Melody</span>
         <button class="note-take-mini-btn" id="melbtn-${m.id}" onclick="runTakeMidi('${m.id}')">Analyse</button>
       </div>
       ${_takeModeToggleHtml(m)}
-      <div class="note-analysis-hint" id="melstatus-${m.id}">${isInstr
-        ? 'Polyphonic: hears chords. Play cleanly, then Analyse.'
-        : 'Sing it as “da-da-da” (not “mmm”) for cleaner notes, then Analyse.'}</div>
+      <div class="note-analysis-hint" id="melstatus-${m.id}">${isPoly
+        ? 'Chords and overlapping notes — including piano with the pedal down.'
+        : 'One line at a time. Humming? “da-da-da” reads cleaner than “mmm”.'}</div>
     </div>`;
   }
   const sel=(_melSel.mid===m.id)?_melSel.idx:-1;
@@ -5353,8 +5403,9 @@ function _takeMelodyHtml(m){
   const isModified=m.midiOriginal&&JSON.stringify(m.midi.map(n=>n.p))!==JSON.stringify(m.midiOriginal.map(n=>n.p));
   const selName=(sel>=0&&m.midi[sel])?midiToNoteName(m.midi[sel].p):'';
   const st=m.midiStats;
+  const recBpm=_takeRecBpm(m), outBpm=_takeOutBpm(m);
   // Instrument stats count notes, not voiced frames — label them honestly.
-  const diag=st?(st.mode==='instrument'
+  const diag=st?((st.mode==='poly'||st.mode==='instrument')
     ? ` · ${st.loHz}–${st.hiHz} Hz · polyphonic`
     : ` · ${st.loHz}–${st.hiHz} Hz · ${st.voiced}/${st.total} voiced`):'';
   return `<div class="note-take-melody">
@@ -5380,7 +5431,14 @@ function _takeMelodyHtml(m){
       <button class="note-mel-btn" onclick="noteMelodySnap('${m.id}')">Snap</button>
       ${isModified?`<button class="note-mel-btn" onclick="noteMelodyReset('${m.id}')">↺ Reset</button>`:''}
     </div>
-    <div class="note-mel-meta">${m.midi.length} note${m.midi.length===1?'':'s'} · ${midiToNoteName(lo)}–${midiToNoteName(hi)}${capEntry.bpm?` · ${capEntry.bpm} BPM`:''}${diag} · tap note to edit</div>
+    ${recBpm?`<div class="note-mel-tempo">
+      <span class="lbl">Tempo</span>
+      <button class="cap-bpm-adj" onclick="adjTakeOutBpm('${m.id}',-5)" aria-label="Slower">−</button>
+      <span class="val">${outBpm}</span><span class="cap-bpm-unit">BPM</span>
+      <button class="cap-bpm-adj" onclick="adjTakeOutBpm('${m.id}',5)" aria-label="Faster">+</button>
+      ${outBpm!==recBpm?`<span class="sub">sung at ${recBpm}</span>`:''}
+    </div>`:''}
+    <div class="note-mel-meta">${m.midi.length} note${m.midi.length===1?'':'s'} · ${midiToNoteName(lo)}–${midiToNoteName(hi)}${recBpm?'':(capEntry.bpm?` · ${capEntry.bpm} BPM`:'')}${diag} · tap note to edit</div>
   </div>`;
 }
 // Refresh only one take's melody block — leaves the <audio> player (and its playback) untouched
@@ -5443,7 +5501,20 @@ function noteMelodyReset(mid){
 }
 function downloadTakeMidi(mid){
   const m=_findTakeMedia(mid); if(!m||!m.midi||!m.midi.length) return;
-  _downloadMidiNotes(m.midi, capEntry, capEntry?.bpm||120);
+  _downloadMidiNotes(m.midi, capEntry, _takeOutBpm(m)||capEntry?.bpm||120);
+}
+// Change the delivered tempo after the fact. Pure arithmetic on symbolic data —
+// no re-analysis, no audio touched, and pitch edits survive untouched.
+function adjTakeOutBpm(mid, d){
+  const m=_findTakeMedia(mid); if(!m) return;
+  const from=_takeOutBpm(m); if(!from) return;
+  const to=Math.max(40,Math.min(300,from+d));
+  if(to===from) return;
+  m.outBpm=to;
+  m.midi=_rescaleNotes(m.midi, from, to);
+  if(Array.isArray(m.midiOriginal)) m.midiOriginal=_rescaleNotes(m.midiOriginal, from, to);
+  try{ persist(); }catch(_){}
+  refreshTakeMelody(mid);
 }
 // ── Transcribe from note window ──
 async function noteTranscribe(mid){
@@ -6154,9 +6225,38 @@ function humSegmentNotes(frames){
   let start=-1, pitches=[], pfs=[];
   const CONF=0.50;  // min confidence
   const TOL=1.2;    // semitone tolerance — wider for real voice drift
+  // A step SMALLER than TOL still starts a new note if the pitch settles there
+  // and stays. Without this, a semitone move inside the tolerance is read as
+  // drift and the two notes become one.
+  //
+  // Found on real piano input: a C major scale lost exactly E and B — its only
+  // two semitone steps. The tracker was not at fault, it reported midi 64 then
+  // 65 at confidence 1.0; segmentation merged them because 1 semitone < 1.2 and
+  // nothing else forced a boundary. Nothing else could: the articulation
+  // detector looks for a DIP, and a struck piano note decays into the next
+  // attack, so energy RISES across the boundary and never dips.
+  //
+  // Drift wanders and comes back; a melodic step goes somewhere and stays. So
+  // confirm over the following frames instead of trusting a single one.
+  const STEP_MIN=0.7;   // semitones — smaller than TOL, larger than voice wobble
+  const STEP_HOLD=nf(0.048); // must hold this long to count as a new note
   const MIN_F=nf(0.046); // 46 ms minimum note — catches 32nd notes at ≥65 BPM
 
   const medOf=arr=>{ const s=[...arr].sort((a,b)=>a-b); return s[Math.floor(s.length/2)]; };
+  // Does the pitch stay away from the current note's centre from frame i onward,
+  // or does it wobble back? One frame proves nothing; a held new pitch does.
+  const _fracAt=g=>(g&&g.freq>0)?69+12*Math.log2(g.freq/440):(g?g.midi:null);
+  const _settlesAt=(i, fromMed)=>{
+    const ahead=[];
+    for(let j=i;j<Math.min(smoothed.length, i+STEP_HOLD+1);j++){
+      const g=smoothed[j];
+      if(!g||g.midi<0||g.conf<CONF) return false; // ran out of voiced signal — don't guess
+      ahead.push(_fracAt(g));
+    }
+    if(ahead.length<=STEP_HOLD) return false;
+    const d=medOf(ahead)-fromMed;
+    return Math.abs(d)>=STEP_MIN;
+  };
   const flush=(endT)=>{
     if(start>=0&&pitches.length>=MIN_F){
       // Resolve octave outliers against the note's OWN median, not against
@@ -6173,13 +6273,28 @@ function humSegmentNotes(frames){
       // frame pitches rather than the rounded MIDI values — the whole point is
       // sub-semitone movement, which rounding would erase. A sustained note sits
       // still; a portamento is still climbing when it gets cut into a segment.
-      let drift=0, tail=null;
+      let drift=0, tail=null, flat=0;
+      // The octave guard applies to drift and tail, which are pitch VALUES.
+      // Flatness is a shape and needs no such guard — and it must be computed
+      // even for a 3-frame sliver, since being too short to measure is itself
+      // the evidence that nothing ever settled there.
       if(pfs.length>=4 && Math.max(...pitches)-Math.min(...pitches)<6){
         const k=Math.max(1, Math.round(pfs.length*0.4));
         drift=medOf(pfs.slice(-k))-medOf(pfs.slice(0,k));
         tail=Math.round(medOf(pfs.slice(-k)));
       }
-      notes.push({t:start, dur:Math.round((endT-start)*1000)/1000, pitch:medOf(fixed), drift, tail});
+      // Longest stretch, in seconds, over which the pitch stayed inside a
+      // third of a semitone. A note — however short — settles somewhere; a
+      // glide is travelling the whole time and settles nowhere. This survives
+      // being chopped into pieces, which raw drift does not: split a glide
+      // finely enough and each fragment looks stationary by distance travelled
+      // while still never holding still.
+      { let lo=0;
+        for(let hi=0;hi<pfs.length;hi++){
+          while(lo<hi && Math.max(...pfs.slice(lo,hi+1))-Math.min(...pfs.slice(lo,hi+1))>0.7) lo++;
+          flat=Math.max(flat, (hi-lo+1)*hop);
+        } }
+      notes.push({t:start, dur:Math.round((endT-start)*1000)/1000, pitch:medOf(fixed), drift, tail, flat});
     }
     start=-1; pitches=[]; pfs=[];
   };
@@ -6193,7 +6308,13 @@ function humSegmentNotes(frames){
       else{
         const med=medOf(pitches);
         const diff=f.midi-med;
-        if(Math.abs(diff)<=TOL){ pitches.push(f.midi); pfs.push(frac); }
+        if(Math.abs(diff)<=TOL){
+          // Within tolerance, but has the pitch actually MOVED and stayed?
+          const fmed=medOf(pfs);
+          if(Math.abs(frac-fmed)>=STEP_MIN && _settlesAt(i, fmed)){
+            flush(f.t); start=f.t; pitches=[f.midi]; pfs=[frac];
+          } else { pitches.push(f.midi); pfs.push(frac); }
+        }
         // Octave error, not a new note: the voice is rich in harmonics and the
         // tracker sometimes locks onto half or double the fundamental, usually
         // during the unstable attack. Left alone this splits one sung note into
@@ -6244,16 +6365,20 @@ function humSegmentNotes(frames){
   //    somewhere along the ramp and reports a pitch that was never sung.
   //    Dropping it would lose a real note; instead re-read the pitch from where
   //    it SETTLED rather than from the middle of the journey.
-  const GLIDE_DRIFT=1.2; // semitones travelled within one segment
+  // A segment that never held still for even this long was never a note.
+  const GLIDE_FLAT=0.06; // seconds
   const kept=[];
   for(let i=0;i<notes.length;i++){
     const n=notes[i], prev=notes[i-1], next=notes[i+1];
-    const moving=Math.abs(n.drift||0)>=GLIDE_DRIFT;
+    const moving=(n.flat||0)<GLIDE_FLAT;
     if(moving&&prev){
       if(next){
         const lo=Math.min(prev.pitch,next.pitch), hi=Math.max(prev.pitch,next.pitch);
         const between=n.pitch>lo&&n.pitch<hi;
-        const sameWay=Math.sign(n.drift)===Math.sign(next.pitch-prev.pitch);
+        // A sliver too short to have a measurable drift has no direction of its
+        // own; `between` already places it on the path from prev to next.
+        const sameWay=Math.abs(n.drift||0)<0.2
+          || Math.sign(n.drift)===Math.sign(next.pitch-prev.pitch);
         if(between&&sameWay){
           const last=kept[kept.length-1];
           if(last) last.dur=Math.round((n.t+n.dur-last.t)*1000)/1000;
@@ -6274,9 +6399,7 @@ function humSegmentNotes(frames){
   // Only collapse truly zero-gap fragments of DIFFERENT pitch that are both micro-short
   // (glitch frames that slipped past MIN_F=2 due to pitch tolerance boundaries).
   const GLITCH_DUR = 0.055; // < 55ms = shorter than a 32nd @ 90 BPM → suspect glitch
-  const SAME_PITCH_GAP = 0.12; // generous: depth, not length, decides (see _wentSilent)
-  // Did the signal actually drop to silence between these two times, or merely dip?
-  const _wentSilent=(t0,t1)=>frames.some(f=>f && f.t>=t0-1e-6 && f.t<t1+1e-6 && (f.rms||0)<rmsFloor);
+  const SAME_PITCH_GAP = 0.12; // generous: depth, not length, decides (see _reattacked)
   const merged=[];
   for(const n of notes){
     const prev=merged[merged.length-1];
@@ -6285,18 +6408,17 @@ function humSegmentNotes(frames){
     if(prev && prev.pitch!==n.pitch && n.dur<=GLITCH_DUR && gap<0.03){
       prev.dur=Math.round((n.t+n.dur-prev.t)*1000)/1000;
     }
-    // Same pitch, and the frames separating them never actually went quiet: this
-    // is one held note that the articulation detector cut in half on a mid-note
-    // volume dip (vibrato, breath). A genuine re-attack ("da-da" on one pitch)
-    // drops to real silence, so it keeps its two notes. Judging by depth rather
-    // than by gap length is what separates the two cases honestly — a fixed time
-    // threshold just lands arbitrarily between them.
-    else if(prev && prev.pitch===n.pitch && gap<=SAME_PITCH_GAP && !_wentSilent(prev.t+prev.dur, n.t)){
+    // Same pitch, and the signal never dipped deeply between them: one held note
+    // that the articulation detector cut in half on a mid-note wobble (vibrato,
+    // breath). A genuine re-attack digs a real hole and keeps its two notes.
+    // Depth, not gap length, is the honest discriminator — a fixed time threshold
+    // just lands arbitrarily between the two cases.
+    else if(prev && prev.pitch===n.pitch && gap<=SAME_PITCH_GAP && !_reattacked(frames, prev.t+prev.dur, n.t)){
       prev.dur=Math.round((n.t+n.dur-prev.t)*1000)/1000;
     }
     else { merged.push({...n}); }
   }
-  return merged.map(({drift, tail, ...n})=>n);
+  return merged.map(({drift, tail, flat, ...n})=>n);
 }
 
 // ── Scale tables & helpers ────────────────────────────────────────────────────
@@ -6682,16 +6804,33 @@ async function swiftF0PitchTrack(blob, onProgress){
   const pitchHz=out.pitch_hz.data, conf=out.confidence.data;
   onProgress?.(0.8);
 
-  // Voicing. The reference implementation gates at 0.9, which is right for
-  // clean sustained tones but throws away quiet humming — exactly the input
-  // this app exists for. So: try strict first, and only if that leaves the
-  // take mostly unvoiced, fall back to a permissive gate. Getting a rough
-  // melody out of a soft hum beats getting nothing.
+  // Voicing, with hysteresis — a Schmitt trigger, not a single threshold.
+  //
+  // A single gate at the reference 0.9 turned out to be the pipeline's most
+  // fragile point. Measured on a steady, full-volume held note, confidence
+  // hovers right around 0.9 and wanders across it, blanking ~180 ms in the
+  // middle of a note that never wavered acoustically. The consequence showed up
+  // as instability rather than as a fixed error: the SAME melody re-synthesised
+  // with a different noise instance gave three different answers in six runs.
+  // That is almost certainly what "you can get it right, but it takes 2-5
+  // attempts" feels like from the outside — not the singer being inconsistent,
+  // but the analysis flipping on differences too small to hear.
+  //
+  // So use two thresholds: a note must be clearly voiced to START, but only
+  // plausibly voiced to CONTINUE. Threshold-crossing flicker disappears, and
+  // the strict onset gate still keeps noise from spawning notes.
   const inRange=i=>pitchHz[i]>=SF0_FMIN&&pitchHz[i]<=SF0_FMAX;
   const N=pitchHz.length;
-  let gate=0.9, kept=0;
-  for(let i=0;i<N;i++) if(conf[i]>gate&&inRange(i)) kept++;
-  if(kept<N*0.15) gate=0.5;
+  let onset=0.9, sustain=0.45, kept=0;
+  for(let i=0;i<N;i++) if(conf[i]>onset&&inRange(i)) kept++;
+  // Quiet humming can fail the strict gate everywhere; a rough melody out of a
+  // soft hum still beats nothing, so drop both gates rather than give up.
+  if(kept<N*0.15){ onset=0.5; sustain=0.3; }
+  const voiced=new Array(N);
+  for(let i=0;i<N;i++){
+    if(!inRange(i)){ voiced[i]=false; continue; }
+    voiced[i] = conf[i]>onset || (i>0 && voiced[i-1] && conf[i]>sustain);
+  }
 
   // RMS over a 512-sample window centred on the frame, not the raw hop: at a
   // 16 ms hop a hop-sized window is too short to be a stable envelope, and the
@@ -6704,7 +6843,7 @@ async function swiftF0PitchTrack(blob, onProgress){
     const rms=n?Math.sqrt(s/n):0;
     const t=Math.round((c0/SF0_SR)*1000)/1000;
     const f=pitchHz[i], cf=conf[i];
-    if(cf>gate && inRange(i)){
+    if(voiced[i]){
       frames.push({t, freq:Math.round(f*10)/10, midi:Math.round(69+12*Math.log2(f/440)), conf:Math.round(cf*100)/100, rms});
     } else {
       frames.push({t, freq:0, midi:-1, conf:0, rms});
@@ -6771,18 +6910,46 @@ function _fixHarmonicOctaves(notes, sig, sr){
 // so the merge has to be re-run after the fold, not before it.
 //
 // The rule is the same one humSegmentNotes uses, and for the same reason: merge
-// only if the signal never actually reached silence in the gap. A deliberate
-// "da-da" on one pitch does reach silence and stays two notes.
+// only if the signal never dipped deeply in the gap. A deliberate "da-da" on one
+// pitch digs a real hole and stays two notes.
+// Did the singer re-articulate between these two times, or is this one held note?
+//
+// This used to ask whether the signal reached SILENCE, which sounded reasonable
+// and was wrong: measured on real-tempo material, a genuine re-attack only digs
+// down to ~40% of the local peak and never comes close to the 4% silence floor —
+// not at 16ths, not even at 0.4-second notes. There is no time to reach silence
+// while singing legato. So every repeated note on one pitch got merged into one
+// long note, which is exactly the reported "two or three notes become one".
+//
+// Depth against the LOCAL peak is the real signal, and it separates cleanly:
+// re-attacks measured 39-42%, while a held note with vibrato produced no local
+// minimum at all. The threshold sits at 50% — deliberately nearer the re-attack
+// end, because merging two real notes destroys something the user has to sing
+// again, while splitting a held note leaves two identical notes that take one
+// tap to fix.
+const REATTACK_DIP=0.50;
+function _reattacked(frames, t0, t1){
+  const near=frames.filter(f=>f && f.t>=t0-0.15 && f.t<=t1+0.15);
+  if(!near.length) return false;
+  const hi=Math.max(...near.map(f=>f.rms||0));
+  if(!(hi>0)) return false;
+  let between=frames.filter(f=>f && f.t>=t0-1e-6 && f.t<t1+1e-6);
+  // Two notes can meet with no frame strictly between them — a piano key struck
+  // again leaves no unvoiced gap, just a trough. Widen to a window around the
+  // join so the trough is still measurable rather than assuming a continuation.
+  if(!between.length) between=frames.filter(f=>f && f.t>=t0-0.04 && f.t<=t1+0.04);
+  if(!between.length) return false;
+  const lo=Math.min(...between.map(f=>f.rms||0));
+  return lo<hi*REATTACK_DIP;
+}
+
 function _mergeSamePitch(notes, frames){
   if(notes.length<2||!frames.length) return notes;
-  const maxRms=Math.max(...frames.map(f=>f.rms||0));
-  const rmsFloor=maxRms*0.04;
-  const silentBetween=(t0,t1)=>frames.some(f=>f && f.t>=t0-1e-6 && f.t<t1+1e-6 && (f.rms||0)<rmsFloor);
   const out=[{...notes[0]}]; // copy: the loop below mutates dur in place
   for(let i=1;i<notes.length;i++){
     const prev=out[out.length-1], cur=notes[i];
     const gapStart=prev.t+prev.dur;
-    if(cur.pitch===prev.pitch && cur.t-gapStart<0.12 && !silentBetween(gapStart, cur.t)){
+    if(cur.pitch===prev.pitch && cur.t-gapStart<0.12 && !_reattacked(frames, gapStart, cur.t)){
       prev.dur=Math.round((cur.t+cur.dur-prev.t)*1000)/1000;
     } else out.push({...cur});
   }
@@ -6832,13 +6999,13 @@ async function voiceTranscribe(blob, opts, onStatus){
 // Polyphonic path: basic-pitch handles chords, which a monophonic model cannot
 // (a monophonic model reads a chord as noise). Post-processing is deliberately
 // the SAME as the voice path, so switching mode changes the model, not the rules.
-async function instrumentTranscribe(blob, opts, onStatus){
+async function polyTranscribe(blob, opts, onStatus){
   opts=opts||{};
   const raw=await generateMidi(blob, onStatus); // [{t,d,p,v}]
-  if(!raw.length) return {notes:[], stats:{mode:'instrument', total:0, voiced:0, loHz:0, hiHz:0}};
+  if(!raw.length) return {notes:[], stats:{mode:'poly', total:0, voiced:0, loHz:0, hiHz:0}};
   const hz=p=>440*Math.pow(2,(p-69)/12);
   const pitches=raw.map(n=>n.p);
-  const stats={ mode:'instrument', total:raw.length, voiced:raw.length,
+  const stats={ mode:'poly', total:raw.length, voiced:raw.length,
     loHz:Math.round(hz(Math.min(...pitches))), hiHz:Math.round(hz(Math.max(...pitches))) };
   let segs=raw.map(n=>({t:n.t, dur:n.d, pitch:n.p, v:n.v}));
   // Same rule as the voice path: never snap to a guessed key (see voiceTranscribe).
@@ -6847,9 +7014,37 @@ async function instrumentTranscribe(blob, opts, onStatus){
                                 p:s.pitch, v:raw[i]?.v??96}));
   return {notes, stats};
 }
+// A take's two tempos: the one it was sung at, and the one it is delivered at.
+function _takeRecBpm(m){ return (m&&m.tempoBpm)||null; }
+function _takeOutBpm(m){ return (m&&m.outBpm)||_takeRecBpm(m)||null; }
+// Re-time a melody between tempos. Exact for any pair, not just neat fractions:
+// scaling every onset and duration by fromBpm/toBpm leaves note VALUES alone,
+// since d·(from/to)·(to/60) = d·from/60. Four decimals rather than three so
+// repeated nudges of the tempo control can't accumulate visible drift.
+function _rescaleNotes(notes, fromBpm, toBpm){
+  if(!fromBpm||!toBpm||fromBpm===toBpm||!Array.isArray(notes)) return notes;
+  const f=fromBpm/toBpm, r=x=>Math.round(x*f*10000)/10000;
+  return notes.map(n=>({...n, t:r(n.t), d:r(n.d)}));
+}
 // Which model a take is analysed with. Stored per take because one note can hold
 // a hummed idea and a piano version of it side by side.
-function _takeMode(m){ return m&&m.midiMode==='instrument' ? 'instrument' : 'voice'; }
+// Mono vs poly, not voice vs instrument.
+//
+// The old labels described the SOURCE, and were wrong about it. What the two
+// paths actually differ on is whether more than one note sounds at a time:
+// SwiftF0 tracks a single fundamental, basic-pitch resolves several at once.
+// A piano playing one line is monophonic and measurably better served by the
+// "voice" model — 8/8 on a scale where the polyphonic path struggled — while a
+// voice singing nothing but one line was never the point. Conversely a piano
+// with the sustain pedal down is a cluster, and the monophonic model returns
+// 1-2 notes out of 8 there, exactly as a monophonic model must.
+//
+// Persisted values accept the old strings so existing takes keep their setting;
+// new ones are written as mono/poly.
+function _takeMode(m){
+  const v=m&&m.midiMode;
+  return (v==='poly'||v==='instrument') ? 'poly' : 'mono';
+}
 function setTakeMode(mid, mode){
   const m=_findTakeMedia(mid); if(!m) return;
   m.midiMode=mode;
@@ -6879,24 +7074,29 @@ async function runTakeMidi(mid){
     const opts={bpm, tempoLocked, key:capEntry.key};
     const mode=_takeMode(m);
     let res;
-    if(mode==='instrument'){
-      res=await instrumentTranscribe(blob, opts, setStatus);
+    if(mode==='poly'){
+      res=await polyTranscribe(blob, opts, setStatus);
     } else {
       try{
         res=await voiceTranscribe(blob, opts, setStatus);
       }catch(voiceErr){
         console.warn('SwiftF0 failed, basic-pitch fallback:', voiceErr);
         setStatus('Falling back to basic-pitch…');
-        res=await instrumentTranscribe(blob, opts, setStatus);
+        res=await polyTranscribe(blob, opts, setStatus);
       }
     }
     if(!res.notes.length){
-      const hint = mode==='instrument'
-        ? 'No notes detected. Play louder, or try Voice mode if this is a hummed melody.'
-        : 'No notes detected. Try “da-da-da”, louder — or switch to Instrument if you played an instrument.';
+      const hint = mode==='poly'
+        ? 'No notes detected. Play louder — or switch to Mono if this is a single line.'
+        : 'No notes detected. Try “da-da-da”, louder — or switch to Poly if notes overlap.';
       setStatus(res.stats?`${hint} (${res.stats.loHz}–${res.stats.hiHz} Hz, ${res.stats.voiced}/${res.stats.total} voiced)`:hint);
       return;
     }
+    // Transcription works in the tempo that was SUNG (which is also the tempo
+    // _quantizeRhythm snapped to, where the grid is coarser and more forgiving).
+    // Only now does it become the tempo the idea is meant to live at.
+    const outBpm=_takeOutBpm(m);
+    if(bpm&&outBpm&&bpm!==outBpm) res.notes=_rescaleNotes(res.notes, bpm, outBpm);
     m.midi=res.notes;
     m.midiOriginal=JSON.parse(JSON.stringify(res.notes));
     if(res.stats) m.midiStats=res.stats;
@@ -7417,6 +7617,7 @@ setLayout(layout);
 // Restore count-in metronome preference
 capCountIn=!!settings.metronome;
 capBpmSel=settings.metroBpm||90;
+capTargetBpm=settings.targetBpm||capBpmSel;
 _syncMetroUI();
 renderProjects();
 renderHeatmap();
