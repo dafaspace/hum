@@ -1092,8 +1092,16 @@ body {
 .cap-metro-btn.on { border-color: var(--warm); color: var(--warm2); opacity: 1; background: var(--warm-soft); }
 .cap-metro-btn.on #cap-metro-bpm { display: inline; }
 #cap-metro-hint { font-size: 10.5px; color: var(--ink3); line-height: 1.4; text-align: center; max-width: 280px; }
-#cap-metro-tempo { display: flex; align-items: center; gap: 8px; font-family: var(--sans); }
-#cap-metro-tempo #cap-bpm-val { font-size: 13px; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; min-width: 26px; text-align: center; }
+#cap-metro-tempo { display: flex; flex-direction: column; align-items: center; gap: 5px; font-family: var(--sans); }
+.cap-bpm-row { display: flex; align-items: center; gap: 8px; }
+.cap-bpm-lbl { font-size: 10px; color: var(--ink3); letter-spacing: 0.04em; min-width: 48px; text-align: right; }
+.cap-bpm-hint { font-size: 10px; color: var(--ink3); text-align: center; max-width: 260px; line-height: 1.45; }
+.cap-bpm-hint b { color: var(--warm2); font-weight: 500; }
+.note-mel-tempo { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-family: var(--sans); }
+.note-mel-tempo .lbl { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink3); }
+.note-mel-tempo .val { font-size: 12px; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; min-width: 28px; text-align: center; }
+.note-mel-tempo .sub { font-size: 10.5px; color: var(--ink3); }
+#cap-metro-tempo .cap-bpm-val { font-size: 13px; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; min-width: 26px; text-align: center; }
 .cap-bpm-unit { font-size: 10px; color: var(--ink3); letter-spacing: 0.08em; }
 .cap-bpm-adj { width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--paper4); background: var(--paper2); color: var(--ink2); font-size: 15px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; flex-shrink: 0; }
 .cap-bpm-adj:hover { border-color: var(--warm); color: var(--warm2); }
@@ -1810,7 +1818,7 @@ audio { display: none; }
       </div>
       <div class="brand-heatmap" id="brand-heatmap" title="Your activity"></div>
     </div>
-    <div class="brand-sub">capture before it fades <span class="brand-ver">v0.13.3</span></div>
+    <div class="brand-sub">capture before it fades <span class="brand-ver">v0.14</span></div>
     <button class="sidebar-close-btn" onclick="closeSidebar()" aria-label="Close">
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg>
     </button>
@@ -1863,7 +1871,7 @@ audio { display: none; }
       <div class="brand-wrap" onclick="toggleTheme()" title="Switch theme" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleTheme()}">
         <span class="brand">hum</span>
         <span class="brand-dot"></span>
-        <span class="brand-ver">v0.13.3</span>
+        <span class="brand-ver">v0.14</span>
       </div>
       <div style="display:flex;align-items:center;gap:4px">
         <button class="mob-settings-btn" onclick="openSettings()" title="Settings">
@@ -2267,7 +2275,7 @@ audio { display: none; }
 <div id="about-overlay">
   <div class="about-card">
     <div class="about-header">
-      <div class="about-title">Hum <span class="brand-ver" style="font-size:12px;opacity:0.5">v0.13.3</span></div>
+      <div class="about-title">Hum <span class="brand-ver" style="font-size:12px;opacity:0.5">v0.14</span></div>
       <div class="about-sub">Capture creative moments before they fade.</div>
     </div>
 
@@ -2451,9 +2459,19 @@ audio { display: none; }
         <button class="cap-arrow" id="cap-cancel" onclick="cancelCapRec()" disabled>Cancel</button>
       </div>
       <div id="cap-metro-tempo" style="display:none">
-        <button class="cap-bpm-adj" onclick="adjCapBpm(-5)" aria-label="Slower">−</button>
-        <span id="cap-bpm-val">90</span><span class="cap-bpm-unit">BPM</span>
-        <button class="cap-bpm-adj" onclick="adjCapBpm(5)" aria-label="Faster">+</button>
+        <div class="cap-bpm-row">
+          <span class="cap-bpm-lbl">Sing at</span>
+          <button class="cap-bpm-adj" onclick="adjCapBpm(-5)" aria-label="Slower">−</button>
+          <span id="cap-bpm-val" class="cap-bpm-val">90</span><span class="cap-bpm-unit">BPM</span>
+          <button class="cap-bpm-adj" onclick="adjCapBpm(5)" aria-label="Faster">+</button>
+        </div>
+        <div class="cap-bpm-row">
+          <span class="cap-bpm-lbl">Save as</span>
+          <button class="cap-bpm-adj" onclick="adjCapTargetBpm(-5)" aria-label="Slower target">−</button>
+          <span id="cap-tgt-val" class="cap-bpm-val">90</span><span class="cap-bpm-unit">BPM</span>
+          <button class="cap-bpm-adj" onclick="adjCapTargetBpm(5)" aria-label="Faster target">+</button>
+        </div>
+        <div id="cap-bpm-hint" class="cap-bpm-hint"></div>
       </div>
     </div>
   </div>
@@ -4584,7 +4602,16 @@ let capRec=null, capChunks=[], capStream=null, capSec=0, capTimer=null, capRecor
 let capAutoName='', capPendingName=null; // editable title state
 // ── Count-in metronome state ──
 let capCountIn=false;          // metronome count-in enabled (persisted in settings)
-let capBpmSel=90;              // selected tempo for count-in
+let capBpmSel=90;              // tempo the metronome clicks — what you sing to
+// The tempo the melody is DELIVERED at, which need not be the one you sang.
+// Singing slower is the cheapest accuracy win there is: every source of error —
+// intonation, articulation, timing — gets worse as notes get shorter, and the
+// measured ceiling is ~90 ms per note (sixteenths at 160 BPM). MIDI is symbolic,
+// so re-timing it is exact: scaling every onset and duration by the tempo ratio
+// leaves note VALUES untouched (a quarter stays a quarter) for ANY pair of
+// tempos, not just neat fractions like 1/2 — d·(rec/out)·(out/60) = d·rec/60.
+let capTargetBpm=90;
+let _capRecTarget=null;        // target captured at the moment recording started
 let capCountingIn=false;       // currently playing the audible count-in
 let _metroCtx=null;            // AudioContext for count-in clicks
 let _metroTimers=[];           // pending setTimeout ids (count-in + visual pulse)
@@ -4672,9 +4699,20 @@ function toggleCapMetro(){
   try{ localStorage.setItem(ST, JSON.stringify(settings)); }catch(_){}
   _syncMetroUI();
 }
+function adjCapTargetBpm(d){
+  capTargetBpm=Math.max(40,Math.min(300,capTargetBpm+d));
+  settings.targetBpm=capTargetBpm;
+  try{ localStorage.setItem(ST, JSON.stringify(settings)); }catch(_){}
+  _syncMetroUI();
+}
 function adjCapBpm(d){
+  const wasLinked=(capTargetBpm===capBpmSel);
   capBpmSel=Math.max(40,Math.min(240,capBpmSel+d));
+  // Until the two are deliberately separated they move together, so the control
+  // stays invisible to anyone who doesn't want it.
+  if(wasLinked) capTargetBpm=capBpmSel;
   settings.metroBpm=capBpmSel;
+  settings.targetBpm=capTargetBpm;
   try{ localStorage.setItem(ST, JSON.stringify(settings)); }catch(_){}
   _syncMetroUI();
 }
@@ -4683,6 +4721,14 @@ function _syncMetroUI(){
   if(btn) btn.classList.toggle('on',capCountIn);
   const bpmL=document.getElementById('cap-metro-bpm'); if(bpmL) bpmL.textContent=capBpmSel;
   const bpmV=document.getElementById('cap-bpm-val'); if(bpmV) bpmV.textContent=capBpmSel;
+  const tgtV=document.getElementById('cap-tgt-val'); if(tgtV) tgtV.textContent=capTargetBpm;
+  const bpmHint=document.getElementById('cap-bpm-hint');
+  if(bpmHint){
+    bpmHint.innerHTML = capTargetBpm===capBpmSel
+      ? 'Short notes are where accuracy dies. Sing slower than the target and the MIDI speeds up afterwards — losslessly.'
+      : `Sing at <b>${capBpmSel}</b> — saved at <b>${capTargetBpm}</b> (${(capTargetBpm/capBpmSel).toFixed(2)}×).`;
+    // (bpmHint, not hint — the count-in headphone warning below already owns that name)
+  }
   const tempo=document.getElementById('cap-metro-tempo'); if(tempo) tempo.style.display=capCountIn?'flex':'none';
   const hint=document.getElementById('cap-metro-hint'); if(hint) hint.style.display=capCountIn?'block':'none';
 }
@@ -4767,7 +4813,7 @@ async function toggleCapRec(){
       const completed=await _runCountIn();
       capCountingIn=false;
       if(!completed){ stream.getTracks().forEach(t=>t.stop()); capStream=null; _resetCapRecUI(); return; }
-      capRecBpm=capBpmSel;
+      capRecBpm=capBpmSel; _capRecTarget=capTargetBpm;
     } else {
       capRecBpm=null;
     }
@@ -4827,12 +4873,16 @@ async function onCapRecStop(){
   }
   const mid=uid();
   const lockedBpm=capRecBpm; capRecBpm=null; // tempo from count-in for THIS take (null = free time)
+  const capRecTargetBpm=_capRecTarget; _capRecTarget=null;
   try{ await idbPut(mid, blob, mime); }catch(err){ toast('Could not store take: '+(err.message||'error')); return; }
   // Legacy takes have no .take field but render positionally (i+1); count them so numbers don't collide
   const audioTakes=(capEntry.media||[]).filter(x=>x.type==='audio');
   const nextTake=Math.max(0, audioTakes.length, ...audioTakes.map(x=>x.take||0))+1;
   const mediaItem={id:mid, type:'audio', mimeType:mime, duration:dur||null, take:nextTake};
-  if(lockedBpm){ mediaItem.tempoBpm=lockedBpm; mediaItem.tempoLocked=true; } // exact tempo, not estimated
+  if(lockedBpm){
+    mediaItem.tempoBpm=lockedBpm; mediaItem.tempoLocked=true; // exact tempo, not estimated
+    mediaItem.outBpm=capRecTargetBpm||lockedBpm;              // tempo the melody is delivered at
+  }
   capEntry.media.push(mediaItem);
   capEntry.hasMedia=true; capEntry.mimeType=capEntry.media[0].mimeType;
   // A take recorded into a photo-first entry should make it read as audio (the
@@ -5353,6 +5403,7 @@ function _takeMelodyHtml(m){
   const isModified=m.midiOriginal&&JSON.stringify(m.midi.map(n=>n.p))!==JSON.stringify(m.midiOriginal.map(n=>n.p));
   const selName=(sel>=0&&m.midi[sel])?midiToNoteName(m.midi[sel].p):'';
   const st=m.midiStats;
+  const recBpm=_takeRecBpm(m), outBpm=_takeOutBpm(m);
   // Instrument stats count notes, not voiced frames — label them honestly.
   const diag=st?(st.mode==='instrument'
     ? ` · ${st.loHz}–${st.hiHz} Hz · polyphonic`
@@ -5380,7 +5431,14 @@ function _takeMelodyHtml(m){
       <button class="note-mel-btn" onclick="noteMelodySnap('${m.id}')">Snap</button>
       ${isModified?`<button class="note-mel-btn" onclick="noteMelodyReset('${m.id}')">↺ Reset</button>`:''}
     </div>
-    <div class="note-mel-meta">${m.midi.length} note${m.midi.length===1?'':'s'} · ${midiToNoteName(lo)}–${midiToNoteName(hi)}${capEntry.bpm?` · ${capEntry.bpm} BPM`:''}${diag} · tap note to edit</div>
+    ${recBpm?`<div class="note-mel-tempo">
+      <span class="lbl">Tempo</span>
+      <button class="cap-bpm-adj" onclick="adjTakeOutBpm('${m.id}',-5)" aria-label="Slower">−</button>
+      <span class="val">${outBpm}</span><span class="cap-bpm-unit">BPM</span>
+      <button class="cap-bpm-adj" onclick="adjTakeOutBpm('${m.id}',5)" aria-label="Faster">+</button>
+      ${outBpm!==recBpm?`<span class="sub">sung at ${recBpm}</span>`:''}
+    </div>`:''}
+    <div class="note-mel-meta">${m.midi.length} note${m.midi.length===1?'':'s'} · ${midiToNoteName(lo)}–${midiToNoteName(hi)}${recBpm?'':(capEntry.bpm?` · ${capEntry.bpm} BPM`:'')}${diag} · tap note to edit</div>
   </div>`;
 }
 // Refresh only one take's melody block — leaves the <audio> player (and its playback) untouched
@@ -5443,7 +5501,20 @@ function noteMelodyReset(mid){
 }
 function downloadTakeMidi(mid){
   const m=_findTakeMedia(mid); if(!m||!m.midi||!m.midi.length) return;
-  _downloadMidiNotes(m.midi, capEntry, capEntry?.bpm||120);
+  _downloadMidiNotes(m.midi, capEntry, _takeOutBpm(m)||capEntry?.bpm||120);
+}
+// Change the delivered tempo after the fact. Pure arithmetic on symbolic data —
+// no re-analysis, no audio touched, and pitch edits survive untouched.
+function adjTakeOutBpm(mid, d){
+  const m=_findTakeMedia(mid); if(!m) return;
+  const from=_takeOutBpm(m); if(!from) return;
+  const to=Math.max(40,Math.min(300,from+d));
+  if(to===from) return;
+  m.outBpm=to;
+  m.midi=_rescaleNotes(m.midi, from, to);
+  if(Array.isArray(m.midiOriginal)) m.midiOriginal=_rescaleNotes(m.midiOriginal, from, to);
+  try{ persist(); }catch(_){}
+  refreshTakeMelody(mid);
 }
 // ── Transcribe from note window ──
 async function noteTranscribe(mid){
@@ -6883,6 +6954,18 @@ async function instrumentTranscribe(blob, opts, onStatus){
                                 p:s.pitch, v:raw[i]?.v??96}));
   return {notes, stats};
 }
+// A take's two tempos: the one it was sung at, and the one it is delivered at.
+function _takeRecBpm(m){ return (m&&m.tempoBpm)||null; }
+function _takeOutBpm(m){ return (m&&m.outBpm)||_takeRecBpm(m)||null; }
+// Re-time a melody between tempos. Exact for any pair, not just neat fractions:
+// scaling every onset and duration by fromBpm/toBpm leaves note VALUES alone,
+// since d·(from/to)·(to/60) = d·from/60. Four decimals rather than three so
+// repeated nudges of the tempo control can't accumulate visible drift.
+function _rescaleNotes(notes, fromBpm, toBpm){
+  if(!fromBpm||!toBpm||fromBpm===toBpm||!Array.isArray(notes)) return notes;
+  const f=fromBpm/toBpm, r=x=>Math.round(x*f*10000)/10000;
+  return notes.map(n=>({...n, t:r(n.t), d:r(n.d)}));
+}
 // Which model a take is analysed with. Stored per take because one note can hold
 // a hummed idea and a piano version of it side by side.
 function _takeMode(m){ return m&&m.midiMode==='instrument' ? 'instrument' : 'voice'; }
@@ -6933,6 +7016,11 @@ async function runTakeMidi(mid){
       setStatus(res.stats?`${hint} (${res.stats.loHz}–${res.stats.hiHz} Hz, ${res.stats.voiced}/${res.stats.total} voiced)`:hint);
       return;
     }
+    // Transcription works in the tempo that was SUNG (which is also the tempo
+    // _quantizeRhythm snapped to, where the grid is coarser and more forgiving).
+    // Only now does it become the tempo the idea is meant to live at.
+    const outBpm=_takeOutBpm(m);
+    if(bpm&&outBpm&&bpm!==outBpm) res.notes=_rescaleNotes(res.notes, bpm, outBpm);
     m.midi=res.notes;
     m.midiOriginal=JSON.parse(JSON.stringify(res.notes));
     if(res.stats) m.midiStats=res.stats;
@@ -7453,6 +7541,7 @@ setLayout(layout);
 // Restore count-in metronome preference
 capCountIn=!!settings.metronome;
 capBpmSel=settings.metroBpm||90;
+capTargetBpm=settings.targetBpm||capBpmSel;
 _syncMetroUI();
 renderProjects();
 renderHeatmap();
