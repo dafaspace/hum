@@ -2,6 +2,8 @@
 # tracked here is publicly served at dafaspace.github.io/hum/<file>.
 CLAUDE.md
 DEV.md
+TESTS.md
+tests.html
 Archive/
 Prototypes/
 client_secret*.json
