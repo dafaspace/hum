@@ -1,7 +1,7 @@
 // Hum service worker — offline cache + auto-update.
 // Registered from index.html as ./sw.js (must be a real same-origin file:
 // browsers reject blob:/data: service worker script URLs).
-const CACHE = 'hum-v12-3';
+const CACHE = 'hum-v13';
 
 self.addEventListener('install', () => self.skipWaiting());
 
@@ -35,9 +35,10 @@ self.addEventListener('fetch', e => {
     return; // default network handling
   }
 
-  // Fonts, versioned CDN libraries, and the TF.js/SPICE model: cache-first (immutable)
-  if (u.includes('fonts.g') || u.includes('cdn.jsdelivr.net') ||
-      u.includes('esm.sh') || u.includes('tfhub.dev') || u.includes('kaggle')) {
+  // Fonts and versioned CDN libraries (onnxruntime-web + its .wasm, basic-pitch,
+  // TF.js): cache-first, since a pinned version never changes. The SwiftF0 model
+  // itself is same-origin now and falls through to the static-asset rule below.
+  if (u.includes('fonts.g') || u.includes('cdn.jsdelivr.net') || u.includes('esm.sh')) {
     e.respondWith(cacheFirst(e.request));
     return;
   }
