@@ -1810,7 +1810,7 @@ audio { display: none; }
       </div>
       <div class="brand-heatmap" id="brand-heatmap" title="Your activity"></div>
     </div>
-    <div class="brand-sub">capture before it fades <span class="brand-ver">v0.13.1</span></div>
+    <div class="brand-sub">capture before it fades <span class="brand-ver">v0.13.2</span></div>
     <button class="sidebar-close-btn" onclick="closeSidebar()" aria-label="Close">
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg>
     </button>
@@ -1863,7 +1863,7 @@ audio { display: none; }
       <div class="brand-wrap" onclick="toggleTheme()" title="Switch theme" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleTheme()}">
         <span class="brand">hum</span>
         <span class="brand-dot"></span>
-        <span class="brand-ver">v0.13.1</span>
+        <span class="brand-ver">v0.13.2</span>
       </div>
       <div style="display:flex;align-items:center;gap:4px">
         <button class="mob-settings-btn" onclick="openSettings()" title="Settings">
@@ -2267,7 +2267,7 @@ audio { display: none; }
 <div id="about-overlay">
   <div class="about-card">
     <div class="about-header">
-      <div class="about-title">Hum <span class="brand-ver" style="font-size:12px;opacity:0.5">v0.13.1</span></div>
+      <div class="about-title">Hum <span class="brand-ver" style="font-size:12px;opacity:0.5">v0.13.2</span></div>
       <div class="about-sub">Capture creative moments before they fade.</div>
     </div>
 
@@ -6151,7 +6151,7 @@ function humSegmentNotes(frames){
   });
 
   const notes=[];
-  let start=-1, pitches=[];
+  let start=-1, pitches=[], pfs=[];
   const CONF=0.50;  // min confidence
   const TOL=1.2;    // semitone tolerance — wider for real voice drift
   const MIN_F=nf(0.046); // 46 ms minimum note — catches 32nd notes at ≥65 BPM
@@ -6169,20 +6169,31 @@ function humSegmentNotes(frames){
         if(Math.abs(Math.abs(d)-24)<=1.5) return d>0?p-24:p+24;
         return p;
       });
-      notes.push({t:start, dur:Math.round((endT-start)*1000)/1000, pitch:medOf(fixed)});
+      // How far the pitch TRAVELLED across the note, measured on the fractional
+      // frame pitches rather than the rounded MIDI values — the whole point is
+      // sub-semitone movement, which rounding would erase. A sustained note sits
+      // still; a portamento is still climbing when it gets cut into a segment.
+      let drift=0, tail=null;
+      if(pfs.length>=4 && Math.max(...pitches)-Math.min(...pitches)<6){
+        const k=Math.max(1, Math.round(pfs.length*0.4));
+        drift=medOf(pfs.slice(-k))-medOf(pfs.slice(0,k));
+        tail=Math.round(medOf(pfs.slice(-k)));
+      }
+      notes.push({t:start, dur:Math.round((endT-start)*1000)/1000, pitch:medOf(fixed), drift, tail});
     }
-    start=-1; pitches=[];
+    start=-1; pitches=[]; pfs=[];
   };
 
   for(let i=0;i<=smoothed.length;i++){
     const f=smoothed[i];
     const voiced=f&&f.conf>=CONF&&f.midi>0;
     if(voiced){
-      if(start<0){ start=f.t; pitches=[f.midi]; }
+      const frac=f.freq>0 ? 69+12*Math.log2(f.freq/440) : f.midi;
+      if(start<0){ start=f.t; pitches=[f.midi]; pfs=[frac]; }
       else{
         const med=medOf(pitches);
         const diff=f.midi-med;
-        if(Math.abs(diff)<=TOL) pitches.push(f.midi);
+        if(Math.abs(diff)<=TOL){ pitches.push(f.midi); pfs.push(frac); }
         // Octave error, not a new note: the voice is rich in harmonics and the
         // tracker sometimes locks onto half or double the fundamental, usually
         // during the unstable attack. Left alone this splits one sung note into
@@ -6190,14 +6201,73 @@ function humSegmentNotes(frames){
         // squashes every row). Keep the raw value and let flush() decide the
         // octave from the note's median once the whole note is in.
         else if(Math.abs(Math.abs(diff)-12)<=1.5 || Math.abs(Math.abs(diff)-24)<=1.5){
-          pitches.push(f.midi);
+          pitches.push(f.midi); pfs.push(frac);
         }
-        else{ flush(f.t); start=f.t; pitches=[f.midi]; }
+        else{ flush(f.t); start=f.t; pitches=[f.midi]; pfs=[frac]; }
       }
     } else {
       flush(f ? f.t : (smoothed[smoothed.length-1]?.t||0));
     }
   }
+
+  // Drop portamento: the pitch caught in transit between two real notes.
+  //
+  // Reported from a real take — a sung E major triad came back as E3 G3 G#3 B3,
+  // twice over, with the same phantom G3 both times. The voice slides from E3 up
+  // to G#3 and the tracker catches G on the way, then holds it long enough to
+  // clear the minimum-note length. Length is the wrong test here: in that take
+  // the phantom G3 was WIDER than the real G#3 it slid into, so any duration
+  // threshold would have deleted the real note and kept the artifact.
+  //
+  // What actually separates them is whether the pitch is standing still. A held
+  // note sits on one frequency; a glide is still climbing when segmentation cuts
+  // it. So require all four: the segment's pitch travelled, it sits between its
+  // two neighbours, it is going the same direction they are, and it is the
+  // shorter thing — a real passing note in a melody fails at least one of these.
+  // Portamento: the pitch caught in transit between two real notes.
+  //
+  // Reported from a real take — a sung E major triad came back as E3 G3 G#3 B3,
+  // twice over, with the same phantom G3 both times. The voice slides from E3 up
+  // to G#3 and the tracker faithfully follows it through G on the way.
+  //
+  // Duration is the wrong test: in that take the phantom was WIDER than the real
+  // note it slid into, so a length threshold would delete the real note and keep
+  // the artifact. What separates them is whether the pitch is STANDING STILL.
+  // Measured on this melody, the separation is not close — real notes drifted
+  // 0.00-0.25 semitones across their length, glide segments 1.88-2.33.
+  //
+  // Two different things happen, and they need opposite treatment:
+  //  * The slide gets its own segment, sandwiched between the two real notes.
+  //    That segment is not a note at all — drop it and give its time to the
+  //    note before it.
+  //  * The slide and its target end up in ONE segment, so the median lands
+  //    somewhere along the ramp and reports a pitch that was never sung.
+  //    Dropping it would lose a real note; instead re-read the pitch from where
+  //    it SETTLED rather than from the middle of the journey.
+  const GLIDE_DRIFT=1.2; // semitones travelled within one segment
+  const kept=[];
+  for(let i=0;i<notes.length;i++){
+    const n=notes[i], prev=notes[i-1], next=notes[i+1];
+    const moving=Math.abs(n.drift||0)>=GLIDE_DRIFT;
+    if(moving&&prev){
+      if(next){
+        const lo=Math.min(prev.pitch,next.pitch), hi=Math.max(prev.pitch,next.pitch);
+        const between=n.pitch>lo&&n.pitch<hi;
+        const sameWay=Math.sign(n.drift)===Math.sign(next.pitch-prev.pitch);
+        if(between&&sameWay){
+          const last=kept[kept.length-1];
+          if(last) last.dur=Math.round((n.t+n.dur-last.t)*1000)/1000;
+          continue;
+        }
+      } else if(n.tail!=null&&Math.sign(n.drift)===Math.sign(n.tail-prev.pitch)){
+        // Trailing slide with its target inside it — keep the note, fix the pitch.
+        kept.push({...n, pitch:n.tail});
+        continue;
+      }
+    }
+    kept.push({...n});
+  }
+  notes.length=0; notes.push(...kept);
 
   // No same-pitch merging — repeated notes (C-C, D-D) must stay separate.
   // The energy gate + median filter already clean up vibrato and single-frame glitches.
@@ -6226,7 +6296,7 @@ function humSegmentNotes(frames){
     }
     else { merged.push({...n}); }
   }
-  return merged;
+  return merged.map(({drift, tail, ...n})=>n);
 }
 
 // ── Scale tables & helpers ────────────────────────────────────────────────────
