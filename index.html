@@ -1810,7 +1810,7 @@ audio { display: none; }
       </div>
       <div class="brand-heatmap" id="brand-heatmap" title="Your activity"></div>
     </div>
-    <div class="brand-sub">capture before it fades <span class="brand-ver">v0.13.2</span></div>
+    <div class="brand-sub">capture before it fades <span class="brand-ver">v0.13.3</span></div>
     <button class="sidebar-close-btn" onclick="closeSidebar()" aria-label="Close">
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg>
     </button>
@@ -1863,7 +1863,7 @@ audio { display: none; }
       <div class="brand-wrap" onclick="toggleTheme()" title="Switch theme" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleTheme()}">
         <span class="brand">hum</span>
         <span class="brand-dot"></span>
-        <span class="brand-ver">v0.13.2</span>
+        <span class="brand-ver">v0.13.3</span>
       </div>
       <div style="display:flex;align-items:center;gap:4px">
         <button class="mob-settings-btn" onclick="openSettings()" title="Settings">
@@ -2267,7 +2267,7 @@ audio { display: none; }
 <div id="about-overlay">
   <div class="about-card">
     <div class="about-header">
-      <div class="about-title">Hum <span class="brand-ver" style="font-size:12px;opacity:0.5">v0.13.2</span></div>
+      <div class="about-title">Hum <span class="brand-ver" style="font-size:12px;opacity:0.5">v0.13.3</span></div>
       <div class="about-sub">Capture creative moments before they fade.</div>
     </div>
 
@@ -6274,9 +6274,7 @@ function humSegmentNotes(frames){
   // Only collapse truly zero-gap fragments of DIFFERENT pitch that are both micro-short
   // (glitch frames that slipped past MIN_F=2 due to pitch tolerance boundaries).
   const GLITCH_DUR = 0.055; // < 55ms = shorter than a 32nd @ 90 BPM → suspect glitch
-  const SAME_PITCH_GAP = 0.12; // generous: depth, not length, decides (see _wentSilent)
-  // Did the signal actually drop to silence between these two times, or merely dip?
-  const _wentSilent=(t0,t1)=>frames.some(f=>f && f.t>=t0-1e-6 && f.t<t1+1e-6 && (f.rms||0)<rmsFloor);
+  const SAME_PITCH_GAP = 0.12; // generous: depth, not length, decides (see _reattacked)
   const merged=[];
   for(const n of notes){
     const prev=merged[merged.length-1];
@@ -6285,13 +6283,12 @@ function humSegmentNotes(frames){
     if(prev && prev.pitch!==n.pitch && n.dur<=GLITCH_DUR && gap<0.03){
       prev.dur=Math.round((n.t+n.dur-prev.t)*1000)/1000;
     }
-    // Same pitch, and the frames separating them never actually went quiet: this
-    // is one held note that the articulation detector cut in half on a mid-note
-    // volume dip (vibrato, breath). A genuine re-attack ("da-da" on one pitch)
-    // drops to real silence, so it keeps its two notes. Judging by depth rather
-    // than by gap length is what separates the two cases honestly — a fixed time
-    // threshold just lands arbitrarily between them.
-    else if(prev && prev.pitch===n.pitch && gap<=SAME_PITCH_GAP && !_wentSilent(prev.t+prev.dur, n.t)){
+    // Same pitch, and the signal never dipped deeply between them: one held note
+    // that the articulation detector cut in half on a mid-note wobble (vibrato,
+    // breath). A genuine re-attack digs a real hole and keeps its two notes.
+    // Depth, not gap length, is the honest discriminator — a fixed time threshold
+    // just lands arbitrarily between the two cases.
+    else if(prev && prev.pitch===n.pitch && gap<=SAME_PITCH_GAP && !_reattacked(frames, prev.t+prev.dur, n.t)){
       prev.dur=Math.round((n.t+n.dur-prev.t)*1000)/1000;
     }
     else { merged.push({...n}); }
@@ -6682,16 +6679,33 @@ async function swiftF0PitchTrack(blob, onProgress){
   const pitchHz=out.pitch_hz.data, conf=out.confidence.data;
   onProgress?.(0.8);
 
-  // Voicing. The reference implementation gates at 0.9, which is right for
-  // clean sustained tones but throws away quiet humming — exactly the input
-  // this app exists for. So: try strict first, and only if that leaves the
-  // take mostly unvoiced, fall back to a permissive gate. Getting a rough
-  // melody out of a soft hum beats getting nothing.
+  // Voicing, with hysteresis — a Schmitt trigger, not a single threshold.
+  //
+  // A single gate at the reference 0.9 turned out to be the pipeline's most
+  // fragile point. Measured on a steady, full-volume held note, confidence
+  // hovers right around 0.9 and wanders across it, blanking ~180 ms in the
+  // middle of a note that never wavered acoustically. The consequence showed up
+  // as instability rather than as a fixed error: the SAME melody re-synthesised
+  // with a different noise instance gave three different answers in six runs.
+  // That is almost certainly what "you can get it right, but it takes 2-5
+  // attempts" feels like from the outside — not the singer being inconsistent,
+  // but the analysis flipping on differences too small to hear.
+  //
+  // So use two thresholds: a note must be clearly voiced to START, but only
+  // plausibly voiced to CONTINUE. Threshold-crossing flicker disappears, and
+  // the strict onset gate still keeps noise from spawning notes.
   const inRange=i=>pitchHz[i]>=SF0_FMIN&&pitchHz[i]<=SF0_FMAX;
   const N=pitchHz.length;
-  let gate=0.9, kept=0;
-  for(let i=0;i<N;i++) if(conf[i]>gate&&inRange(i)) kept++;
-  if(kept<N*0.15) gate=0.5;
+  let onset=0.9, sustain=0.45, kept=0;
+  for(let i=0;i<N;i++) if(conf[i]>onset&&inRange(i)) kept++;
+  // Quiet humming can fail the strict gate everywhere; a rough melody out of a
+  // soft hum still beats nothing, so drop both gates rather than give up.
+  if(kept<N*0.15){ onset=0.5; sustain=0.3; }
+  const voiced=new Array(N);
+  for(let i=0;i<N;i++){
+    if(!inRange(i)){ voiced[i]=false; continue; }
+    voiced[i] = conf[i]>onset || (i>0 && voiced[i-1] && conf[i]>sustain);
+  }
 
   // RMS over a 512-sample window centred on the frame, not the raw hop: at a
   // 16 ms hop a hop-sized window is too short to be a stable envelope, and the
@@ -6704,7 +6718,7 @@ async function swiftF0PitchTrack(blob, onProgress){
     const rms=n?Math.sqrt(s/n):0;
     const t=Math.round((c0/SF0_SR)*1000)/1000;
     const f=pitchHz[i], cf=conf[i];
-    if(cf>gate && inRange(i)){
+    if(voiced[i]){
       frames.push({t, freq:Math.round(f*10)/10, midi:Math.round(69+12*Math.log2(f/440)), conf:Math.round(cf*100)/100, rms});
     } else {
       frames.push({t, freq:0, midi:-1, conf:0, rms});
@@ -6771,18 +6785,40 @@ function _fixHarmonicOctaves(notes, sig, sr){
 // so the merge has to be re-run after the fold, not before it.
 //
 // The rule is the same one humSegmentNotes uses, and for the same reason: merge
-// only if the signal never actually reached silence in the gap. A deliberate
-// "da-da" on one pitch does reach silence and stays two notes.
+// only if the signal never dipped deeply in the gap. A deliberate "da-da" on one
+// pitch digs a real hole and stays two notes.
+// Did the singer re-articulate between these two times, or is this one held note?
+//
+// This used to ask whether the signal reached SILENCE, which sounded reasonable
+// and was wrong: measured on real-tempo material, a genuine re-attack only digs
+// down to ~40% of the local peak and never comes close to the 4% silence floor —
+// not at 16ths, not even at 0.4-second notes. There is no time to reach silence
+// while singing legato. So every repeated note on one pitch got merged into one
+// long note, which is exactly the reported "two or three notes become one".
+//
+// Depth against the LOCAL peak is the real signal, and it separates cleanly:
+// re-attacks measured 39-42%, while a held note with vibrato produced no local
+// minimum at all. The threshold sits at 50% — deliberately nearer the re-attack
+// end, because merging two real notes destroys something the user has to sing
+// again, while splitting a held note leaves two identical notes that take one
+// tap to fix.
+const REATTACK_DIP=0.50;
+function _reattacked(frames, t0, t1){
+  const between=frames.filter(f=>f && f.t>=t0-1e-6 && f.t<t1+1e-6);
+  if(!between.length) return false; // no gap at all — a continuation, not a re-attack
+  const near=frames.filter(f=>f && f.t>=t0-0.15 && f.t<=t1+0.15);
+  const hi=Math.max(...near.map(f=>f.rms||0));
+  const lo=Math.min(...between.map(f=>f.rms||0));
+  return hi>0 && lo<hi*REATTACK_DIP;
+}
+
 function _mergeSamePitch(notes, frames){
   if(notes.length<2||!frames.length) return notes;
-  const maxRms=Math.max(...frames.map(f=>f.rms||0));
-  const rmsFloor=maxRms*0.04;
-  const silentBetween=(t0,t1)=>frames.some(f=>f && f.t>=t0-1e-6 && f.t<t1+1e-6 && (f.rms||0)<rmsFloor);
   const out=[{...notes[0]}]; // copy: the loop below mutates dur in place
   for(let i=1;i<notes.length;i++){
     const prev=out[out.length-1], cur=notes[i];
     const gapStart=prev.t+prev.dur;
-    if(cur.pitch===prev.pitch && cur.t-gapStart<0.12 && !silentBetween(gapStart, cur.t)){
+    if(cur.pitch===prev.pitch && cur.t-gapStart<0.12 && !_reattacked(frames, gapStart, cur.t)){
       prev.dur=Math.round((cur.t+cur.dur-prev.t)*1000)/1000;
     } else out.push({...cur});
   }
