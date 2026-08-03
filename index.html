@@ -1810,7 +1810,7 @@ audio { display: none; }
       </div>
       <div class="brand-heatmap" id="brand-heatmap" title="Your activity"></div>
     </div>
-    <div class="brand-sub">capture before it fades <span class="brand-ver">v0.12.3</span></div>
+    <div class="brand-sub">capture before it fades <span class="brand-ver">v0.13</span></div>
     <button class="sidebar-close-btn" onclick="closeSidebar()" aria-label="Close">
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg>
     </button>
@@ -1863,7 +1863,7 @@ audio { display: none; }
       <div class="brand-wrap" onclick="toggleTheme()" title="Switch theme" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleTheme()}">
         <span class="brand">hum</span>
         <span class="brand-dot"></span>
-        <span class="brand-ver">v0.12.3</span>
+        <span class="brand-ver">v0.13</span>
       </div>
       <div style="display:flex;align-items:center;gap:4px">
         <button class="mob-settings-btn" onclick="openSettings()" title="Settings">
@@ -2267,7 +2267,7 @@ audio { display: none; }
 <div id="about-overlay">
   <div class="about-card">
     <div class="about-header">
-      <div class="about-title">Hum <span class="brand-ver" style="font-size:12px;opacity:0.5">v0.12.3</span></div>
+      <div class="about-title">Hum <span class="brand-ver" style="font-size:12px;opacity:0.5">v0.13</span></div>
       <div class="about-sub">Capture creative moments before they fade.</div>
     </div>
 
@@ -2305,7 +2305,9 @@ audio { display: none; }
       <div class="about-section-icon"><svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="3" y="3" width="14" height="14" rx="2"/><path d="M7 10h6M10 7v6"/></svg></div>
       <div>
         <div class="about-section-title">Open source</div>
-        <div class="about-section-body">Built by Daniil Favorov. Source at <a href="https://github.com/dafaspace/hum" target="_blank" rel="noopener">github.com/dafaspace/hum</a>.</div>
+        <div class="about-section-body">Built by Daniil Favorov. Source at <a href="https://github.com/dafaspace/hum" target="_blank" rel="noopener">github.com/dafaspace/hum</a>.
+          <div style="margin-top:6px;font-size:11px;opacity:0.7">Pitch detection by <a href="https://github.com/lars76/swift-f0" target="_blank" rel="noopener">SwiftF0</a> (© 2025 Lars Nieradzik, MIT) and <a href="https://github.com/spotify/basic-pitch" target="_blank" rel="noopener">basic-pitch</a> (© Spotify, Apache-2.0).</div>
+        </div>
       </div>
     </div>
 
@@ -6103,16 +6105,25 @@ async function humPitchTrack(blob, onProgress){
 function humSegmentNotes(frames){
   if(!frames.length) return [];
 
+  // Every window below is expressed in SECONDS and converted using the actual
+  // frame spacing. They used to be raw frame counts, which meant they silently
+  // meant different durations whenever the tracker's hop changed — and they had
+  // already drifted: the comments claimed a 23 ms hop while SPICE ran at 32 ms,
+  // so a "±115 ms" window was really ±160 ms. Now the tuning is stated in the
+  // units it was reasoned about.
+  const hop=frames.length>1 ? Math.max(0.001, frames[1].t-frames[0].t) : 0.032;
+  const nf=sec=>Math.max(1, Math.round(sec/hop));
+
   // Energy gate: absolute silence below 4% of peak
   const maxRms=Math.max(...frames.map(f=>f.rms||0));
   const rmsFloor=maxRms*0.04;
 
-  // Articulation detection: even if YIN stays confident, a relative RMS dip
-  // means the singer re-attacked — treat it as a note boundary.
+  // Articulation detection: even if the tracker stays confident, a relative RMS
+  // dip means the singer re-attacked — treat it as a note boundary.
   // A frame is an articulation boundary when its RMS < 58% of the local peak
-  // in a ±5-frame window (±115ms). This catches C-C, D-D humming re-attacks
-  // that never go fully silent.
-  const BREAK_WIN=5, BREAK_RATIO=0.58;
+  // in a ±115 ms window. This catches C-C, D-D humming re-attacks that never
+  // go fully silent.
+  const BREAK_WIN=nf(0.115), BREAK_RATIO=0.58;
   const isBoundary=frames.map((f,i)=>{
     const rms=f?.rms||0;
     if(rms<rmsFloor) return false; // absolute silence handled by gate
@@ -6124,9 +6135,9 @@ function humSegmentNotes(frames){
     return localMax>rmsFloor*4 && rms<localMax*BREAK_RATIO;
   });
 
-  // Median filter on MIDI values (window ±2 frames = ±46ms).
+  // Median filter on MIDI values over a ±46 ms window.
   // Boundary frames are excluded so they can't bridge the gap.
-  const WIN=2;
+  const WIN=nf(0.046);
   const smoothed=frames.map((f,i)=>{
     if(!f||f.midi<0||(f.rms||0)<rmsFloor||isBoundary[i]) return {...f,midi:-1,conf:0};
     const slice=[];
@@ -6143,7 +6154,7 @@ function humSegmentNotes(frames){
   let start=-1, pitches=[];
   const CONF=0.50;  // min confidence
   const TOL=1.2;    // semitone tolerance — wider for real voice drift
-  const MIN_F=2;    // ~46 ms minimum note @ 23ms hop — catches 32nd notes at ≥65 BPM
+  const MIN_F=nf(0.046); // 46 ms minimum note — catches 32nd notes at ≥65 BPM
 
   const medOf=arr=>{ const s=[...arr].sort((a,b)=>a-b); return s[Math.floor(s.length/2)]; };
   const flush=(endT)=>{
@@ -6541,20 +6552,42 @@ function midiToNoteName(midi){
   return names[midi%12]+oct;
 }
 
-// ── SPICE: monophonic pitch from voice/humming (Google, TF.js) ───────────────
-// Purpose-built for singing/humming → far fewer octave errors than YIN.
-// Model: tfhub spice/2. Output [uncertainty, pitch]; pitch∈[0,1] per 32ms frame.
-let _spiceLibs=null;
-async function loadSpice(onStatus){
-  if(_spiceLibs) return _spiceLibs;
+// ── SwiftF0: monophonic pitch from voice/humming (Lars Nieradzik, MIT) ──────
+// Replaced Google's SPICE. Three reasons, in order of how much they matter:
+//   1. Resolution. SwiftF0 steps every 256 samples @ 16 kHz = 16 ms; SPICE
+//      stepped 512 = 32 ms. Note boundaries are located twice as precisely,
+//      and short notes stop falling below the minimum-length floor.
+//   2. Noise. SwiftF0 reports a 91.8% harmonic mean at 10 dB SNR, ~12 points
+//      above CREPE, and loses only 2.3 points versus clean audio. Captures are
+//      made in rooms, not booths, so this is the realistic operating point.
+//   3. Supply chain. SPICE loaded from tfhub.dev, which now 302s to a Kaggle
+//      URL signed with a 3-hour expiry — a third party we don't control, in
+//      the critical path of the app's core feature. SwiftF0 is a 398 KB file
+//      in this repo, served same-origin and cached by the service worker.
+// It also drops TensorFlow.js from the voice path entirely (basic-pitch still
+// pulls it for Instrument mode), so a hummed take no longer waits on a ~1 MB
+// framework download before it can be analysed.
+//
+// The STFT lives inside the ONNX graph, so the model takes raw 16 kHz mono
+// samples and returns pitch_hz + confidence directly. No feature extraction here.
+const SF0_SR=16000, SF0_HOP=256, SF0_CENTER=127.5; // (1024-1)/2 - 384 padding
+const SF0_FMIN=46.875, SF0_FMAX=2093.75;           // hard model limits (G1–C7)
+let _sf0=null;
+async function loadSwiftF0(onStatus){
+  if(_sf0) return _sf0;
   onStatus?.('Loading pitch model…');
-  const tf=await import('https://esm.sh/@tensorflow/tfjs@4.22.0');
+  // ort.wasm.min.mjs is the WASM-only build — 49 KB, versus 446 KB for the full
+  // one that also ships WebGL and WebGPU backends we have no use for.
+  const ORT='https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/';
+  const ort=await import(ORT+'ort.wasm.min.mjs');
+  ort.env.wasm.wasmPaths=ORT;
+  ort.env.wasm.numThreads=1; // no cross-origin isolation on GitHub Pages
   onStatus?.('Loading pitch model (first run only)…');
-  const model=await tf.loadGraphModel('https://tfhub.dev/google/tfjs-model/spice/2/default/1',{fromTFHub:true});
-  _spiceLibs={tf, model};
-  return _spiceLibs;
+  const session=await ort.InferenceSession.create('swiftf0.onnx',{executionProviders:['wasm']});
+  _sf0={ort, session};
+  return _sf0;
 }
-// Decode + resample a blob to 16 kHz mono Float32Array (SPICE requirement)
+// Decode + resample a blob to 16 kHz mono Float32Array (SwiftF0 requirement)
 async function _decodeTo16kMono(blob){
   const ab=await blob.arrayBuffer();
   const ctx=new (window.AudioContext||window.webkitAudioContext)();
@@ -6568,36 +6601,44 @@ async function _decodeTo16kMono(blob){
   const rendered=await offline.startRendering();
   return rendered.getChannelData(0).slice();
 }
-const _spiceHz=p=>10*Math.pow(2,(p*63.07+25.58)/12);
-// SPICE → per-frame [{t, freq, midi, conf, rms}] (same shape humSegmentNotes expects)
-async function spicePitchTrack(blob, onProgress){
-  const {tf, model}=await loadSpice();
+// SwiftF0 → per-frame [{t, freq, midi, conf, rms}] (same shape humSegmentNotes expects)
+async function swiftF0PitchTrack(blob, onProgress){
+  const {ort, session}=await loadSwiftF0();
   const sig=await _decodeTo16kMono(blob);
-  const SR=16000, HOP=512;
-  const input=tf.tensor(sig);
-  let pitchRaw, uncertainty;
-  try{
-    const out=model.execute({'input_audio_samples':input});
-    const arr=Array.isArray(out)?out:[out];
-    uncertainty=await arr[0].data();
-    pitchRaw=await arr[1].data();
-    arr.forEach(o=>o.dispose());
-  } finally { input.dispose(); }
-  const N=pitchRaw.length, frames=[];
+  if(sig.length<SF0_HOP) return [];
+  onProgress?.(0.1);
+  const input=new ort.Tensor('float32', sig, [1, sig.length]);
+  const out=await session.run({input_audio:input});
+  const pitchHz=out.pitch_hz.data, conf=out.confidence.data;
+  onProgress?.(0.8);
+
+  // Voicing. The reference implementation gates at 0.9, which is right for
+  // clean sustained tones but throws away quiet humming — exactly the input
+  // this app exists for. So: try strict first, and only if that leaves the
+  // take mostly unvoiced, fall back to a permissive gate. Getting a rough
+  // melody out of a soft hum beats getting nothing.
+  const inRange=i=>pitchHz[i]>=SF0_FMIN&&pitchHz[i]<=SF0_FMAX;
+  const N=pitchHz.length;
+  let gate=0.9, kept=0;
+  for(let i=0;i<N;i++) if(conf[i]>gate&&inRange(i)) kept++;
+  if(kept<N*0.15) gate=0.5;
+
+  // RMS over a 512-sample window centred on the frame, not the raw hop: at a
+  // 16 ms hop a hop-sized window is too short to be a stable envelope, and the
+  // articulation detector downstream reads dips in this signal as re-attacks.
+  const HALF=256, frames=[];
   for(let i=0;i<N;i++){
-    const off=i*HOP;
-    let s=0,c=0;
-    for(let k=off;k<Math.min(off+HOP,sig.length);k++){ s+=sig[k]*sig[k]; c++; }
-    const rms=c?Math.sqrt(s/c):0;
-    const conf=1-uncertainty[i];
-    const f=_spiceHz(pitchRaw[i]);
-    const t=Math.round((off/SR)*1000)/1000;
-    if(conf>=0.5 && f>=50 && f<=1500){
-      frames.push({t, freq:Math.round(f*10)/10, midi:Math.round(69+12*Math.log2(f/440)), conf:Math.round(conf*100)/100, rms});
+    const c0=Math.round(i*SF0_HOP+SF0_CENTER);
+    let s=0,n=0;
+    for(let k=Math.max(0,c0-HALF);k<Math.min(c0+HALF,sig.length);k++){ s+=sig[k]*sig[k]; n++; }
+    const rms=n?Math.sqrt(s/n):0;
+    const t=Math.round((c0/SF0_SR)*1000)/1000;
+    const f=pitchHz[i], cf=conf[i];
+    if(cf>gate && inRange(i)){
+      frames.push({t, freq:Math.round(f*10)/10, midi:Math.round(69+12*Math.log2(f/440)), conf:Math.round(cf*100)/100, rms});
     } else {
       frames.push({t, freq:0, midi:-1, conf:0, rms});
     }
-    if(i%64===0){ onProgress?.(i/N); await new Promise(r=>setTimeout(r,0)); }
   }
   onProgress?.(1);
   return frames;
@@ -6617,14 +6658,14 @@ function _quantizeRhythm(notes, bpm){
     return {...n, t:Math.round(relS*1000)/1000, dur:Math.round((relE-relS)*1000)/1000};
   });
 }
-// Full monophonic transcription: SPICE f0 → notes [{t,d,p,v}]
-// opts: { bpm, tempoLocked, key }. Snaps to key when known; snaps rhythm only
-// when tempoLocked (count-in gives an exact grid).
-async function spiceTranscribe(blob, opts, onStatus){
+// Full monophonic transcription: SwiftF0 f0 → notes [{t,d,p,v}]
+// opts: { bpm, tempoLocked, key }. Snaps rhythm only when tempoLocked (a
+// count-in gives an exact grid); never snaps pitch — see below.
+async function voiceTranscribe(blob, opts, onStatus){
   opts=opts||{};
-  const frames=await spicePitchTrack(blob, p=>onStatus?.(`Analysing pitch ${Math.round(p*100)}%…`));
+  const frames=await swiftF0PitchTrack(blob, p=>onStatus?.(`Analysing pitch ${Math.round(p*100)}%…`));
   onStatus?.('Extracting notes…');
-  // Diagnostic stats — reveals whether SPICE actually tracked varying pitch
+  // Diagnostic stats — reveals whether the tracker actually followed varying pitch
   const voicedFreqs=frames.filter(f=>f.midi>0&&f.freq>0).map(f=>f.freq);
   const stats={ total:frames.length, voiced:voicedFreqs.length,
     loHz:voicedFreqs.length?Math.round(Math.min(...voicedFreqs)):0,
@@ -6642,7 +6683,7 @@ async function spiceTranscribe(blob, opts, onStatus){
   return {notes, stats};
 }
 
-// Polyphonic path: basic-pitch handles chords, which SPICE structurally cannot
+// Polyphonic path: basic-pitch handles chords, which a monophonic model cannot
 // (a monophonic model reads a chord as noise). Post-processing is deliberately
 // the SAME as the voice path, so switching mode changes the model, not the rules.
 async function instrumentTranscribe(blob, opts, onStatus){
@@ -6654,7 +6695,7 @@ async function instrumentTranscribe(blob, opts, onStatus){
   const stats={ mode:'instrument', total:raw.length, voiced:raw.length,
     loHz:Math.round(hz(Math.min(...pitches))), hiHz:Math.round(hz(Math.max(...pitches))) };
   let segs=raw.map(n=>({t:n.t, dur:n.d, pitch:n.p, v:n.v}));
-  // Same rule as the voice path: never snap to a guessed key (see spiceTranscribe).
+  // Same rule as the voice path: never snap to a guessed key (see voiceTranscribe).
   if(opts.tempoLocked && opts.bpm) segs=_quantizeRhythm(segs, opts.bpm);
   const notes=segs.map((s,i)=>({t:Math.round(s.t*1000)/1000, d:Math.round(s.dur*1000)/1000,
                                 p:s.pitch, v:raw[i]?.v??96}));
@@ -6696,9 +6737,9 @@ async function runTakeMidi(mid){
       res=await instrumentTranscribe(blob, opts, setStatus);
     } else {
       try{
-        res=await spiceTranscribe(blob, opts, setStatus);
-      }catch(spiceErr){
-        console.warn('SPICE failed, basic-pitch fallback:', spiceErr);
+        res=await voiceTranscribe(blob, opts, setStatus);
+      }catch(voiceErr){
+        console.warn('SwiftF0 failed, basic-pitch fallback:', voiceErr);
         setStatus('Falling back to basic-pitch…');
         res=await instrumentTranscribe(blob, opts, setStatus);
       }
