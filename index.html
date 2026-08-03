@@ -1162,8 +1162,8 @@ body {
 .note-analysis-action:hover { border-color: var(--ink4); color: var(--ink); }
 .note-analysis-text { font-size: 12.5px; color: var(--ink2); line-height: 1.7; white-space: pre-wrap; margin-top: 6px; }
 .note-analysis-hint { font-size: 12px; color: var(--ink3); margin-top: 4px; }
-/* Segmented voice/instrument picker: two halves of one control, so it reads as
-   a choice between two states rather than two independent buttons. */
+/* Segmented mono/poly picker: two halves of one control, so it reads as a
+   choice between two states rather than two independent buttons. */
 .mel-mode { display: inline-flex; margin-top: 7px; border: 1px solid var(--paper4); border-radius: 8px; overflow: hidden; background: var(--paper2); }
 .mel-mode-btn { font-family: var(--sans); font-size: 11px; padding: 4px 12px; border: none; background: none; color: var(--ink3); cursor: pointer; transition: background .12s, color .12s; }
 .mel-mode-btn + .mel-mode-btn { border-left: 1px solid var(--paper4); }
@@ -1818,7 +1818,7 @@ audio { display: none; }
       </div>
       <div class="brand-heatmap" id="brand-heatmap" title="Your activity"></div>
     </div>
-    <div class="brand-sub">capture before it fades <span class="brand-ver">v0.14.1</span></div>
+    <div class="brand-sub">capture before it fades <span class="brand-ver">v0.14.2</span></div>
     <button class="sidebar-close-btn" onclick="closeSidebar()" aria-label="Close">
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg>
     </button>
@@ -1871,7 +1871,7 @@ audio { display: none; }
       <div class="brand-wrap" onclick="toggleTheme()" title="Switch theme" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleTheme()}">
         <span class="brand">hum</span>
         <span class="brand-dot"></span>
-        <span class="brand-ver">v0.14.1</span>
+        <span class="brand-ver">v0.14.2</span>
       </div>
       <div style="display:flex;align-items:center;gap:4px">
         <button class="mob-settings-btn" onclick="openSettings()" title="Settings">
@@ -2275,7 +2275,7 @@ audio { display: none; }
 <div id="about-overlay">
   <div class="about-card">
     <div class="about-header">
-      <div class="about-title">Hum <span class="brand-ver" style="font-size:12px;opacity:0.5">v0.14.1</span></div>
+      <div class="about-title">Hum <span class="brand-ver" style="font-size:12px;opacity:0.5">v0.14.2</span></div>
       <div class="about-sub">Capture creative moments before they fade.</div>
     </div>
 
@@ -5372,24 +5372,24 @@ function _takeModeToggleHtml(m){
   const btn=(v,label,title)=>`<button class="mel-mode-btn${mode===v?' on':''}" title="${title}"
       onclick="setTakeMode('${m.id}','${v}')">${label}</button>`;
   return `<div class="mel-mode" role="group" aria-label="Analysis mode">
-    ${btn('voice','Voice','Humming or singing — one melody line')}
-    ${btn('instrument','Instrument','Piano, guitar — can hear chords')}
+    ${btn('mono','Mono','One note at a time — humming, or a single line on any instrument')}
+    ${btn('poly','Poly','Several notes at once — chords, or piano with the sustain pedal down')}
   </div>`;
 }
 function _takeMelodyHtml(m){
   const hasMidi=Array.isArray(m.midi)&&m.midi.length>0;
   const NAMES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
   if(!hasMidi){
-    const isInstr=_takeMode(m)==='instrument';
+    const isPoly=_takeMode(m)==='poly';
     return `<div class="note-take-melody">
       <div class="note-take-transcript-head">
         <span class="note-take-transcript-label">Melody</span>
         <button class="note-take-mini-btn" id="melbtn-${m.id}" onclick="runTakeMidi('${m.id}')">Analyse</button>
       </div>
       ${_takeModeToggleHtml(m)}
-      <div class="note-analysis-hint" id="melstatus-${m.id}">${isInstr
-        ? 'Polyphonic: hears chords. Play cleanly, then Analyse.'
-        : 'Sing it as “da-da-da” (not “mmm”) for cleaner notes, then Analyse.'}</div>
+      <div class="note-analysis-hint" id="melstatus-${m.id}">${isPoly
+        ? 'Chords and overlapping notes — including piano with the pedal down.'
+        : 'One line at a time. Humming? “da-da-da” reads cleaner than “mmm”.'}</div>
     </div>`;
   }
   const sel=(_melSel.mid===m.id)?_melSel.idx:-1;
@@ -5405,7 +5405,7 @@ function _takeMelodyHtml(m){
   const st=m.midiStats;
   const recBpm=_takeRecBpm(m), outBpm=_takeOutBpm(m);
   // Instrument stats count notes, not voiced frames — label them honestly.
-  const diag=st?(st.mode==='instrument'
+  const diag=st?((st.mode==='poly'||st.mode==='instrument')
     ? ` · ${st.loHz}–${st.hiHz} Hz · polyphonic`
     : ` · ${st.loHz}–${st.hiHz} Hz · ${st.voiced}/${st.total} voiced`):'';
   return `<div class="note-take-melody">
@@ -6999,13 +6999,13 @@ async function voiceTranscribe(blob, opts, onStatus){
 // Polyphonic path: basic-pitch handles chords, which a monophonic model cannot
 // (a monophonic model reads a chord as noise). Post-processing is deliberately
 // the SAME as the voice path, so switching mode changes the model, not the rules.
-async function instrumentTranscribe(blob, opts, onStatus){
+async function polyTranscribe(blob, opts, onStatus){
   opts=opts||{};
   const raw=await generateMidi(blob, onStatus); // [{t,d,p,v}]
-  if(!raw.length) return {notes:[], stats:{mode:'instrument', total:0, voiced:0, loHz:0, hiHz:0}};
+  if(!raw.length) return {notes:[], stats:{mode:'poly', total:0, voiced:0, loHz:0, hiHz:0}};
   const hz=p=>440*Math.pow(2,(p-69)/12);
   const pitches=raw.map(n=>n.p);
-  const stats={ mode:'instrument', total:raw.length, voiced:raw.length,
+  const stats={ mode:'poly', total:raw.length, voiced:raw.length,
     loHz:Math.round(hz(Math.min(...pitches))), hiHz:Math.round(hz(Math.max(...pitches))) };
   let segs=raw.map(n=>({t:n.t, dur:n.d, pitch:n.p, v:n.v}));
   // Same rule as the voice path: never snap to a guessed key (see voiceTranscribe).
@@ -7028,7 +7028,23 @@ function _rescaleNotes(notes, fromBpm, toBpm){
 }
 // Which model a take is analysed with. Stored per take because one note can hold
 // a hummed idea and a piano version of it side by side.
-function _takeMode(m){ return m&&m.midiMode==='instrument' ? 'instrument' : 'voice'; }
+// Mono vs poly, not voice vs instrument.
+//
+// The old labels described the SOURCE, and were wrong about it. What the two
+// paths actually differ on is whether more than one note sounds at a time:
+// SwiftF0 tracks a single fundamental, basic-pitch resolves several at once.
+// A piano playing one line is monophonic and measurably better served by the
+// "voice" model — 8/8 on a scale where the polyphonic path struggled — while a
+// voice singing nothing but one line was never the point. Conversely a piano
+// with the sustain pedal down is a cluster, and the monophonic model returns
+// 1-2 notes out of 8 there, exactly as a monophonic model must.
+//
+// Persisted values accept the old strings so existing takes keep their setting;
+// new ones are written as mono/poly.
+function _takeMode(m){
+  const v=m&&m.midiMode;
+  return (v==='poly'||v==='instrument') ? 'poly' : 'mono';
+}
 function setTakeMode(mid, mode){
   const m=_findTakeMedia(mid); if(!m) return;
   m.midiMode=mode;
@@ -7058,21 +7074,21 @@ async function runTakeMidi(mid){
     const opts={bpm, tempoLocked, key:capEntry.key};
     const mode=_takeMode(m);
     let res;
-    if(mode==='instrument'){
-      res=await instrumentTranscribe(blob, opts, setStatus);
+    if(mode==='poly'){
+      res=await polyTranscribe(blob, opts, setStatus);
     } else {
       try{
         res=await voiceTranscribe(blob, opts, setStatus);
       }catch(voiceErr){
         console.warn('SwiftF0 failed, basic-pitch fallback:', voiceErr);
         setStatus('Falling back to basic-pitch…');
-        res=await instrumentTranscribe(blob, opts, setStatus);
+        res=await polyTranscribe(blob, opts, setStatus);
       }
     }
     if(!res.notes.length){
-      const hint = mode==='instrument'
-        ? 'No notes detected. Play louder, or try Voice mode if this is a hummed melody.'
-        : 'No notes detected. Try “da-da-da”, louder — or switch to Instrument if you played an instrument.';
+      const hint = mode==='poly'
+        ? 'No notes detected. Play louder — or switch to Mono if this is a single line.'
+        : 'No notes detected. Try “da-da-da”, louder — or switch to Poly if notes overlap.';
       setStatus(res.stats?`${hint} (${res.stats.loHz}–${res.stats.hiHz} Hz, ${res.stats.voiced}/${res.stats.total} voiced)`:hint);
       return;
     }
