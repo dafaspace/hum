@@ -1810,7 +1810,7 @@ audio { display: none; }
       </div>
       <div class="brand-heatmap" id="brand-heatmap" title="Your activity"></div>
     </div>
-    <div class="brand-sub">capture before it fades <span class="brand-ver">v0.13</span></div>
+    <div class="brand-sub">capture before it fades <span class="brand-ver">v0.13.1</span></div>
     <button class="sidebar-close-btn" onclick="closeSidebar()" aria-label="Close">
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg>
     </button>
@@ -1863,7 +1863,7 @@ audio { display: none; }
       <div class="brand-wrap" onclick="toggleTheme()" title="Switch theme" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleTheme()}">
         <span class="brand">hum</span>
         <span class="brand-dot"></span>
-        <span class="brand-ver">v0.13</span>
+        <span class="brand-ver">v0.13.1</span>
       </div>
       <div style="display:flex;align-items:center;gap:4px">
         <button class="mob-settings-btn" onclick="openSettings()" title="Settings">
@@ -2267,7 +2267,7 @@ audio { display: none; }
 <div id="about-overlay">
   <div class="about-card">
     <div class="about-header">
-      <div class="about-title">Hum <span class="brand-ver" style="font-size:12px;opacity:0.5">v0.13</span></div>
+      <div class="about-title">Hum <span class="brand-ver" style="font-size:12px;opacity:0.5">v0.13.1</span></div>
       <div class="about-sub">Capture creative moments before they fade.</div>
     </div>
 
@@ -6605,7 +6605,7 @@ async function _decodeTo16kMono(blob){
 async function swiftF0PitchTrack(blob, onProgress){
   const {ort, session}=await loadSwiftF0();
   const sig=await _decodeTo16kMono(blob);
-  if(sig.length<SF0_HOP) return [];
+  if(sig.length<SF0_HOP) return {frames:[], sig, sr:SF0_SR};
   onProgress?.(0.1);
   const input=new ort.Tensor('float32', sig, [1, sig.length]);
   const out=await session.run({input_audio:input});
@@ -6641,7 +6641,82 @@ async function swiftF0PitchTrack(blob, onProgress){
     }
   }
   onProgress?.(1);
-  return frames;
+  return {frames, sig, sr:SF0_SR};
+}
+
+// Goertzel magnitude at one frequency over one span — a single-bin DFT, much
+// cheaper than a full FFT when we only ever ask about three frequencies.
+function _goertzel(sig, i0, i1, f, sr){
+  const n=i1-i0;
+  if(n<16||f<=0||f>=sr/2) return 0;
+  const k=2*Math.cos(2*Math.PI*f/sr);
+  let s1=0, s2=0;
+  for(let i=i0;i<i1;i++){
+    const w=0.5-0.5*Math.cos(2*Math.PI*(i-i0)/(n-1)); // Hann, to limit leakage
+    const s=w*sig[i]+k*s1-s2; s2=s1; s1=s;
+  }
+  return Math.sqrt(Math.max(0, s1*s1+s2*s2-k*s1*s2))/n;
+}
+
+// Undo harmonic locking: whole notes reported an octave too high.
+//
+// The tracker can lock onto the 2nd harmonic instead of the fundamental. This
+// is NOT the flaky-attack error that flush() already handles by voting inside
+// a note — here every frame of the note agrees on the wrong octave, so no
+// amount of intra-note voting can see it. Measured across timbres on the same
+// melody: a closed-mouth hum (near-sine) transcribes perfectly, an open vowel
+// with a strong 2nd harmonic loses notes to the octave above, and a weak
+// fundamental is worst of all — which is the phone case, since a phone mic
+// rolls off right where a low hum sits.
+//
+// So ask the audio rather than infer from the melody's shape: if there is real
+// energy an octave BELOW the reported pitch, the fundamental was there and the
+// tracker took a harmonic for it. A genuine octave leap has no energy under it
+// and is left alone — which is exactly why this tests the signal instead of
+// the interval to the previous note.
+function _fixHarmonicOctaves(notes, sig, sr){
+  if(!notes.length||!sig||!sig.length) return notes;
+  const hz=p=>440*Math.pow(2,(p-69)/12);
+  return notes.map(n=>{
+    const f=hz(n.pitch), half=f/2;
+    if(half<SF0_FMIN) return n;              // folding would leave the model's range
+    const i0=Math.max(0, Math.round(n.t*sr));
+    const i1=Math.min(sig.length, Math.round((n.t+n.dur)*sr));
+    if(i1-i0<Math.round(0.04*sr)) return n;  // too short to measure reliably
+    const magF=_goertzel(sig,i0,i1,f,sr);
+    const magH=_goertzel(sig,i0,i1,half,sr);
+    // 0.75f is a harmonic of neither, so it reads the local noise/leakage floor.
+    const magN=_goertzel(sig,i0,i1,f*0.75,sr);
+    if(magH>magF*0.20 && magH>magN*4) return {...n, pitch:n.pitch-12};
+    return n;
+  });
+}
+
+// Rejoin notes that only ever got split BY the octave error.
+//
+// When the tracker flips between the fundamental and its 2nd harmonic partway
+// through a held note, segmentation sees a 12-semitone jump and correctly
+// starts a new note. Folding the octave afterwards leaves two adjacent
+// fragments at the same pitch that were never one thing at segmentation time —
+// so the merge has to be re-run after the fold, not before it.
+//
+// The rule is the same one humSegmentNotes uses, and for the same reason: merge
+// only if the signal never actually reached silence in the gap. A deliberate
+// "da-da" on one pitch does reach silence and stays two notes.
+function _mergeSamePitch(notes, frames){
+  if(notes.length<2||!frames.length) return notes;
+  const maxRms=Math.max(...frames.map(f=>f.rms||0));
+  const rmsFloor=maxRms*0.04;
+  const silentBetween=(t0,t1)=>frames.some(f=>f && f.t>=t0-1e-6 && f.t<t1+1e-6 && (f.rms||0)<rmsFloor);
+  const out=[{...notes[0]}]; // copy: the loop below mutates dur in place
+  for(let i=1;i<notes.length;i++){
+    const prev=out[out.length-1], cur=notes[i];
+    const gapStart=prev.t+prev.dur;
+    if(cur.pitch===prev.pitch && cur.t-gapStart<0.12 && !silentBetween(gapStart, cur.t)){
+      prev.dur=Math.round((cur.t+cur.dur-prev.t)*1000)/1000;
+    } else out.push({...cur});
+  }
+  return out;
 }
 // Snap note onsets/durations to a 16th-note grid at a known tempo.
 // Anchored to the first onset (trims leading silence). Only call with a tempo
@@ -6663,7 +6738,7 @@ function _quantizeRhythm(notes, bpm){
 // count-in gives an exact grid); never snaps pitch — see below.
 async function voiceTranscribe(blob, opts, onStatus){
   opts=opts||{};
-  const frames=await swiftF0PitchTrack(blob, p=>onStatus?.(`Analysing pitch ${Math.round(p*100)}%…`));
+  const {frames, sig, sr}=await swiftF0PitchTrack(blob, p=>onStatus?.(`Analysing pitch ${Math.round(p*100)}%…`));
   onStatus?.('Extracting notes…');
   // Diagnostic stats — reveals whether the tracker actually followed varying pitch
   const voicedFreqs=frames.filter(f=>f.midi>0&&f.freq>0).map(f=>f.freq);
@@ -6672,6 +6747,7 @@ async function voiceTranscribe(blob, opts, onStatus){
     hiHz:voicedFreqs.length?Math.round(Math.max(...voicedFreqs)):0 };
   let segs=humSegmentNotes(frames); // [{t,dur,pitch}]
   if(!segs.length) return {notes:[], stats};
+  segs=_mergeSamePitch(_fixHarmonicOctaves(segs, sig, sr), frames);
   // NO automatic scale snapping. quantizeToScale moves a note by up to 3 semitones
   // to force it into a key, and the key here was only ever GUESSED by detectKey.
   // A wrong guess silently rewrote what was actually sung: a real B major triad
