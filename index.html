@@ -1818,7 +1818,7 @@ audio { display: none; }
       </div>
       <div class="brand-heatmap" id="brand-heatmap" title="Your activity"></div>
     </div>
-    <div class="brand-sub">capture before it fades <span class="brand-ver">v0.14</span></div>
+    <div class="brand-sub">capture before it fades <span class="brand-ver">v0.14.1</span></div>
     <button class="sidebar-close-btn" onclick="closeSidebar()" aria-label="Close">
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg>
     </button>
@@ -1871,7 +1871,7 @@ audio { display: none; }
       <div class="brand-wrap" onclick="toggleTheme()" title="Switch theme" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleTheme()}">
         <span class="brand">hum</span>
         <span class="brand-dot"></span>
-        <span class="brand-ver">v0.14</span>
+        <span class="brand-ver">v0.14.1</span>
       </div>
       <div style="display:flex;align-items:center;gap:4px">
         <button class="mob-settings-btn" onclick="openSettings()" title="Settings">
@@ -2275,7 +2275,7 @@ audio { display: none; }
 <div id="about-overlay">
   <div class="about-card">
     <div class="about-header">
-      <div class="about-title">Hum <span class="brand-ver" style="font-size:12px;opacity:0.5">v0.14</span></div>
+      <div class="about-title">Hum <span class="brand-ver" style="font-size:12px;opacity:0.5">v0.14.1</span></div>
       <div class="about-sub">Capture creative moments before they fade.</div>
     </div>
 
@@ -6225,9 +6225,38 @@ function humSegmentNotes(frames){
   let start=-1, pitches=[], pfs=[];
   const CONF=0.50;  // min confidence
   const TOL=1.2;    // semitone tolerance — wider for real voice drift
+  // A step SMALLER than TOL still starts a new note if the pitch settles there
+  // and stays. Without this, a semitone move inside the tolerance is read as
+  // drift and the two notes become one.
+  //
+  // Found on real piano input: a C major scale lost exactly E and B — its only
+  // two semitone steps. The tracker was not at fault, it reported midi 64 then
+  // 65 at confidence 1.0; segmentation merged them because 1 semitone < 1.2 and
+  // nothing else forced a boundary. Nothing else could: the articulation
+  // detector looks for a DIP, and a struck piano note decays into the next
+  // attack, so energy RISES across the boundary and never dips.
+  //
+  // Drift wanders and comes back; a melodic step goes somewhere and stays. So
+  // confirm over the following frames instead of trusting a single one.
+  const STEP_MIN=0.7;   // semitones — smaller than TOL, larger than voice wobble
+  const STEP_HOLD=nf(0.048); // must hold this long to count as a new note
   const MIN_F=nf(0.046); // 46 ms minimum note — catches 32nd notes at ≥65 BPM
 
   const medOf=arr=>{ const s=[...arr].sort((a,b)=>a-b); return s[Math.floor(s.length/2)]; };
+  // Does the pitch stay away from the current note's centre from frame i onward,
+  // or does it wobble back? One frame proves nothing; a held new pitch does.
+  const _fracAt=g=>(g&&g.freq>0)?69+12*Math.log2(g.freq/440):(g?g.midi:null);
+  const _settlesAt=(i, fromMed)=>{
+    const ahead=[];
+    for(let j=i;j<Math.min(smoothed.length, i+STEP_HOLD+1);j++){
+      const g=smoothed[j];
+      if(!g||g.midi<0||g.conf<CONF) return false; // ran out of voiced signal — don't guess
+      ahead.push(_fracAt(g));
+    }
+    if(ahead.length<=STEP_HOLD) return false;
+    const d=medOf(ahead)-fromMed;
+    return Math.abs(d)>=STEP_MIN;
+  };
   const flush=(endT)=>{
     if(start>=0&&pitches.length>=MIN_F){
       // Resolve octave outliers against the note's OWN median, not against
@@ -6244,13 +6273,28 @@ function humSegmentNotes(frames){
       // frame pitches rather than the rounded MIDI values — the whole point is
       // sub-semitone movement, which rounding would erase. A sustained note sits
       // still; a portamento is still climbing when it gets cut into a segment.
-      let drift=0, tail=null;
+      let drift=0, tail=null, flat=0;
+      // The octave guard applies to drift and tail, which are pitch VALUES.
+      // Flatness is a shape and needs no such guard — and it must be computed
+      // even for a 3-frame sliver, since being too short to measure is itself
+      // the evidence that nothing ever settled there.
       if(pfs.length>=4 && Math.max(...pitches)-Math.min(...pitches)<6){
         const k=Math.max(1, Math.round(pfs.length*0.4));
         drift=medOf(pfs.slice(-k))-medOf(pfs.slice(0,k));
         tail=Math.round(medOf(pfs.slice(-k)));
       }
-      notes.push({t:start, dur:Math.round((endT-start)*1000)/1000, pitch:medOf(fixed), drift, tail});
+      // Longest stretch, in seconds, over which the pitch stayed inside a
+      // third of a semitone. A note — however short — settles somewhere; a
+      // glide is travelling the whole time and settles nowhere. This survives
+      // being chopped into pieces, which raw drift does not: split a glide
+      // finely enough and each fragment looks stationary by distance travelled
+      // while still never holding still.
+      { let lo=0;
+        for(let hi=0;hi<pfs.length;hi++){
+          while(lo<hi && Math.max(...pfs.slice(lo,hi+1))-Math.min(...pfs.slice(lo,hi+1))>0.7) lo++;
+          flat=Math.max(flat, (hi-lo+1)*hop);
+        } }
+      notes.push({t:start, dur:Math.round((endT-start)*1000)/1000, pitch:medOf(fixed), drift, tail, flat});
     }
     start=-1; pitches=[]; pfs=[];
   };
@@ -6264,7 +6308,13 @@ function humSegmentNotes(frames){
       else{
         const med=medOf(pitches);
         const diff=f.midi-med;
-        if(Math.abs(diff)<=TOL){ pitches.push(f.midi); pfs.push(frac); }
+        if(Math.abs(diff)<=TOL){
+          // Within tolerance, but has the pitch actually MOVED and stayed?
+          const fmed=medOf(pfs);
+          if(Math.abs(frac-fmed)>=STEP_MIN && _settlesAt(i, fmed)){
+            flush(f.t); start=f.t; pitches=[f.midi]; pfs=[frac];
+          } else { pitches.push(f.midi); pfs.push(frac); }
+        }
         // Octave error, not a new note: the voice is rich in harmonics and the
         // tracker sometimes locks onto half or double the fundamental, usually
         // during the unstable attack. Left alone this splits one sung note into
@@ -6315,16 +6365,20 @@ function humSegmentNotes(frames){
   //    somewhere along the ramp and reports a pitch that was never sung.
   //    Dropping it would lose a real note; instead re-read the pitch from where
   //    it SETTLED rather than from the middle of the journey.
-  const GLIDE_DRIFT=1.2; // semitones travelled within one segment
+  // A segment that never held still for even this long was never a note.
+  const GLIDE_FLAT=0.06; // seconds
   const kept=[];
   for(let i=0;i<notes.length;i++){
     const n=notes[i], prev=notes[i-1], next=notes[i+1];
-    const moving=Math.abs(n.drift||0)>=GLIDE_DRIFT;
+    const moving=(n.flat||0)<GLIDE_FLAT;
     if(moving&&prev){
       if(next){
         const lo=Math.min(prev.pitch,next.pitch), hi=Math.max(prev.pitch,next.pitch);
         const between=n.pitch>lo&&n.pitch<hi;
-        const sameWay=Math.sign(n.drift)===Math.sign(next.pitch-prev.pitch);
+        // A sliver too short to have a measurable drift has no direction of its
+        // own; `between` already places it on the path from prev to next.
+        const sameWay=Math.abs(n.drift||0)<0.2
+          || Math.sign(n.drift)===Math.sign(next.pitch-prev.pitch);
         if(between&&sameWay){
           const last=kept[kept.length-1];
           if(last) last.dur=Math.round((n.t+n.dur-last.t)*1000)/1000;
@@ -6364,7 +6418,7 @@ function humSegmentNotes(frames){
     }
     else { merged.push({...n}); }
   }
-  return merged.map(({drift, tail, ...n})=>n);
+  return merged.map(({drift, tail, flat, ...n})=>n);
 }
 
 // ── Scale tables & helpers ────────────────────────────────────────────────────
@@ -6875,12 +6929,18 @@ function _fixHarmonicOctaves(notes, sig, sr){
 // tap to fix.
 const REATTACK_DIP=0.50;
 function _reattacked(frames, t0, t1){
-  const between=frames.filter(f=>f && f.t>=t0-1e-6 && f.t<t1+1e-6);
-  if(!between.length) return false; // no gap at all — a continuation, not a re-attack
   const near=frames.filter(f=>f && f.t>=t0-0.15 && f.t<=t1+0.15);
+  if(!near.length) return false;
   const hi=Math.max(...near.map(f=>f.rms||0));
+  if(!(hi>0)) return false;
+  let between=frames.filter(f=>f && f.t>=t0-1e-6 && f.t<t1+1e-6);
+  // Two notes can meet with no frame strictly between them — a piano key struck
+  // again leaves no unvoiced gap, just a trough. Widen to a window around the
+  // join so the trough is still measurable rather than assuming a continuation.
+  if(!between.length) between=frames.filter(f=>f && f.t>=t0-0.04 && f.t<=t1+0.04);
+  if(!between.length) return false;
   const lo=Math.min(...between.map(f=>f.rms||0));
-  return hi>0 && lo<hi*REATTACK_DIP;
+  return lo<hi*REATTACK_DIP;
 }
 
 function _mergeSamePitch(notes, frames){
