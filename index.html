@@ -1818,7 +1818,7 @@ audio { display: none; }
       </div>
       <div class="brand-heatmap" id="brand-heatmap" title="Your activity"></div>
     </div>
-    <div class="brand-sub">capture before it fades <span class="brand-ver">v0.14.2</span></div>
+    <div class="brand-sub">capture before it fades <span class="brand-ver">v0.14.4</span></div>
     <button class="sidebar-close-btn" onclick="closeSidebar()" aria-label="Close">
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg>
     </button>
@@ -1871,7 +1871,7 @@ audio { display: none; }
       <div class="brand-wrap" onclick="toggleTheme()" title="Switch theme" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleTheme()}">
         <span class="brand">hum</span>
         <span class="brand-dot"></span>
-        <span class="brand-ver">v0.14.2</span>
+        <span class="brand-ver">v0.14.4</span>
       </div>
       <div style="display:flex;align-items:center;gap:4px">
         <button class="mob-settings-btn" onclick="openSettings()" title="Settings">
@@ -2275,7 +2275,7 @@ audio { display: none; }
 <div id="about-overlay">
   <div class="about-card">
     <div class="about-header">
-      <div class="about-title">Hum <span class="brand-ver" style="font-size:12px;opacity:0.5">v0.14.2</span></div>
+      <div class="about-title">Hum <span class="brand-ver" style="font-size:12px;opacity:0.5">v0.14.4</span></div>
       <div class="about-sub">Capture creative moments before they fade.</div>
     </div>
 
@@ -6195,15 +6195,26 @@ function humSegmentNotes(frames){
   // in a ±115 ms window. This catches C-C, D-D humming re-attacks that never
   // go fully silent.
   const BREAK_WIN=nf(0.115), BREAK_RATIO=0.58;
+  // A percussive re-attack digs a hole too narrow for the 32 ms envelope. The
+  // short one sees it, but on its own it would also fire on brief voice
+  // flutter, so both must agree: a deep trough in the fast envelope AND at
+  // least a visible sag in the slow one. A key released for 30 ms reads 23% and
+  // 51%; ordinary vibrato leaves the slow envelope flat and is ignored.
+  const FAST_RATIO=0.45, SLOW_CONFIRM=0.75;
   const isBoundary=frames.map((f,i)=>{
     const rms=f?.rms||0;
     if(rms<rmsFloor) return false; // absolute silence handled by gate
-    let localMax=0;
+    let localMax=0, localMaxFast=0;
     for(let j=Math.max(0,i-BREAK_WIN);j<=Math.min(frames.length-1,i+BREAK_WIN);j++){
-      if(j!==i) localMax=Math.max(localMax, frames[j]?.rms||0);
+      if(j!==i){
+        localMax=Math.max(localMax, frames[j]?.rms||0);
+        localMaxFast=Math.max(localMaxFast, frames[j]?.rmsFast||0);
+      }
     }
-    // Only fire when surrounded by noticeably louder frames
-    return localMax>rmsFloor*4 && rms<localMax*BREAK_RATIO;
+    if(!(localMax>rmsFloor*4)) return false; // must sit among noticeably louder frames
+    if(rms<localMax*BREAK_RATIO) return true;
+    const fast=f?.rmsFast||0;
+    return localMaxFast>0 && fast<localMaxFast*FAST_RATIO && rms<localMax*SLOW_CONFIRM;
   });
 
   // Median filter on MIDI values over a ±46 ms window.
@@ -6832,21 +6843,34 @@ async function swiftF0PitchTrack(blob, onProgress){
     voiced[i] = conf[i]>onset || (i>0 && voiced[i-1] && conf[i]>sustain);
   }
 
-  // RMS over a 512-sample window centred on the frame, not the raw hop: at a
-  // 16 ms hop a hop-sized window is too short to be a stable envelope, and the
-  // articulation detector downstream reads dips in this signal as re-attacks.
-  const HALF=256, frames=[];
+  // Two envelopes, because one window cannot do both jobs.
+  //
+  // 32 ms (rms) is the stable one: wide enough that vibrato and ordinary voice
+  // wobble don't read as events, which is what the silence gate and the general
+  // shape of a note need.
+  //
+  // 8 ms (rmsFast) is the sensitive one. A struck note played again is separated
+  // only by how long the key was up — 10-30 ms for a pianist at speed — and the
+  // wide window smears that away. Measured on a re-struck note with a 30 ms key
+  // release: the trough reads 51% of local peak at 32 ms and 23% at 8 ms, and
+  // the attack that follows is a 31% jump against a 70% one. Since the merge
+  // rule's threshold sits at 50%, the wide window was deciding that case by a
+  // single percentage point.
+  const HALF=256, HALF_FAST=64, frames=[];
   for(let i=0;i<N;i++){
     const c0=Math.round(i*SF0_HOP+SF0_CENTER);
     let s=0,n=0;
     for(let k=Math.max(0,c0-HALF);k<Math.min(c0+HALF,sig.length);k++){ s+=sig[k]*sig[k]; n++; }
     const rms=n?Math.sqrt(s/n):0;
+    let sf=0,nf=0;
+    for(let k=Math.max(0,c0-HALF_FAST);k<Math.min(c0+HALF_FAST,sig.length);k++){ sf+=sig[k]*sig[k]; nf++; }
+    const rmsFast=nf?Math.sqrt(sf/nf):0;
     const t=Math.round((c0/SF0_SR)*1000)/1000;
     const f=pitchHz[i], cf=conf[i];
     if(voiced[i]){
-      frames.push({t, freq:Math.round(f*10)/10, midi:Math.round(69+12*Math.log2(f/440)), conf:Math.round(cf*100)/100, rms});
+      frames.push({t, freq:Math.round(f*10)/10, midi:Math.round(69+12*Math.log2(f/440)), conf:Math.round(cf*100)/100, rms, rmsFast});
     } else {
-      frames.push({t, freq:0, midi:-1, conf:0, rms});
+      frames.push({t, freq:0, midi:-1, conf:0, rms, rmsFast});
     }
   }
   onProgress?.(1);
@@ -6931,7 +6955,11 @@ const REATTACK_DIP=0.50;
 function _reattacked(frames, t0, t1){
   const near=frames.filter(f=>f && f.t>=t0-0.15 && f.t<=t1+0.15);
   if(!near.length) return false;
-  const hi=Math.max(...near.map(f=>f.rms||0));
+  // Measured on the short envelope: this decision is about a narrow trough, and
+  // the wide one smears a re-struck key's 10-30 ms key-up down to the far side
+  // of the threshold.
+  const E=f=>(f&&f.rmsFast!=null)?f.rmsFast:(f?f.rms:0)||0;
+  const hi=Math.max(...near.map(E));
   if(!(hi>0)) return false;
   let between=frames.filter(f=>f && f.t>=t0-1e-6 && f.t<t1+1e-6);
   // Two notes can meet with no frame strictly between them — a piano key struck
@@ -6939,7 +6967,7 @@ function _reattacked(frames, t0, t1){
   // join so the trough is still measurable rather than assuming a continuation.
   if(!between.length) between=frames.filter(f=>f && f.t>=t0-0.04 && f.t<=t1+0.04);
   if(!between.length) return false;
-  const lo=Math.min(...between.map(f=>f.rms||0));
+  const lo=Math.min(...between.map(E));
   return lo<hi*REATTACK_DIP;
 }
 
