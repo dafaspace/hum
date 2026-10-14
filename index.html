@@ -1213,6 +1213,17 @@ body {
 .note-take-mini-btn:hover { border-color: var(--warm); color: var(--warm2); }
 .note-take-mini-btn:disabled { opacity: 0.5; cursor: default; }
 .note-take-melody { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--paper4); }
+.inbox-line { margin-top: 6px; font-family: var(--sans); font-size: 11px; color: var(--ink3); display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; line-height: 1.4; }
+.inbox-ok { color: var(--sage); display: inline-flex; align-items: center; gap: 4px; font-weight: 500; }
+.inbox-name { color: var(--ink3); overflow-wrap: anywhere; }
+.inbox-err { color: var(--rose); }
+.inbox-btn { position: relative; display: inline-flex; align-items: center; justify-content: center; line-height: 1; font-family: var(--sans); font-size: 11px; padding: 8px 14px; border-radius: 7px; border: 1px solid var(--warm); background: var(--warm-soft); color: var(--warm2); cursor: pointer; text-box: trim-both cap alphabetic; }
+/* 44px touch floor without a bigger-looking button: invisible hit-slop, the house pattern */
+.inbox-btn::after { content: ''; position: absolute; inset: -9px -4px; }
+.inbox-how { margin-top: 10px; font-family: var(--sans); font-size: 12px; color: var(--ink2); }
+.inbox-how summary { cursor: pointer; color: var(--warm2); padding: 6px 0; }
+.inbox-how p { margin: 6px 0; line-height: 1.55; }
+.inbox-how a { color: var(--warm2); }
 .note-take-melody .note-take-transcript-head { margin-bottom: 6px; }
 
 
@@ -1818,7 +1829,7 @@ audio { display: none; }
       </div>
       <div class="brand-heatmap" id="brand-heatmap" title="Your activity"></div>
     </div>
-    <div class="brand-sub">capture before it fades <span class="brand-ver">v0.14.4</span></div>
+    <div class="brand-sub">capture before it fades <span class="brand-ver">v0.15</span></div>
     <button class="sidebar-close-btn" onclick="closeSidebar()" aria-label="Close">
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg>
     </button>
@@ -1871,7 +1882,7 @@ audio { display: none; }
       <div class="brand-wrap" onclick="toggleTheme()" title="Switch theme" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleTheme()}">
         <span class="brand">hum</span>
         <span class="brand-dot"></span>
-        <span class="brand-ver">v0.14.4</span>
+        <span class="brand-ver">v0.15</span>
       </div>
       <div style="display:flex;align-items:center;gap:4px">
         <button class="mob-settings-btn" onclick="openSettings()" title="Settings">
@@ -2208,6 +2219,28 @@ audio { display: none; }
       <div class="settings-hint">Alternative to Groq. Used only if no Groq key. Stored locally only.</div>
     </div>
     <hr class="settings-sep">
+    <div class="settings-section-title">DAW Inbox</div>
+    <div class="settings-hint" style="margin-top:0;margin-bottom:10px">Every take you record goes to a <strong>Hum Inbox</strong> folder in your Google Drive: a WAV, and a MIDI file with the same name when Hum hears a melody. Add the folder to your DAW's browser once, and new ideas are simply there. Takes recorded from now on; nothing older is sent.</div>
+    <div class="gd-btn-row" id="inbox-off-row">
+      <button class="gd-small-btn primary" onclick="inboxTurnOn()">Turn on</button>
+    </div>
+    <div id="inbox-on-row" style="display:none">
+      <div class="settings-hint" id="inbox-status" style="margin-top:0;color:var(--ink2)"></div>
+      <div class="gd-btn-row">
+        <a class="gd-small-btn" id="inbox-open-link" target="_blank" rel="noopener" style="display:none;text-decoration:none">Open folder in Drive</a>
+        <button class="gd-small-btn" onclick="inboxKick(true)">Send waiting takes</button>
+        <button class="gd-small-btn danger" onclick="inboxTurnOff()">Turn off</button>
+      </div>
+    </div>
+    <details class="inbox-how">
+      <summary>Add the folder to your DAW</summary>
+      <p>On the computer, install <a href="https://www.google.com/drive/download/" target="_blank" rel="noopener">Google Drive for desktop</a> and sign in with the same account. The folder appears under Google Drive › My Drive › Hum Inbox, in Finder or Explorer.</p>
+      <p><strong>Ableton Live:</strong> in the browser, Places › Add Folder, and pick Hum Inbox.<br>
+      <strong>FL Studio:</strong> Options › File settings › Browser extra search folders.<br>
+      <strong>Logic Pro and others:</strong> open the folder in the DAW's file browser, or keep a Finder window on it and drag.</p>
+      <p>The WAV is what you sang. The MIDI is Hum's transcription of it: check it before you build on it.</p>
+    </details>
+    <hr class="settings-sep">
     <div class="settings-section-title">Storage</div>
     <div id="storage-state" class="storage-state"></div>
     <div class="settings-hint" id="storage-detail" style="margin-top:6px"></div>
@@ -2275,7 +2308,7 @@ audio { display: none; }
 <div id="about-overlay">
   <div class="about-card">
     <div class="about-header">
-      <div class="about-title">Hum <span class="brand-ver" style="font-size:12px;opacity:0.5">v0.14.4</span></div>
+      <div class="about-title">Hum <span class="brand-ver" style="font-size:12px;opacity:0.5">v0.15</span></div>
       <div class="about-sub">Capture creative moments before they fade.</div>
     </div>
 
@@ -3140,6 +3173,12 @@ function migrateMediaArray(){
 
 // ── GOOGLE DRIVE SYNC ──
 const GD_SCOPE='https://www.googleapis.com/auth/drive.file';
+// Hum's own OAuth client. A client id is public by design (every web app that
+// signs in with Google ships one); it is only accepted from the origins it was
+// registered for. Before this, connecting meant creating a Google Cloud project
+// by hand, which no one recording an idea on their phone is going to do.
+const HUM_GD_CLIENT_ID='788086541587-nodid0a7da5l43mvs3jl3porp9a5badu.apps.googleusercontent.com';
+function _gdClientId(){ return settings.gdClientId||HUM_GD_CLIENT_ID; }
 let _gdToken=null, _gdTokenExp=0, _gdVaultId=null;
 let _gdInboxId=null, _gdProjectsRootId=null;
 const _gdProjectFolderIds=new Map(); // projectId → Drive folder id
@@ -3155,7 +3194,7 @@ function gdRequestToken(){
   return new Promise((resolve,reject)=>{
     if(!window.google?.accounts?.oauth2){ reject(new Error('Google Identity Services not loaded')); return; }
     const client=google.accounts.oauth2.initTokenClient({
-      client_id: settings.gdClientId, scope: GD_SCOPE,
+      client_id: _gdClientId(), scope: GD_SCOPE,
       callback(resp){
         if(resp.error){ reject(new Error(resp.error_description||resp.error)); return; }
         _gdToken=resp.access_token; _gdTokenExp=Date.now()+resp.expires_in*1000;
@@ -3190,7 +3229,42 @@ async function gdFindFile(name,parentId){
   const r=await gdFetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id)&spaces=drive`);
   const d=await r.json(); return d.files?.[0]?.id||null;
 }
+// Resumable upload. Google's rule: multipart is for files of 5 MB or less;
+// resumable is for anything larger and "when there's a high chance of network
+// interruption, such as when creating a file from a mobile app". A minute of WAV
+// is 5.8 MB. On interruption it asks Drive how much arrived and continues from
+// there; the session itself stays valid for a week.
+async function gdResumableUpload(name,blob,mimeType,parentId){
+  const init=await gdFetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id',{
+    method:'POST',
+    headers:{'Content-Type':'application/json; charset=UTF-8','X-Upload-Content-Type':mimeType,'X-Upload-Content-Length':String(blob.size)},
+    body:JSON.stringify({name,mimeType,parents:[parentId]})
+  });
+  const session=init.headers.get('Location');
+  if(!session) throw new Error('Drive returned no upload session');
+  let from=0;
+  for(let attempt=0;attempt<6;attempt++){
+    try{
+      const r=await fetch(session,{method:'PUT',
+        headers:{'Content-Range':`bytes ${from}-${blob.size-1}/${blob.size}`},body:blob.slice(from)});
+      if(r.status===200||r.status===201) return (await r.json()).id;
+      if(r.status!==308&&r.status<500) throw Object.assign(new Error(`Drive ${r.status}`),{fatal:true});
+    }catch(err){ if(err.fatal) throw err; }
+    await new Promise(res=>setTimeout(res,1000*(attempt+1)));
+    let q;
+    try{ q=await fetch(session,{method:'PUT',headers:{'Content-Range':`bytes */${blob.size}`}}); }
+    catch(_){ continue; } // still offline - wait and ask again
+    if(q.status===200||q.status===201) return (await q.json()).id;
+    if(q.status===404) throw new Error('Upload session expired');
+    const range=q.headers.get('Range'); // "bytes=0-N" or absent when nothing arrived
+    from=range?parseInt(range.split('-')[1],10)+1:0;
+  }
+  throw new Error('Upload interrupted too often');
+}
 async function gdUpload(name,blob,mimeType,parentId,existId){
+  // New files over the multipart ceiling go resumable. Before this, every take
+  // over 5 MB failed to sync and the error only surfaced as a toast.
+  if(!existId&&blob.size>4.5*1024*1024) return gdResumableUpload(name,blob,mimeType,parentId);
   const form=new FormData();
   const meta=existId?{}:{name,parents:[parentId]};
   form.append('metadata',new Blob([JSON.stringify(meta)],{type:'application/json'}));
@@ -3388,6 +3462,228 @@ function updateGdUi(){
   if(cidInput) cidInput.disabled=connected;
   updateGdStatus();
 }
+// ── DAW INBOX ──
+// The job Hum is built around: a take recorded on the phone turns up, on its
+// own, in a folder the DAW already shows - as audio, and as notes when Hum
+// hears a melody. Found by reading what composers had built by hand: eight of
+// them, over five years, each with a private chain (mail to self, a text to
+// self, Dropbox to a Folder Action to an iTunes playlist) for this one move.
+//
+// What is promised and what is not:
+//  * the audio arriving is a guarantee - a take is only marked delivered when
+//    Drive has returned a file id, and it is retried until it does;
+//  * the notes are a transcription, named as one, and never block the audio.
+// Files are never deleted from Drive by Hum: a DAW session may point at them.
+const INBOX_FOLDER='Hum Inbox';
+const _inboxDrive={
+  ready(){ return gdTokenValid(); },
+  async connect(){
+    loadGsi();
+    for(let i=0;i<30&&!window.google?.accounts?.oauth2;i++) await new Promise(r=>setTimeout(r,300));
+    if(!window.google?.accounts?.oauth2) throw new Error('Google sign-in did not load');
+    await gdAuth();
+  },
+  async folder(){
+    if(!settings.inboxFolderId){
+      settings.inboxFolderId=await gdFindOrCreateFolder(INBOX_FOLDER,null);
+      try{ localStorage.setItem(ST,JSON.stringify(settings)); }catch(_){}
+    }
+    return settings.inboxFolderId;
+  },
+  forgetFolder(){ settings.inboxFolderId=null; try{ localStorage.setItem(ST,JSON.stringify(settings)); }catch(_){} },
+  async find(name,folderId){ return gdFindFile(name,folderId); },
+  async create(name,blob,mime,folderId){ return gdResumableUpload(name,blob,mime,folderId); },
+  async replace(fileId,name,blob,mime){
+    const form=new FormData();
+    form.append('metadata',new Blob([JSON.stringify({name})],{type:'application/json'}));
+    form.append('file',blob);
+    await gdFetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart`,{method:'PATCH',body:form});
+  },
+};
+let _inboxT=_inboxDrive;
+function _inboxSetTransport(t){ _inboxT=t||_inboxDrive; } // tests swap in a fake
+
+// Names are identifiers a DAW session will point at, so they are decided once,
+// at the first send, and never change. Only facts go in: the moment, the title
+// if the user gave one, the take, and a tempo only when a count-in made it exact.
+// No key: Hum's key is an estimate, and a filename that states a guess as fact
+// is worse than one that says nothing.
+function _inboxStamp(ts){
+  const d=new Date(ts), p=n=>String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}${p(d.getMinutes())}`;
+}
+function _inboxTitle(t){ return String(t||'').replace(/[\/\\:*?"<>|\x00-\x1f]/g,' ').replace(/\s+/g,' ').trim().slice(0,40).trim(); }
+function _inboxBase(e,m,n){
+  const parts=[_inboxStamp(m.ts||e.ts)];
+  const t=_inboxTitle(e.name); if(t) parts.push(t);
+  if((m.take||1)>1) parts.push('take '+m.take);
+  if(n>1) parts.push(String(n));
+  return parts.join(' ');
+}
+// The audio is at the tempo it was sung; the notes at the tempo they are
+// delivered at. With "sing at 60, save as 120" those differ, and each file
+// says its own.
+function _inboxWavName(base,m){ return base+(m.tempoLocked&&m.tempoBpm?` ${m.tempoBpm}bpm`:'')+'.wav'; }
+function _inboxMidName(base,m){ const o=m.tempoLocked?_takeOutBpm(m):null; return base+(o?` ${o}bpm`:'')+'.mid'; }
+function _inboxSig(m){
+  const s=JSON.stringify([(m.midi||[]).map(n=>[n.t,n.d,n.p]),_takeOutBpm(m)||120]);
+  let h=5381; for(let i=0;i<s.length;i++) h=((h<<5)+h+s.charCodeAt(i))|0;
+  return String(h>>>0);
+}
+async function _wavFromBlob(blob){
+  const ctx=new (window.AudioContext||window.webkitAudioContext)();
+  let buf; try{ buf=await ctx.decodeAudioData(await blob.arrayBuffer()); } finally{ try{ ctx.close(); }catch(_){} }
+  return audioBufferToWav(buf);
+}
+function _inboxAllTakes(){
+  const out=[];
+  for(const e of entries) for(const m of (e.media||[])) if(m.type==='audio'&&m.inbox) out.push([e,m]);
+  return out;
+}
+function _inboxNeedsWork(m){
+  const ib=m.inbox; if(!ib) return false;
+  if(ib.state!=='done') return true;
+  return Array.isArray(m.midi)&&m.midi.length>0&&_inboxSig(m)!==ib.midSig;
+}
+
+async function _inboxSendTake(e,m){
+  const ib=m.inbox;
+  ib.state='sending'; ib.err=null; _inboxPaint(m);
+  try{
+    let folder=await _inboxT.folder();
+    if(!ib.base){
+      let n=1, base=_inboxBase(e,m,1);
+      // A file already there under this name belongs to another take recorded
+      // the same minute: step aside rather than overwrite it.
+      while(await _inboxT.find(_inboxWavName(base,m),folder)) base=_inboxBase(e,m,++n);
+      ib.base=base; persistSoon();
+    }
+    if(!ib.wavId){
+      const rec=await idbGet(m.id); if(!rec?.blob) throw new Error('audio missing on this device');
+      const mime=rec.mimeType||rec.blob.type||'';
+      const wav=/wav/i.test(mime)?rec.blob:await _wavFromBlob(rec.blob);
+      // The base is ours by now, so a file with this exact name is a previous
+      // attempt that finished after the app was closed. Adopt it, don't upload twice.
+      try{ ib.wavId=(await _inboxT.find(_inboxWavName(ib.base,m),folder))
+                  ||await _inboxT.create(_inboxWavName(ib.base,m),wav,'audio/wav',folder); }
+      catch(err){
+        // The folder was deleted in Drive: make it again, once.
+        if(!/Drive 404/.test(err.message||'')) throw err;
+        _inboxT.forgetFolder?.(); folder=await _inboxT.folder();
+        ib.wavId=await _inboxT.create(_inboxWavName(ib.base,m),wav,'audio/wav',folder);
+      }
+      persistSoon();
+    }
+    // What Hum shows is what lands in the DAW: the notes are produced here only
+    // if the take has none yet, and then kept on the take like any analysis.
+    if(!Array.isArray(m.midi)){
+      const rec=await idbGet(m.id);
+      const res=await _analyseTakeBlob(rec.blob,e,m,null);
+      m.midi=res.notes; m.midiOriginal=JSON.parse(JSON.stringify(res.notes));
+      if(res.stats) m.midiStats=res.stats;
+      if(capEntry===e) refreshTakeMelody(m.id);
+    }
+    if(m.midi.length){
+      const name=_inboxMidName(ib.base,m), sig=_inboxSig(m);
+      const blob=notesToMidiBlob(m.midi,_takeOutBpm(m)||120);
+      if(!ib.midId){
+        // Adopt a file left by an interrupted attempt, but rewrite it: the notes
+        // may have been edited since it was written.
+        const found=await _inboxT.find(name,folder);
+        if(found){ ib.midId=found; await _inboxT.replace(found,name,blob,'audio/midi'); }
+        else ib.midId=await _inboxT.create(name,blob,'audio/midi',folder);
+      }
+      else if(ib.midSig!==sig||ib.midName!==name) await _inboxT.replace(ib.midId,name,blob,'audio/midi');
+      ib.midSig=sig; ib.midName=name;
+    }
+    ib.state='done'; ib.ts=Date.now();
+  }catch(err){
+    const msg=String(err&&err.message||err);
+    const offline=navigator.onLine===false||/Failed to fetch|NetworkError|Load failed|network|interrupted/i.test(msg);
+    ib.state=offline?'offline':'error'; ib.err=msg.slice(0,140);
+  }
+  persistSoon(); _inboxPaint(m);
+}
+
+let _inboxBusy=null, _inboxAgain=false;
+// Never during a recording: the pitch model blocks the main thread for up to a
+// second, and capture comes first. Stopping a take kicks the queue again.
+function inboxKick(interactive){
+  if(!settings.inboxOn) return Promise.resolve();
+  if(_inboxBusy){ _inboxAgain=true; return _inboxBusy; }
+  if(capRecording||capCountingIn) return Promise.resolve();
+  const pending=_inboxAllTakes().filter(([,m])=>_inboxNeedsWork(m));
+  if(!pending.length) return Promise.resolve();
+  // .finally() rather than try/finally inside the async body: when the body
+  // returns before its first await (no sign-in yet), an inner finally runs
+  // synchronously, BEFORE _inboxBusy is assigned - which then pins it to a
+  // settled promise for good, and the queue never runs again. Found by tests.html.
+  _inboxBusy=(async()=>{
+    {
+      if(!_inboxT.ready()){
+        // A Google sign-in popup can only be opened by a tap. Without one, mark
+        // the takes and let the user's next tap on "Send" do it.
+        if(!interactive){ pending.forEach(([,m])=>{ if(m.inbox.state!=='done') m.inbox.state='auth'; m.inbox.needsTap=true; _inboxPaint(m); }); return; }
+        try{ await _inboxT.connect(); }catch(err){ toast('Google: '+(err.message||'not connected')); return; }
+      }
+      for(const [e,m] of pending){
+        if(capRecording||capCountingIn) break;
+        m.inbox.needsTap=false;
+        await _inboxSendTake(e,m);
+      }
+    }
+  })().finally(()=>{
+    _inboxBusy=null;
+    if(_inboxAgain){ _inboxAgain=false; setTimeout(()=>inboxKick(false),300); }
+  });
+  return _inboxBusy;
+}
+let _inboxSoonT=null;
+function inboxSoon(){ if(!settings.inboxOn) return; clearTimeout(_inboxSoonT); _inboxSoonT=setTimeout(()=>inboxKick(false),1500); }
+
+function _inboxLineHtml(m){
+  const ib=m.inbox; if(!ib) return '';
+  const send=`<button class="inbox-btn" onclick="inboxKick(true)">Send</button>`;
+  const files=()=>escHtml(_inboxWavName(ib.base||'',m))+(ib.midId?' + .mid':'');
+  if(ib.state==='done'){
+    const stale=_inboxNeedsWork(m);
+    return `<span class="inbox-ok"><svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M3 8l3 3 7-7"/></svg>In Hum Inbox</span> <span class="inbox-name">${files()}</span>`
+      +(stale?` <span class="inbox-wait">notes changed</span> ${ib.needsTap?send:''}`:'');
+  }
+  if(ib.state==='sending') return `<span class="inbox-wait">Sending to Hum Inbox…</span>`;
+  if(ib.state==='offline') return `<span class="inbox-wait">Hum Inbox: waiting for network</span> ${send}`;
+  if(ib.state==='auth') return `<span class="inbox-wait">Hum Inbox: one tap to sign in to Google</span> ${send}`;
+  if(ib.state==='error') return `<span class="inbox-err">Hum Inbox: not sent (${escHtml(ib.err||'error')})</span> ${send}`;
+  return `<span class="inbox-wait">Hum Inbox: queued</span>`;
+}
+function _inboxPaint(m){ const el=document.getElementById('inbox-'+m.id); if(el) el.innerHTML=_inboxLineHtml(m); }
+
+async function inboxTurnOn(){
+  settings.inboxOn=true; try{ localStorage.setItem(ST,JSON.stringify(settings)); }catch(_){}
+  inboxPaintSettings('Connecting to Google…');
+  try{ await _inboxT.connect(); await _inboxT.folder(); toast('Hum Inbox is on'); }
+  catch(err){ settings.inboxOn=false; try{ localStorage.setItem(ST,JSON.stringify(settings)); }catch(_){} toast('Google: '+(err.message||'not connected')); }
+  inboxPaintSettings();
+}
+function inboxTurnOff(){
+  settings.inboxOn=false; try{ localStorage.setItem(ST,JSON.stringify(settings)); }catch(_){}
+  inboxPaintSettings(); toast('Hum Inbox is off. Files already sent stay in Drive.');
+}
+function inboxPaintSettings(busy){
+  const on=!!settings.inboxOn;
+  const off=document.getElementById('inbox-off-row'), onRow=document.getElementById('inbox-on-row');
+  if(off) off.style.display=on?'none':'';
+  if(onRow) onRow.style.display=on?'':'none';
+  const st=document.getElementById('inbox-status'); if(!st) return;
+  if(busy){ st.textContent=busy; return; }
+  const all=_inboxAllTakes(), sent=all.filter(([,m])=>m.inbox.state==='done').length, wait=all.length-sent;
+  st.textContent=on?`New takes go to Google Drive › ${INBOX_FOLDER}. ${sent} sent${wait?`, ${wait} waiting`:''}.`:'';
+  const link=document.getElementById('inbox-open-link');
+  if(link){ link.style.display=settings.inboxFolderId?'':'none'; if(settings.inboxFolderId) link.href='https://drive.google.com/drive/folders/'+encodeURIComponent(settings.inboxFolderId); }
+}
+window.addEventListener('online',()=>inboxKick(false));
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') inboxKick(false); });
+
 // Auto-push after save (only if token already valid — no popup)
 let _gdSyncTimer=null;
 function scheduleGdPush(){
@@ -4878,7 +5174,8 @@ async function onCapRecStop(){
   // Legacy takes have no .take field but render positionally (i+1); count them so numbers don't collide
   const audioTakes=(capEntry.media||[]).filter(x=>x.type==='audio');
   const nextTake=Math.max(0, audioTakes.length, ...audioTakes.map(x=>x.take||0))+1;
-  const mediaItem={id:mid, type:'audio', mimeType:mime, duration:dur||null, take:nextTake};
+  const mediaItem={id:mid, type:'audio', mimeType:mime, duration:dur||null, take:nextTake, ts:Date.now()};
+  if(settings.inboxOn) mediaItem.inbox={state:'queued'}; // forward only: switching on never dumps the archive
   if(lockedBpm){
     mediaItem.tempoBpm=lockedBpm; mediaItem.tempoLocked=true; // exact tempo, not estimated
     mediaItem.outBpm=capRecTargetBpm||lockedBpm;              // tempo the melody is delivered at
@@ -4896,6 +5193,7 @@ async function onCapRecStop(){
   }
   try{ persist(); }catch(_){ toast('Storage full'); return; }
   scheduleGdPush();
+  inboxSoon();
   const target=capEntry;
   // If the note was closed while encoding finished, surface the entry in the grid instead
   const noteOpen=document.getElementById('capture-overlay')?.style.display!=='none';
@@ -5280,6 +5578,7 @@ function renderNoteTakes(){
         <button id="spd-${m.id}" class="spd-btn" onclick="cycleSpeed('${m.id}')">1×</button>
       </div>
       <audio id="da-${m.id}" data-mid="${m.id}"></audio>
+      ${m.inbox?`<div class="inbox-line" id="inbox-${m.id}">${_inboxLineHtml(m)}</div>`:''}
       ${trBlock}
       ${isLegacy?'':`<div id="melblock-${m.id}">${_takeMelodyHtml(m)}</div>`}
     </div>`;
@@ -5444,6 +5743,7 @@ function _takeMelodyHtml(m){
 // Refresh only one take's melody block — leaves the <audio> player (and its playback) untouched
 function refreshTakeMelody(mid){
   const m=_findTakeMedia(mid); if(!m) return;
+  if(m.inbox) inboxSoon(); // edited notes follow the take into the DAW folder
   const block=document.getElementById('melblock-'+mid);
   if(block) block.innerHTML=_takeMelodyHtml(m);
   else renderNoteTakes();
@@ -5994,6 +6294,10 @@ function _txKey(){ return settings.groqKey||settings.openaiKey||''; }
 function openAbout(){ document.getElementById('about-overlay').classList.add('show'); }
 function closeAbout(){ document.getElementById('about-overlay').classList.remove('show'); }
 function openSettings(){
+  setTimeout(()=>inboxPaintSettings(),0);
+  // Load Google sign-in now, not on the tap: Safari only lets a popup open in the
+  // first moment after a tap, and fetching the script first would spend it.
+  loadGsi();
   document.getElementById('username').value=settings.username||'';
   document.getElementById('groq-key').value=settings.groqKey||'';
   document.getElementById('openai-key').value=settings.openaiKey||'';
@@ -6660,23 +6964,19 @@ function playMelodyNotes(notes, btn, mid){
 // Loads basic-pitch + midi-writer-js lazily from esm.sh on first use.
 // Model & libs are browser-cached after initial download (~10 MB total).
 
-let _bpLibs=null; // {pitch, noteFramesToTime, addPitchBendsToNoteEvents, outputToNotesPoly, MidiWriter}
+let _bpLibs=null; // {pitch, noteFramesToTime, addPitchBendsToNoteEvents, outputToNotesPoly}
 
 async function loadAudioToMidiLibs(onStatus){
   if(_bpLibs) return _bpLibs;
   onStatus?.('Loading basic-pitch + TensorFlow.js…');
-  const [bp, mw] = await Promise.all([
-    import('https://esm.sh/@spotify/basic-pitch@1.0.1'),
-    import('https://esm.sh/midi-writer-js@3.1.1')
-  ]);
+  const bp=await import('https://esm.sh/@spotify/basic-pitch@1.0.1');
   onStatus?.('Initialising model…');
   const modelUrl='https://cdn.jsdelivr.net/npm/@spotify/basic-pitch@1.0.1/model/model.json';
   _bpLibs={
     pitch: new bp.BasicPitch(modelUrl),
     noteFramesToTime: bp.noteFramesToTime,
     addPitchBendsToNoteEvents: bp.addPitchBendsToNoteEvents,
-    outputToNotesPoly: bp.outputToNotesPoly,
-    MidiWriter: mw.default||mw
+    outputToNotesPoly: bp.outputToNotesPoly
   };
   return _bpLibs;
 }
@@ -6725,29 +7025,37 @@ async function generateMidi(blob, onStatus){
   }));
 }
 
-function notesToMidiBlob(notes, bpm){
-  const MidiWriter=_bpLibs?.MidiWriter; if(!MidiWriter) throw new Error('Libs not loaded');
-  const tempo=bpm||120;
-  const TPQ=128; // midi-writer-js default ticks per quarter
-  const ticksPerSec=(tempo/60)*TPQ;
-  const track=new MidiWriter.Track();
-  track.setTempo(tempo);
-  notes.forEach(n=>{
-    const startTick=Math.round(n.t*ticksPerSec);
-    const durTicks=Math.max(1,Math.round(n.d*ticksPerSec));
-    track.addEvent(new MidiWriter.NoteEvent({
-      pitch:[n.p],
-      duration:'T'+durTicks,
-      startTick,
-      velocity:n.v
-    }));
-  });
-  const writer=new MidiWriter.Writer([track]);
-  // buildFile() returns Uint8Array in v3, string in older
-  const data=writer.buildFile();
-  const arr=typeof data==='string' ? Uint8Array.from(data, c=>c.charCodeAt(0)) : data;
-  return new Blob([arr],{type:'audio/midi'});
+// A Standard MIDI File written by hand: type 0, one track, 480 ticks per quarter.
+// It replaces midi-writer-js, which Hum could only load bundled with basic-pitch
+// and TensorFlow.js - over a megabyte, unavailable offline - to write a few hundred
+// bytes. The DAW Inbox writes a .mid after every take, so this path has to work
+// with no network and nothing else loaded. tests.html reads the output back with
+// an independent parser (@tonejs/midi) to keep it honest.
+function _smfBytes(notes, bpm){
+  const PPQ=480, tempo=bpm||120, tps=PPQ*tempo/60;
+  const ev=[];
+  for(const n of notes||[]){
+    const p=Math.max(0,Math.min(127,Math.round(n.p)));
+    const v=Math.max(1,Math.min(127,Math.round(n.v||96)));
+    const on=Math.max(0,Math.round(n.t*tps));
+    const off=Math.max(on+1,Math.round((n.t+n.d)*tps));
+    // At the same tick a note-off sorts before a note-on, so a repeated pitch
+    // ends cleanly before it starts again instead of being cut short.
+    ev.push([on,1,[0x90,p,v]],[off,0,[0x80,p,0]]);
+  }
+  ev.sort((a,b)=>a[0]-b[0]||a[1]-b[1]);
+  const vlq=x=>{ const b=[x&0x7F]; while(x>>=7) b.unshift((x&0x7F)|0x80); return b; };
+  const us=Math.round(60000000/tempo);
+  const trk=[0x00,0xFF,0x51,0x03,(us>>16)&255,(us>>8)&255,us&255,   // tempo
+             0x00,0xFF,0x58,0x04,4,2,24,8];                          // 4/4
+  let last=0;
+  for(const [t,,b] of ev){ trk.push(...vlq(t-last),...b); last=t; }
+  trk.push(0x00,0xFF,0x2F,0x00);
+  const u32=x=>[(x>>>24)&255,(x>>>16)&255,(x>>>8)&255,x&255];
+  return new Uint8Array([0x4D,0x54,0x68,0x64,...u32(6),0,0,0,1,(PPQ>>8)&255,PPQ&255,
+                         0x4D,0x54,0x72,0x6B,...u32(trk.length),...trk]);
 }
+function notesToMidiBlob(notes, bpm){ return new Blob([_smfBytes(notes,bpm)],{type:'audio/midi'}); }
 
 function midiToNoteName(midi){
   const names=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
@@ -7080,6 +7388,29 @@ function setTakeMode(mid, mode){
   refreshTakeMelody(mid);
 }
 // Analyse ONE take (audio media item) → store melody on that media item.
+// Audio blob → notes at the tempo the idea is delivered at. No UI: the Analyse
+// button and the DAW Inbox both call this, so what Hum shows and what lands in
+// the DAW cannot drift apart.
+async function _analyseTakeBlob(blob, e, m, onStatus){
+  const bpm=m.tempoBpm||(e&&e.bpm)||null;
+  const opts={bpm, tempoLocked:!!m.tempoLocked, key:e&&e.key};
+  let res;
+  if(_takeMode(m)==='poly') res=await polyTranscribe(blob, opts, onStatus);
+  else {
+    try{ res=await voiceTranscribe(blob, opts, onStatus); }
+    catch(voiceErr){
+      console.warn('SwiftF0 failed, basic-pitch fallback:', voiceErr);
+      onStatus?.('Falling back to basic-pitch…');
+      res=await polyTranscribe(blob, opts, onStatus);
+    }
+  }
+  // Transcription works in the tempo that was SUNG (which is also the tempo
+  // _quantizeRhythm snapped to, where the grid is coarser and more forgiving).
+  // Only now does it become the tempo the idea is meant to live at.
+  const outBpm=_takeOutBpm(m);
+  if(res.notes.length&&bpm&&outBpm&&bpm!==outBpm) res.notes=_rescaleNotes(res.notes, bpm, outBpm);
+  return res;
+}
 async function runTakeMidi(mid){
   if(!capEntry) return;
   const m=(capEntry.media||[]).find(x=>x.id===mid)
@@ -7097,22 +7428,8 @@ async function runTakeMidi(mid){
       const rec=await idbGet(mid); blob=rec?.blob||null;
     }
     if(!blob){ toast('Audio not available'); return; }
-    const bpm=m.tempoBpm||capEntry.bpm||null;
-    const tempoLocked=!!m.tempoLocked;
-    const opts={bpm, tempoLocked, key:capEntry.key};
     const mode=_takeMode(m);
-    let res;
-    if(mode==='poly'){
-      res=await polyTranscribe(blob, opts, setStatus);
-    } else {
-      try{
-        res=await voiceTranscribe(blob, opts, setStatus);
-      }catch(voiceErr){
-        console.warn('SwiftF0 failed, basic-pitch fallback:', voiceErr);
-        setStatus('Falling back to basic-pitch…');
-        res=await polyTranscribe(blob, opts, setStatus);
-      }
-    }
+    const res=await _analyseTakeBlob(blob, capEntry, m, setStatus);
     if(!res.notes.length){
       const hint = mode==='poly'
         ? 'No notes detected. Play louder — or switch to Mono if this is a single line.'
@@ -7120,17 +7437,13 @@ async function runTakeMidi(mid){
       setStatus(res.stats?`${hint} (${res.stats.loHz}–${res.stats.hiHz} Hz, ${res.stats.voiced}/${res.stats.total} voiced)`:hint);
       return;
     }
-    // Transcription works in the tempo that was SUNG (which is also the tempo
-    // _quantizeRhythm snapped to, where the grid is coarser and more forgiving).
-    // Only now does it become the tempo the idea is meant to live at.
-    const outBpm=_takeOutBpm(m);
-    if(bpm&&outBpm&&bpm!==outBpm) res.notes=_rescaleNotes(res.notes, bpm, outBpm);
     m.midi=res.notes;
     m.midiOriginal=JSON.parse(JSON.stringify(res.notes));
     if(res.stats) m.midiStats=res.stats;
     _melSel={mid:null,idx:-1};
     try{ persist(); }catch(_){}
     renderNoteTakes();
+    inboxSoon();
     toast(`${res.notes.length} note${res.notes.length===1?'':'s'}`);
   }catch(err){
     console.error('Melody analysis failed', err);
@@ -7144,7 +7457,6 @@ async function runTakeMidi(mid){
 async function _downloadMidiNotes(notes, e, bpm){
   if(!notes||!notes.length) return;
   try{
-    if(!_bpLibs) await loadAudioToMidiLibs();
     const blob=notesToMidiBlob(notes, bpm||120);
     const url=URL.createObjectURL(blob);
     const a=document.createElement('a');
@@ -7651,8 +7963,9 @@ renderProjects();
 renderHeatmap();
 // Migrate old base64 media to IndexedDB on app load (frees localStorage)
 migrateLegacyMedia().then(()=>{ migrateMediaArray(); render(); }).catch(err=>console.warn('Media migration failed:',err));
-if(settings.gdClientId) loadGsi();
+if(settings.gdClientId||settings.inboxOn) loadGsi();
 vaultResume();
+if(settings.inboxOn) setTimeout(()=>inboxKick(false),2500);
 // Ask the browser not to evict the archive. Silent: it either quietly succeeds
 // or the Storage section in Settings shows it needs attention. Deferred so it
 // never competes with the capture button becoming usable.
