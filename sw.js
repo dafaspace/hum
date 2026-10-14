@@ -15,7 +15,7 @@
 // deleted all of it on every version bump — six times in one day of work, each
 // one silently leaving an installed app unable to analyse until it next had a
 // network. Version this only if the pinned versions above ever change.
-const SHELL = 'hum-shell-v14-4';
+const SHELL = 'hum-shell-v15';
 const ASSETS = 'hum-assets-1';
 
 const SHELL_FILES = [
