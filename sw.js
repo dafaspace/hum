@@ -15,7 +15,7 @@
 // deleted all of it on every version bump — six times in one day of work, each
 // one silently leaving an installed app unable to analyse until it next had a
 // network. Version this only if the pinned versions above ever change.
-const SHELL = 'hum-shell-v15';
+const SHELL = 'hum-shell-v15-1';
 const ASSETS = 'hum-assets-1';
 
 const SHELL_FILES = [
@@ -56,11 +56,15 @@ self.addEventListener('install', e => {
   })());
 });
 
+// Only Hum's own old caches go. dafaspace.github.io is one origin with one Cache
+// Storage shared by every app served from it (Keymood, the AstroTrip bridge), so
+// "delete everything but mine" wiped their offline copies. Every name Hum has
+// ever used starts with "hum-".
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys()
       .then(keys => Promise.all(
-        keys.filter(k => k !== SHELL && k !== ASSETS).map(k => caches.delete(k))))
+        keys.filter(k => k.startsWith('hum-') && k !== SHELL && k !== ASSETS).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
